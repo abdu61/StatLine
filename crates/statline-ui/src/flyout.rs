@@ -364,6 +364,6 @@ mod tests {
     fn height_grows_with_rows() {
         let model = model(&snapshot(), &History::default());
         assert!(height(&model, 1.0) > 2.0 * 46.0);
-        assert_eq!(height(&Model::default(), 1.0) > 0.0, true);
+        assert!(height(&Model::default(), 1.0) > 0.0);
     }
 }
