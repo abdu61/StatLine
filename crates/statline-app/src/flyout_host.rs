@@ -24,6 +24,7 @@ pub struct Flyout {
     /// Module the panel was opened from; drives the highlight and sort order.
     focus: Option<flyout::Focus>,
     units: UnitSystem,
+    mica: bool,
     /// Strip rectangle the panel is anchored to, kept for height changes.
     anchor: RECT,
     scale: f32,
@@ -40,6 +41,7 @@ impl Flyout {
             model: Model::default(),
             focus: None,
             units: UnitSystem::Binary,
+            mica: false,
             anchor: RECT::default(),
             scale,
             palette,
@@ -60,6 +62,11 @@ impl Flyout {
     /// Change the byte units; the next refresh rebuilds the strings.
     pub fn set_units(&mut self, units: UnitSystem) {
         self.units = units;
+    }
+
+    /// Match the Mica setting; the next paint makes the panel translucent.
+    pub fn set_mica(&mut self, mica: bool) {
+        self.mica = mica;
     }
 
     pub fn is_open(&self) -> bool {
@@ -187,6 +194,7 @@ impl Flyout {
                 &self.palette,
                 &self.model,
                 self.scale,
+                self.mica,
             );
         }
         if let Some(surface) = self.surface.as_ref() {

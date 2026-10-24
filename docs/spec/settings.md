@@ -16,6 +16,7 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
 
   "appearance": {
     "theme": "system",            // system | light | dark
+    "accent": "system",           // system | blue | green | purple | orange | teal | pink
     "mica": false                 // DWM Mica backdrop on framed windows
   }
 }
@@ -50,6 +51,7 @@ Tray icon or strip right-click → **Settings…**. Rows cycle on click:
 | Theme | System → Dark → Light |
 | Update interval | 500 → 1000 → 2000 → 5000 ms |
 | Units | Binary (KiB) ↔ Decimal (kB) |
+| Accent | System → Blue → Green → Purple → Orange → Teal → Pink |
 | Mica window effect | On ↔ Off (`DWMWA_SYSTEMBACKDROP_TYPE` on the framed windows) |
 | Strip placement | Right ↔ Left (left anchors past Start, clamped at the tray) |
 | Start with Windows | On ↔ Off (writes `HKCU\...\Run`) |
@@ -59,4 +61,6 @@ the next tick, and an open flyout/companion repaints with the new palette and un
 Binary is the default (KiB/MiB); decimal switches every surface to kB/MB.
 
 Mica applies to the framed companion and settings windows. The strip and flyout are
-layered windows and cannot host a DWM backdrop, so they keep their opaque panels.
+layered windows and cannot host a DWM backdrop; the flyout instead becomes lightly
+translucent when Mica is on. Turning Mica on shows a warning that DWM blur can cost GPU
+power and battery.

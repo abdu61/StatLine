@@ -98,8 +98,50 @@ impl Units {
 #[serde(default)]
 pub struct Appearance {
     pub theme: Theme,
+    /// Accent used by charts, meters and selection.
+    pub accent: Accent,
     /// Windows 11 Mica system backdrop on the framed companion/settings windows.
     pub mica: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Accent {
+    /// Follow the Windows accent colour.
+    #[default]
+    System,
+    Blue,
+    Green,
+    Purple,
+    Orange,
+    Teal,
+    Pink,
+}
+
+impl Accent {
+    pub fn next(self) -> Self {
+        match self {
+            Self::System => Self::Blue,
+            Self::Blue => Self::Green,
+            Self::Green => Self::Purple,
+            Self::Purple => Self::Orange,
+            Self::Orange => Self::Teal,
+            Self::Teal => Self::Pink,
+            Self::Pink => Self::System,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::System => "System",
+            Self::Blue => "Blue",
+            Self::Green => "Green",
+            Self::Purple => "Purple",
+            Self::Orange => "Orange",
+            Self::Teal => "Teal",
+            Self::Pink => "Pink",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -312,5 +354,18 @@ mod tests {
         assert_eq!(Units::Binary.next(), Units::Decimal);
         assert_eq!(Units::Decimal.next(), Units::Binary);
         assert_ne!(Units::Binary.label(), Units::Decimal.label());
+    }
+
+    #[test]
+    fn accent_cycles_through_every_preset() {
+        let mut accent = Accent::System;
+        let mut seen = 0;
+        for _ in 0..7 {
+            accent = accent.next();
+            seen += 1;
+        }
+        assert_eq!(seen, 7);
+        assert_eq!(accent, Accent::System);
+        assert_eq!(Accent::Green.label(), "Green");
     }
 }

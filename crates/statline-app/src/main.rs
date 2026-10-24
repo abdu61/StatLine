@@ -139,7 +139,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // build will not cooperate.
     let mut _strip = None;
     if !args.iter().any(|a| a == "--tray-only") {
-        match strip_host::Host::start(strip_host::default_palette(dark)) {
+        match strip_host::Host::start(strip_host::palette(dark, settings.appearance.accent)) {
             Ok(host) => {
                 info!("taskbar strip attached");
                 _strip = Some(host);

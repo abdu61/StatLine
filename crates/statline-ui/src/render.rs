@@ -139,15 +139,26 @@ pub fn render(
                 label_style(scale),
                 palette.text_muted,
             );
+            let tone = segment
+                .percent
+                .map(|percent| palette.value_color(percent, segment.warn, segment.critical))
+                .unwrap_or(palette.text_primary);
             let _ = text.draw(
                 surface,
                 &segment.value,
                 (left, value_top, content, value_height),
                 value_style(scale),
-                palette.text_primary,
+                tone,
             );
 
             if let Some(percent) = segment.percent {
+                let meter_tone = if segment.critical > 0.0 && percent >= segment.critical {
+                    palette.critical
+                } else if segment.warn > 0.0 && percent >= segment.warn {
+                    palette.warning
+                } else {
+                    palette.accent
+                };
                 let filled = (content * (percent.clamp(0.0, 100.0) / 100.0)).max(0.0);
                 surface.fill_round_rect(
                     left,
@@ -164,7 +175,7 @@ pub fn render(
                         filled,
                         meter_height,
                         meter_height / 2.0,
-                        palette.accent,
+                        meter_tone,
                     );
                 }
             }

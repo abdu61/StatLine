@@ -27,17 +27,18 @@ detail sampling on
 - **Flyout**: opens on strip click, toggles closed on a second click, closes on Esc or
   focus loss. A segment click shows only that module — CPU with per-core bars and the
   CPU process table, Memory with commit/cache and top memory apps, Disk with volumes,
-  Network with adapters — plus System and Battery. It is created at its final anchored
-  rect and re-anchors upward when the process table arrives, so it never grows over
-  the strip.
+  Network with adapters — plus System and Battery. Charts use the accent and turn
+  warning yellow / critical red as a value approaches its limit. It is created at its
+  final anchored rect and re-anchors upward when the process table arrives. With Mica
+  on, the panel is lightly translucent.
 - **Companion**: framed resizable window with a left nav (Dashboard, CPU, Memory, GPU,
   Disk, Network, Battery, System, Settings) and a page per module: CPU cores and process
   table, memory cache and top memory apps, per-volume and per-adapter rows. Optional
   Mica DWM backdrop on the framed windows.
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
-  with theme, sampler interval, byte units, Mica, strip placement and start-with-Windows.
-  Changes apply live and are saved atomically to `%APPDATA%\Statline\settings.json`;
-  unknown keys are ignored.
+  with theme, accent presets, sampler interval, byte units, Mica, strip placement and
+  start-with-Windows. Mica shows a GPU/battery caution. Changes apply live and are saved
+  atomically to `%APPDATA%\Statline\settings.json`; unknown keys are ignored.
 - **Packaging**: portable zip script (exe, README, changelog, licence texts) and an
   MSIX manifest with `runFullTrust` + a user-toggleable startup task. Both build locally;
   CI verifies fmt/clippy/test/deny/build and produces tag artifacts.

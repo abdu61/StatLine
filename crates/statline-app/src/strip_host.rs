@@ -6,14 +6,14 @@
 
 use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
-use statline_config::{Settings, StripPlacement, Units};
+use statline_config::{Accent, Settings, StripPlacement, Units};
 use statline_core::model::Snapshot;
 use statline_core::units::UnitSystem;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
 use statline_ui::{flyout, render, strip};
 use statline_win::menus::MenuState;
-use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar};
+use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar, theme};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::time::Duration;
 use windows::Win32::Foundation::RECT;
@@ -398,7 +398,7 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
     let Some(host) = host() else {
         return;
     };
-    let palette = default_palette(dark);
+    let palette = palette(dark, settings.appearance.accent);
     host.palette = palette;
     host.flyout.set_palette(palette);
     host.dashboard.set_palette(palette);
@@ -411,6 +411,7 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
         Units::Decimal => UnitSystem::Decimal,
     };
     host.flyout.set_units(host.units);
+    host.flyout.set_mica(settings.appearance.mica);
     host.dashboard.set_units(host.units);
     host.dashboard.set_mica(settings.appearance.mica);
     host.sampler.set_interval(Duration::from_millis(
@@ -592,7 +593,25 @@ pub unsafe extern "system" fn strip_proc(
     }
 }
 
-/// Default palette used until settings are wired (M4+).
-pub fn default_palette(dark: bool) -> Palette {
-    Palette::for_theme(dark, Color::rgb(0x4C, 0xC2, 0xFF))
+/// Default accent when the system value is unavailable.
+const FALLBACK_ACCENT: Color = Color::rgb(0x4C, 0xC2, 0xFF);
+
+/// Resolve the configured accent to a concrete colour.
+pub fn accent_color(accent: Accent) -> Color {
+    match accent {
+        Accent::System => theme::accent_rgb()
+            .map(|(r, g, b)| Color::rgb(r, g, b))
+            .unwrap_or(FALLBACK_ACCENT),
+        Accent::Blue => FALLBACK_ACCENT,
+        Accent::Green => Color::rgb(0x4A, 0xDE, 0x80),
+        Accent::Purple => Color::rgb(0xA7, 0x8B, 0xFA),
+        Accent::Orange => Color::rgb(0xFB, 0x92, 0x3C),
+        Accent::Teal => Color::rgb(0x2D, 0xD4, 0xBF),
+        Accent::Pink => Color::rgb(0xF4, 0x72, 0xB6),
+    }
+}
+
+/// Palette for a theme and accent choice.
+pub fn palette(dark: bool, accent: Accent) -> Palette {
+    Palette::for_theme(dark, accent_color(accent))
 }

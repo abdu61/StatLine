@@ -16,6 +16,8 @@ pub struct Row {
 #[derive(Debug, Clone, Default)]
 pub struct Model {
     pub rows: Vec<Row>,
+    /// Optional caution shown above the footer (e.g. Mica's resource cost).
+    pub warning: Option<String>,
     pub footer: String,
 }
 
@@ -47,7 +49,8 @@ pub fn width(scale: f32) -> f32 {
 
 /// Window height in physical pixels.
 pub fn height(model: &Model, scale: f32) -> f32 {
-    (HEADER + model.rows.len() as f32 * ROW_HEIGHT + FOOTER) * scale
+    let warning = if model.warning.is_some() { 24.0 } else { 0.0 };
+    (HEADER + model.rows.len() as f32 * ROW_HEIGHT + warning + FOOTER) * scale
 }
 
 /// Row under a client-space y coordinate, if any.
@@ -129,6 +132,16 @@ pub fn render(
         y += ROW_HEIGHT * scale;
     }
 
+    if let Some(warning) = model.warning.as_ref() {
+        let _ = text.draw(
+            surface,
+            warning,
+            (pad, y + 4.0 * scale, width - pad * 2.0, 14.0 * scale),
+            subtitle_style(scale),
+            palette.warning,
+        );
+    }
+
     let _ = text.draw(
         surface,
         &model.footer,
@@ -158,6 +171,7 @@ mod tests {
                     value: format!("{index}"),
                 })
                 .collect(),
+            warning: None,
             footer: String::new(),
         }
     }
@@ -189,5 +203,12 @@ mod tests {
     #[test]
     fn height_grows_with_rows() {
         assert!(height(&model(3), 1.0) > height(&model(2), 1.0));
+    }
+
+    #[test]
+    fn warning_adds_height() {
+        let mut with_warning = model(2);
+        with_warning.warning = Some(String::from("Mica can cost battery"));
+        assert!(height(&with_warning, 1.0) > height(&model(2), 1.0));
     }
 }

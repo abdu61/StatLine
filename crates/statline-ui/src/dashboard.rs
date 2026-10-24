@@ -267,7 +267,7 @@ fn card(
         &row.value,
         (x + w / 2.0, y + pad * 0.55, w / 2.0 - pad, 28.0 * scale),
         value_style(scale),
-        palette.text_primary,
+        row.value_color(palette),
     );
     let _ = text.draw(
         surface,
@@ -282,7 +282,7 @@ fn card(
             surface,
             &row.series,
             (x + pad, y + h - 20.0 * scale, w - pad * 2.0, 14.0 * scale),
-            palette.accent.scaled_alpha(0.75),
+            row.chart_color(palette).scaled_alpha(0.75),
             palette.meter_track,
         );
     }
@@ -626,6 +626,7 @@ mod tests {
                 value: String::from("1%"),
                 detail: String::new(),
                 series: Vec::new(),
+                ..Row::default()
             }],
             processes: vec![ProcessRow::default()],
             ..Model::default()

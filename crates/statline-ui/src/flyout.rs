@@ -44,13 +44,38 @@ impl Focus {
 }
 
 /// One card in the panel.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Row {
     pub label: &'static str,
     pub value: String,
     pub detail: String,
     /// Sparkline samples, 0..=100; empty hides the chart.
     pub series: Vec<f32>,
+    /// Current percentage used for the warning/critical colour.
+    pub current: f32,
+    /// Warning threshold (0 disables it).
+    pub warn: f32,
+    /// Critical threshold (0 disables it).
+    pub critical: f32,
+}
+
+impl Row {
+    /// Colour for the value, honouring the thresholds.
+    pub fn value_color(&self, palette: &Palette) -> Color {
+        palette.value_color(self.current, self.warn, self.critical)
+    }
+
+    /// Colour for the chart line: the accent normally, warning/critical as the
+    /// value approaches the limit.
+    pub fn chart_color(&self, palette: &Palette) -> Color {
+        if self.critical > 0.0 && self.current >= self.critical {
+            palette.critical
+        } else if self.warn > 0.0 && self.current >= self.warn {
+            palette.warning
+        } else {
+            palette.accent
+        }
+    }
 }
 
 /// One line of the process table.
@@ -139,6 +164,9 @@ pub fn model_focused(
                 value: format_percent(cpu.total_percent),
                 detail,
                 series: series(&history.cpu, cpu.total_percent),
+                current: cpu.total_percent,
+                warn: 85.0,
+                critical: 95.0,
             });
             if focus == Some(Focus::Cpu) {
                 cores = cpu.per_core_percent.clone();
@@ -159,6 +187,9 @@ pub fn model_focused(
                 value: format_percent(memory.percent()),
                 detail,
                 series: series(&history.memory, memory.percent()),
+                current: memory.percent(),
+                warn: 85.0,
+                critical: 95.0,
             });
 
             if focus == Some(Focus::Memory) && memory.cached_bytes > 0 {
@@ -195,6 +226,9 @@ pub fn model_focused(
                 value: format_percent(gpu.utilization_percent),
                 detail,
                 series: series(&history.gpu, gpu.utilization_percent),
+                current: gpu.utilization_percent,
+                warn: 90.0,
+                critical: 98.0,
             });
         }
     }
@@ -220,6 +254,9 @@ pub fn model_focused(
                 value: format_percent(disk.busy_percent),
                 detail,
                 series: Vec::new(),
+                current: disk.busy_percent,
+                warn: 90.0,
+                critical: 98.0,
             });
 
             if focus == Some(Focus::Disk) {
@@ -267,7 +304,7 @@ pub fn model_focused(
                     Some(adapter) => adapter.name.clone(),
                     None => String::from("no active adapter"),
                 },
-                series: Vec::new(),
+                ..Row::default()
             });
 
             if focus == Some(Focus::Network) {
@@ -313,6 +350,7 @@ pub fn model_focused(
             value: format_percent(battery.percent),
             detail,
             series: Vec::new(),
+            ..Row::default()
         }
     });
 
@@ -331,6 +369,7 @@ pub fn model_focused(
             value: format_temperature(thermal.system_c),
             detail,
             series: Vec::new(),
+            ..Row::default()
         }
     });
 
@@ -518,26 +557,29 @@ pub(crate) fn core_bars(
 }
 
 /// Draw the panel. Returns its size in physical pixels.
+///
+/// `mica` makes the panel lightly translucent so the taskbar shows through a
+/// little, matching the DWM backdrop on the framed windows. It is transparency,
+/// not a blur: the layered window cannot host a composition backdrop.
 pub fn render(
     surface: &mut Surface,
     text: &mut TextEngine,
     palette: &Palette,
     model: &Model,
     scale: f32,
+    mica: bool,
 ) -> (f32, f32) {
     let padding = space::L * scale;
     let width = width(scale);
     let height = height(model, scale);
 
-    surface.begin(palette.surface);
-    surface.fill_round_rect(
-        0.0,
-        0.0,
-        width,
-        height,
-        radius::PANEL * scale,
-        palette.surface,
-    );
+    let background = if mica {
+        palette.surface.with_alpha(232)
+    } else {
+        palette.surface
+    };
+    surface.begin(background);
+    surface.fill_round_rect(0.0, 0.0, width, height, radius::PANEL * scale, background);
 
     let mut y = padding;
     let _ = text.draw(
@@ -584,7 +626,7 @@ pub fn render(
                 16.0 * scale,
             ),
             value_style(scale),
-            palette.text_primary,
+            row.value_color(palette),
         );
         let _ = text.draw(
             surface,
@@ -609,7 +651,7 @@ pub fn render(
                     width - padding * 2.0,
                     16.0 * scale,
                 ),
-                palette.accent.scaled_alpha(0.75),
+                row.chart_color(palette).scaled_alpha(0.75),
                 palette.meter_track,
             );
         }
@@ -998,6 +1040,22 @@ mod tests {
             "disk detail has no per-app data"
         );
         assert_eq!(model.rows[0].label, "Disk");
+    }
+
+    #[test]
+    fn row_colours_follow_the_thresholds() {
+        let palette = Palette::dark(Color::rgb(0x00, 0x78, 0xD4));
+        let mut row = Row {
+            current: 50.0,
+            warn: 85.0,
+            critical: 95.0,
+            ..Row::default()
+        };
+        assert_eq!(row.value_color(&palette), palette.text_primary);
+        row.current = 90.0;
+        assert_eq!(row.value_color(&palette), palette.warning);
+        row.current = 99.0;
+        assert_eq!(row.value_color(&palette), palette.critical);
     }
 
     #[test]

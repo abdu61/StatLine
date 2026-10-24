@@ -74,7 +74,7 @@ fn open() -> windows::core::Result<()> {
         .appearance
         .theme
         .resolve_dark(theme::is_dark_mode());
-    let palette = strip_host::default_palette(dark);
+    let palette = strip_host::palette(dark, settings.appearance.accent);
 
     // Client area plus an allowance for the frame; render() fills the client.
     let width = settings::width(scale) as i32 + (20.0 * scale) as i32;
@@ -122,6 +122,10 @@ fn build_model(settings: &Settings) -> settings::Model {
                 value: String::from(settings.general.units.label()),
             },
             settings::Row {
+                label: "Accent",
+                value: String::from(settings.appearance.accent.label()),
+            },
+            settings::Row {
                 label: "Mica window effect",
                 value: String::from(if settings.appearance.mica {
                     "On"
@@ -142,6 +146,13 @@ fn build_model(settings: &Settings) -> settings::Model {
                 }),
             },
         ],
+        warning: if settings.appearance.mica {
+            Some(String::from(
+                "Mica blurs the desktop through DWM; it can cost GPU power and battery.",
+            ))
+        } else {
+            None
+        },
         footer: String::from("Click a row to change \u{00b7} Esc closes"),
     }
 }
@@ -172,11 +183,12 @@ impl SettingsWindow {
                     next_interval(self.settings.general.update_interval_ms)
             }
             2 => self.settings.general.units = self.settings.general.units.next(),
-            3 => self.settings.appearance.mica = !self.settings.appearance.mica,
-            4 => {
+            3 => self.settings.appearance.accent = self.settings.appearance.accent.next(),
+            4 => self.settings.appearance.mica = !self.settings.appearance.mica,
+            5 => {
                 self.settings.general.strip_placement = self.settings.general.strip_placement.next()
             }
-            5 => {
+            6 => {
                 let enabled = !self.settings.general.run_at_startup;
                 match autostart::set_enabled(enabled) {
                     Ok(()) => self.settings.general.run_at_startup = enabled,
@@ -197,7 +209,7 @@ impl SettingsWindow {
             .appearance
             .theme
             .resolve_dark(theme::is_dark_mode());
-        self.palette = strip_host::default_palette(dark);
+        self.palette = strip_host::palette(dark, self.settings.appearance.accent);
         strip_host::apply_settings(&self.settings, dark);
         window::set_backdrop(self.hwnd, self.settings.appearance.mica);
     }

@@ -8,6 +8,12 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Accent presets (System, Blue, Green, Purple, Orange, Teal, Pink) applied to the strip,
+  flyout, companion and settings; System reads the Windows DWM accent.
+- Charts and meters use the accent normally and switch to warning yellow or critical
+  red as a value approaches its limit (CPU/MEM 85/95, GPU/DISK 90/98).
+- Mica warning in Settings: DWM blur can cost GPU power and battery. The flyout panel
+  becomes lightly translucent when Mica is on.
 - Binary/decimal units setting, applied live to the strip, flyout and companion.
 - Companion left navigation: Dashboard, CPU, Memory, GPU, Disk, Network, Battery,
   System and Settings, with a dedicated detail page per module.

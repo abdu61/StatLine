@@ -94,8 +94,9 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **M5 partial**: flyout opens on strip click, toggles on a second click, closes on Esc
   or focus loss. A segment focuses one module (CPU per-core bars and CPU process table,
   Memory commit/cache and top memory apps, Disk volumes, Network adapters) plus System
-  and Battery; the background click shows the overview. It is created at its final
-  anchored rect and re-anchors upward when the process table arrives.
+  and Battery; the background click shows the overview. Charts use the accent and turn
+  yellow/red at the module thresholds. It is created at its final anchored rect and
+  re-anchors upward when the process table arrives; Mica makes the panel translucent.
 - **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
   resizable, Windows 11 dark frame + rounded corners). Left nav with Dashboard, CPU,
   Memory, GPU, Disk, Network, Battery, System and Settings; each module has a page built
@@ -105,9 +106,10 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
   zero when both are closed.
 - **Settings**: framed window from the tray/strip menu or the companion nav. Theme
-  (system/light/dark), interval, byte units (binary/decimal), Mica, strip placement and
-  autostart, applied live and saved atomically to `%APPDATA%\Statline\settings.json`. The
-  Run key is treated as the truth for startup.
+  (system/light/dark), accent presets (system/blue/green/purple/orange/teal/pink),
+  interval, byte units, Mica, strip placement and autostart, applied live and saved
+  atomically to `%APPDATA%\Statline\settings.json`. Turning Mica on shows a GPU/battery
+  caution. The Run key is treated as the truth for startup.
 - **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
   `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
   battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
@@ -177,9 +179,9 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
   `makeappx.exe` under `Windows Kits\10\bin\...\x64`. Sideloading an unsigned package
   fails; sign with a trusted dev certificate.
 - **Mica is frame-only on Win32.** `DWMWA_SYSTEMBACKDROP_TYPE = 2` applies to normal
-  framed windows (companion/settings). The strip and flyout are layered (ULW); DWM
-  backdrops do not apply to them, and per-pixel blur would require a composition
-  swapchain. The setting is labelled "Mica window effect", not a card blur.
+  framed windows (companion/settings). The strip and flyout are layered (ULW); the
+  flyout becomes lightly translucent instead, and per-pixel blur would require a
+  composition swapchain. Turning it on shows a GPU/battery caution in Settings.
 - **GUI-subsystem CLI output can vanish.** The release binary has no console; `--probe`
   and friends attach to the parent console, and that output races process exit when the
   command is run in a loop. An empty `--startup-status` line is not "disabled": read

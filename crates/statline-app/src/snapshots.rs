@@ -209,8 +209,29 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
 
         let mut surface = renderer.surface(width, height)?;
-        flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        flyout::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            false,
+        );
         let path = dir.join("flyout-dark-125.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+
+        // The same panel in Mica mode: slightly translucent over the taskbar.
+        let mut surface = renderer.surface(width, height)?;
+        flyout::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            true,
+        );
+        let path = dir.join("flyout-dark-125-mica.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
 
@@ -223,7 +244,14 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         );
         let height = flyout::height(&model, scale).ceil() as u32;
         let mut surface = renderer.surface(width, height)?;
-        flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        flyout::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            false,
+        );
         let path = dir.join("flyout-dark-125-memory.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
@@ -237,7 +265,14 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         );
         let height = flyout::height(&model, scale).ceil() as u32;
         let mut surface = renderer.surface(width, height)?;
-        flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        flyout::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            false,
+        );
         let path = dir.join("flyout-dark-125-cpu.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
@@ -312,6 +347,10 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     value: String::from("Binary (KiB)"),
                 },
                 settings_ui::Row {
+                    label: "Accent",
+                    value: String::from("System"),
+                },
+                settings_ui::Row {
                     label: "Mica window effect",
                     value: String::from("Off"),
                 },
@@ -324,6 +363,7 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     value: String::from("Off"),
                 },
             ],
+            warning: None,
             footer: String::from("Click a row to change \u{00b7} Esc closes"),
         };
         let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
@@ -337,6 +377,27 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
             surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
             written.push(path);
         }
+
+        // Mica on: the row reads On and the resource warning appears.
+        let mut mica = model.clone();
+        if let Some(row) = mica
+            .rows
+            .iter_mut()
+            .find(|row| row.label == "Mica window effect")
+        {
+            row.value = String::from("On");
+        }
+        mica.warning = Some(String::from(
+            "Mica blurs the desktop through DWM; it can cost GPU power and battery.",
+        ));
+        let scale = 1.25_f32;
+        let width = settings_ui::width(scale).ceil() as u32;
+        let height = settings_ui::height(&mica, scale).ceil() as u32;
+        let mut surface = renderer.surface(width, height)?;
+        settings_ui::render(&mut surface, &mut renderer.text, &palette, &mica, scale);
+        let path = dir.join("settings-dark-125-mica.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
     }
     for path in written {
         println!("{}", path.display());

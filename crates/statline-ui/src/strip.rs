@@ -22,17 +22,28 @@ pub struct Segment {
     pub extra: Option<String>,
     /// Meter fill, 0.0..=100.0. `None` hides the meter.
     pub percent: Option<f32>,
+    /// Warning threshold for the value/meter colour (0 disables it).
+    pub warn: f32,
+    /// Critical threshold for the value/meter colour (0 disables it).
+    pub critical: f32,
     /// Widest text this segment must accommodate, for stable sizing.
     pub width_sample: &'static str,
 }
 
 impl Segment {
     fn new(label: &'static str, value: String, percent: Option<f32>) -> Self {
+        let (warn, critical) = match label {
+            "CPU" | "MEM" => (85.0, 95.0),
+            "GPU" | "DISK" => (90.0, 98.0),
+            _ => (0.0, 0.0),
+        };
         Self {
             label,
             value,
             extra: None,
             percent,
+            warn,
+            critical,
             width_sample: "",
         }
     }
@@ -66,6 +77,8 @@ pub fn segments_with(snapshot: &Snapshot, units: UnitSystem) -> Vec<Segment> {
                 format_rate_short(network.tx_bytes_per_sec, units)
             )),
             percent: None,
+            warn: 0.0,
+            critical: 0.0,
             width_sample: match units {
                 UnitSystem::Binary => RATE_SAMPLE_BINARY,
                 UnitSystem::Decimal => RATE_SAMPLE_DECIMAL,
