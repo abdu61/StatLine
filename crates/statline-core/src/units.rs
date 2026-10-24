@@ -91,6 +91,33 @@ pub fn format_frequency(mhz: u32) -> String {
     }
 }
 
+/// Very compact rate for the taskbar strip: 1_240_000 becomes "1.2M".
+///
+/// The strip has no room for a unit per value, so the suffix replaces both the
+/// unit and the "/s"; the segment label says what the numbers mean.
+pub fn format_rate_compact(bytes_per_sec: f64, units: UnitSystem) -> String {
+    if !bytes_per_sec.is_finite() || bytes_per_sec <= 0.0 {
+        return String::from("0");
+    }
+
+    let base = units.base();
+    let suffixes = ["B", "K", "M", "G", "T"];
+    let mut scaled = bytes_per_sec;
+    let mut index = 0;
+    while scaled >= base && index + 1 < suffixes.len() {
+        scaled /= base;
+        index += 1;
+    }
+
+    if index == 0 {
+        format!("{scaled:.0}B")
+    } else if scaled < 10.0 {
+        format!("{scaled:.1}{}", suffixes[index])
+    } else {
+        format!("{scaled:.0}{}", suffixes[index])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,32 +185,5 @@ mod tests {
     #[test]
     fn temperature_has_one_suffix() {
         assert_eq!(format_temperature(62.4), "62 °C");
-    }
-}
-
-/// Very compact rate for the taskbar strip: 1_240_000 becomes "1.2M".
-///
-/// The strip has no room for a unit per value, so the suffix replaces both the
-/// unit and the "/s"; the segment label says what the numbers mean.
-pub fn format_rate_compact(bytes_per_sec: f64, units: UnitSystem) -> String {
-    if !bytes_per_sec.is_finite() || bytes_per_sec <= 0.0 {
-        return String::from("0");
-    }
-
-    let base = units.base();
-    let suffixes = ["B", "K", "M", "G", "T"];
-    let mut scaled = bytes_per_sec;
-    let mut index = 0;
-    while scaled >= base && index + 1 < suffixes.len() {
-        scaled /= base;
-        index += 1;
-    }
-
-    if index == 0 {
-        format!("{scaled:.0}B")
-    } else if scaled < 10.0 {
-        format!("{scaled:.1}{}", suffixes[index])
-    } else {
-        format!("{scaled:.0}{}", suffixes[index])
     }
 }

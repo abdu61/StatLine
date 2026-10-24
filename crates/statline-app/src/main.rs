@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cli;
+mod flyout_host;
 mod profile;
 mod snapshots;
 mod strip_host;

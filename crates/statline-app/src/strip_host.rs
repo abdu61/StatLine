@@ -4,6 +4,7 @@
 //! published through a process-wide pointer that the strip's window procedure
 //! reads on every timer tick and mouse message.
 
+use crate::flyout_host::Flyout;
 use statline_core::model::Snapshot;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
@@ -43,6 +44,7 @@ pub struct Host {
     hovered: Option<usize>,
     segment_rects: Vec<(f32, f32)>,
     tracking_leave: bool,
+    flyout: Flyout,
 }
 
 impl Host {
@@ -76,6 +78,7 @@ impl Host {
             hovered: None,
             segment_rects: Vec::new(),
             tracking_leave: false,
+            flyout: Flyout::new(palette, scale),
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -136,6 +139,11 @@ impl Host {
                 self.height,
             );
             self.segment_rects = metrics.segments;
+        }
+
+        self.flyout.record(&snapshot);
+        if self.flyout.is_open() {
+            self.flyout.refresh(&mut self.renderer, &snapshot);
         }
 
         let padding = (4.0 * self.scale) as i32;
@@ -242,6 +250,9 @@ impl Host {
         }
         self.visible = visible;
         log::info!("strip visibility -> {visible}");
+        if !visible {
+            self.flyout.close();
+        }
         strip_window::set_visible(self.hwnd, visible);
     }
 }
@@ -359,10 +370,18 @@ pub unsafe extern "system" fn strip_proc(
             LRESULT(0)
         }
         WM_LBUTTONUP => {
-            // The flyout lands in M5; log the hit so the path is observable.
+            log::debug!("strip left click");
             let x = (lparam.0 & 0xFFFF) as i16 as f32;
-            let segment = host().and_then(|host| render::hit_test(&host.segment_rects, x));
-            log::debug!("strip clicked, segment={segment:?}");
+            if let Some(host) = host() {
+                if host.flyout.is_open() {
+                    host.flyout.close();
+                } else {
+                    let anchor = strip_window::window_rect(hwnd);
+                    let snapshot = host.sampler.snapshot();
+                    let _segment = render::hit_test(&host.segment_rects, x);
+                    host.flyout.open(&mut host.renderer, &snapshot, anchor);
+                }
+            }
             LRESULT(0)
         }
         WM_RBUTTONUP => {

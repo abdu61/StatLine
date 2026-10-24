@@ -116,6 +116,70 @@ pub fn keep_on_top(hwnd: HWND) {
     }
 }
 
+/// Create an activatable layered popup (the flyout).
+///
+/// Unlike the strip this window takes focus, so `WM_ACTIVATE` gives us the
+/// natural "the user clicked elsewhere" signal to close it.
+pub fn create_popup_window(
+    class_name: &str,
+    title: &str,
+    wndproc: WNDPROC,
+    rect: RECT,
+) -> Result<HWND> {
+    let class_wide = to_wide(OsStr::new(class_name));
+    // SAFETY: converting an opaque module handle for the current executable.
+    let instance = unsafe { GetModuleHandleW(None)? };
+
+    let class = WNDCLASSW {
+        lpfnWndProc: wndproc,
+        hInstance: instance.into(),
+        lpszClassName: PCWSTR(class_wide.as_ptr()),
+        ..Default::default()
+    };
+    // SAFETY: descriptor is fully initialized; a duplicate class name is fine.
+    unsafe {
+        let _ = RegisterClassW(&class);
+    }
+
+    let title_wide = to_wide(OsStr::new(title));
+    let width = (rect.right - rect.left).max(1);
+    let height = (rect.bottom - rect.top).max(1);
+
+    // SAFETY: strings outlive the call; layered for per-pixel alpha, toolwindow
+    // to keep it out of Alt-Tab.
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WINDOW_EX_STYLE(WS_EX_LAYERED.0 | WS_EX_TOOLWINDOW.0),
+            PCWSTR(class_wide.as_ptr()),
+            PCWSTR(title_wide.as_ptr()),
+            WS_POPUP,
+            rect.left,
+            rect.top,
+            width,
+            height,
+            None,
+            None,
+            Some(instance.into()),
+            None,
+        )
+    }?;
+
+    // SAFETY: our window; topmost so it sits above the taskbar.
+    unsafe {
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            rect.left,
+            rect.top,
+            width,
+            height,
+            SWP_SHOWWINDOW,
+        );
+        let _ = windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow(hwnd);
+    }
+    Ok(hwnd)
+}
+
 /// Destroy the strip window (used when Explorer restarts).
 pub fn destroy(hwnd: HWND) {
     // SAFETY: the handle is ours; DestroyWindow is idempotent for dead handles

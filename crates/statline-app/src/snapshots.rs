@@ -134,6 +134,30 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         written.push(path);
     }
 
+    // Flyout at 125 % with a synthetic one-minute history.
+    {
+        use statline_ui::flyout::{self, History};
+
+        let mut history = History::default();
+        for index in 0..48 {
+            let t = index as f32 / 48.0;
+            history.cpu.push(22.0 + 14.0 * (t * 12.0).sin());
+            history.memory.push(57.0 + 6.0 * t);
+            history.gpu.push(6.0 + 9.0 * (t * 22.0).cos());
+        }
+
+        let model = flyout::model(&snapshot, &history);
+        let scale = 1.25_f32;
+        let width = flyout::width(scale).ceil() as u32;
+        let height = flyout::height(&model, scale).ceil() as u32;
+        let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
+
+        let mut surface = renderer.surface(width, height)?;
+        flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        let path = dir.join("flyout-dark-125.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+    }
     for path in written {
         println!("{}", path.display());
     }
