@@ -239,6 +239,43 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
     }
+    // Settings window at 100 % and 125 %.
+    {
+        use statline_ui::settings as settings_ui;
+
+        let model = settings_ui::Model {
+            rows: vec![
+                settings_ui::Row {
+                    label: "Theme",
+                    value: String::from("System"),
+                },
+                settings_ui::Row {
+                    label: "Update interval",
+                    value: String::from("1000 ms"),
+                },
+                settings_ui::Row {
+                    label: "Strip placement",
+                    value: String::from("Right"),
+                },
+                settings_ui::Row {
+                    label: "Start with Windows",
+                    value: String::from("Off"),
+                },
+            ],
+            footer: String::from("Click a row to change \u{00b7} Esc closes"),
+        };
+        let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
+
+        for (name, scale) in [("100", 1.0_f32), ("125", 1.25)] {
+            let width = settings_ui::width(scale).ceil() as u32;
+            let height = settings_ui::height(&model, scale).ceil() as u32;
+            let mut surface = renderer.surface(width, height)?;
+            settings_ui::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+            let path = dir.join(format!("settings-dark-{name}.png"));
+            surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+            written.push(path);
+        }
+    }
     for path in written {
         println!("{}", path.display());
     }

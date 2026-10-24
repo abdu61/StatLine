@@ -5,15 +5,17 @@ mod cli;
 mod dashboard_host;
 mod flyout_host;
 mod profile;
+mod settings_host;
 mod snapshots;
 mod strip_host;
 
 use log::{LevelFilter, error, info};
+use statline_config::Settings;
 use statline_core::{APP_NAME, VERSION};
 use statline_win::window::MessageWindow;
 use statline_win::{
     HWND, LPARAM, LRESULT, WPARAM, command_id, destroy_window, dpi, is_destroy, logger, menus,
-    paths, quit_message_loop, shell, tray, window,
+    paths, quit_message_loop, shell, theme, tray, window,
 };
 use std::time::Duration;
 
@@ -112,6 +114,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
 
+    let settings_path = paths::settings_file();
+    let mut settings = match Settings::load_or_default(&settings_path) {
+        Ok(settings) => settings,
+        Err(err) => {
+            error!("could not read settings: {err}");
+            Settings::default()
+        }
+    };
+    settings.normalize();
+    let dark = settings
+        .appearance
+        .theme
+        .resolve_dark(theme::is_dark_mode());
+
     let window = MessageWindow::create(WINDOW_CLASS, APP_NAME, Some(wndproc))?;
     if let Err(err) = tray::add(window.hwnd(), TRAY_ICON_ID, APP_NAME) {
         error!("failed to add tray icon: {err}");
@@ -123,10 +139,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // build will not cooperate.
     let mut _strip = None;
     if !args.iter().any(|a| a == "--tray-only") {
-        match strip_host::Host::start(strip_host::default_palette(true)) {
+        match strip_host::Host::start(strip_host::default_palette(dark)) {
             Ok(host) => {
                 info!("taskbar strip attached");
                 _strip = Some(host);
+                strip_host::apply_settings(&settings, dark);
             }
             Err(err) => error!("taskbar strip unavailable: {err}"),
         }
@@ -175,6 +192,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             menus::MENU_DASHBOARD => {
                 strip_host::toggle_dashboard();
             }
+            menus::MENU_SETTINGS => settings_host::toggle(),
             _ => {}
         }
         return LRESULT(0);

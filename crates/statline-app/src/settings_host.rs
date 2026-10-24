@@ -1,0 +1,343 @@
+//! The settings window.
+//!
+//! A frameless-by-content but normally framed tool window: four rows you click
+//! to cycle, applied immediately and persisted atomically. It owns its own
+//! renderer so it also works under `--tray-only`, where there is no strip host.
+
+use crate::strip_host;
+use statline_config::{INTERVALS_MS, Settings};
+use statline_render::{Palette, Renderer, Surface};
+use statline_ui::settings;
+use statline_win::{HWND, LPARAM, LRESULT, WPARAM, autostart, paths, taskbar, theme, window};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicPtr, Ordering};
+use windows::Win32::Foundation::RECT;
+use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT};
+use windows::Win32::UI::WindowsAndMessaging::{
+    DefWindowProcW, DestroyWindow, GetClientRect, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONUP,
+    WM_PAINT, WM_SIZE,
+};
+
+const CLASS: &str = "StatlineSettingsWindow";
+
+/// Pointer to the live window, for its own procedure.
+static SETTINGS_WINDOW: AtomicPtr<SettingsWindow> = AtomicPtr::new(std::ptr::null_mut());
+
+struct SettingsWindow {
+    hwnd: HWND,
+    surface: Option<Surface>,
+    renderer: Renderer,
+    settings: Settings,
+    path: PathBuf,
+    model: settings::Model,
+    scale: f32,
+    palette: Palette,
+}
+
+/// Open the settings window, or close it when it is already open.
+pub fn toggle() {
+    let pointer = SETTINGS_WINDOW.load(Ordering::Acquire);
+    if !pointer.is_null() {
+        // SAFETY: the pointer is the boxed window published below; the window
+        // procedure drops and clears it on WM_DESTROY.
+        let hwnd = unsafe { (*pointer).hwnd };
+        // SAFETY: our window on this thread.
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
+        return;
+    }
+
+    if let Err(error) = open() {
+        log::error!("could not open settings: {error}");
+    }
+}
+
+fn open() -> windows::core::Result<()> {
+    let path = paths::settings_file();
+    let mut settings = match Settings::load_or_default(&path) {
+        Ok(settings) => settings,
+        Err(error) => {
+            log::warn!("could not read settings: {error}");
+            Settings::default()
+        }
+    };
+    settings.normalize();
+    // The Run key is the truth for startup, not a possibly stale file.
+    settings.general.run_at_startup = autostart::is_enabled();
+
+    let scale = taskbar::primary()
+        .map(|geometry| geometry.dpi as f32 / 96.0)
+        .unwrap_or(1.0);
+    let model = build_model(&settings);
+    let dark = settings
+        .appearance
+        .theme
+        .resolve_dark(theme::is_dark_mode());
+    let palette = strip_host::default_palette(dark);
+
+    // Client area plus an allowance for the frame; render() fills the client.
+    let width = settings::width(scale) as i32 + (20.0 * scale) as i32;
+    let height = settings::height(&model, scale) as i32 + (44.0 * scale) as i32;
+
+    let renderer = Renderer::new()?;
+    let hwnd = window::create_frame_window(
+        CLASS,
+        "Statline Settings",
+        Some(settings_proc),
+        width,
+        height,
+        dark,
+    )?;
+    let mut window = Box::new(SettingsWindow {
+        hwnd,
+        surface: None,
+        renderer,
+        settings,
+        path,
+        model,
+        scale,
+        palette,
+    });
+    window.render();
+    SETTINGS_WINDOW.store(Box::into_raw(window), Ordering::Release);
+    log::info!("settings window opened");
+    Ok(())
+}
+
+fn build_model(settings: &Settings) -> settings::Model {
+    settings::Model {
+        rows: vec![
+            settings::Row {
+                label: "Theme",
+                value: String::from(settings.appearance.theme.label()),
+            },
+            settings::Row {
+                label: "Update interval",
+                value: format!("{} ms", settings.general.update_interval_ms),
+            },
+            settings::Row {
+                label: "Strip placement",
+                value: String::from(settings.general.strip_placement.label()),
+            },
+            settings::Row {
+                label: "Start with Windows",
+                value: String::from(if settings.general.run_at_startup {
+                    "On"
+                } else {
+                    "Off"
+                }),
+            },
+        ],
+        footer: String::from("Click a row to change \u{00b7} Esc closes"),
+    }
+}
+
+impl SettingsWindow {
+    fn click(&mut self, y: f32) {
+        let Some(index) = settings::row_at(&self.model, y, self.scale) else {
+            return;
+        };
+        if !self.cycle(index) {
+            return;
+        }
+        if let Err(error) = self.settings.save(&self.path) {
+            log::warn!("could not save settings: {error}");
+        }
+        self.apply();
+        self.model = build_model(&self.settings);
+        self.render();
+        self.invalidate();
+        log::info!("settings changed, saved to {}", self.path.display());
+    }
+
+    fn cycle(&mut self, index: usize) -> bool {
+        match index {
+            0 => self.settings.appearance.theme = self.settings.appearance.theme.next(),
+            1 => {
+                self.settings.general.update_interval_ms =
+                    next_interval(self.settings.general.update_interval_ms)
+            }
+            2 => {
+                self.settings.general.strip_placement = self.settings.general.strip_placement.next()
+            }
+            3 => {
+                let enabled = !self.settings.general.run_at_startup;
+                match autostart::set_enabled(enabled) {
+                    Ok(()) => self.settings.general.run_at_startup = enabled,
+                    Err(error) => {
+                        log::warn!("could not change the startup entry: {error}");
+                        return false;
+                    }
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn apply(&mut self) {
+        let dark = self
+            .settings
+            .appearance
+            .theme
+            .resolve_dark(theme::is_dark_mode());
+        self.palette = strip_host::default_palette(dark);
+        strip_host::apply_settings(&self.settings, dark);
+    }
+
+    fn render(&mut self) {
+        let mut client = RECT::default();
+        // SAFETY: valid out-parameter for a live window.
+        unsafe {
+            let _ = GetClientRect(self.hwnd, &mut client);
+        }
+        let width = (client.right - client.left).max(1) as u32;
+        let height = (client.bottom - client.top).max(1) as u32;
+
+        let needs_surface = self
+            .surface
+            .as_ref()
+            .map(|surface| surface.width() != width || surface.height() != height)
+            .unwrap_or(true);
+        if needs_surface {
+            match self.renderer.surface(width, height) {
+                Ok(surface) => self.surface = Some(surface),
+                Err(error) => {
+                    log::error!("could not allocate settings surface: {error}");
+                    return;
+                }
+            }
+        }
+
+        if let Some(surface) = self.surface.as_mut() {
+            settings::render(
+                surface,
+                &mut self.renderer.text,
+                &self.palette,
+                &self.model,
+                self.scale,
+            );
+        }
+    }
+
+    fn invalidate(&self) {
+        // SAFETY: our window; a null rect invalidates the whole client area.
+        unsafe {
+            let _ = InvalidateRect(Some(self.hwnd), None, false);
+        }
+    }
+}
+
+fn next_interval(current: u32) -> u32 {
+    let index = INTERVALS_MS
+        .iter()
+        .position(|value| *value == current)
+        .unwrap_or(0);
+    INTERVALS_MS[(index + 1) % INTERVALS_MS.len()]
+}
+
+fn window_ref() -> Option<&'static mut SettingsWindow> {
+    let pointer = SETTINGS_WINDOW.load(Ordering::Acquire);
+    if pointer.is_null() {
+        None
+    } else {
+        // SAFETY: the pointer is set from a boxed window and cleared in its
+        // WM_DESTROY handler, on the UI thread that dispatches these messages.
+        Some(unsafe { &mut *pointer })
+    }
+}
+
+unsafe extern "system" fn settings_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_LBUTTONUP => {
+            let y = (lparam.0 >> 16) as i16 as f32;
+            if let Some(window) = window_ref() {
+                window.click(y);
+            }
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            if wparam.0 == 0x1B {
+                // SAFETY: our window.
+                unsafe {
+                    let _ = DestroyWindow(hwnd);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_SIZE => {
+            if let Some(window) = window_ref() {
+                window.render();
+                window.invalidate();
+            }
+            LRESULT(0)
+        }
+        WM_PAINT => {
+            // SAFETY: standard begin/end paint pair; blit our DIB if ready.
+            unsafe {
+                let mut ps = PAINTSTRUCT::default();
+                let hdc = BeginPaint(hwnd, &mut ps);
+                if let Some(window) = window_ref() {
+                    if let Some(surface) = window.surface.as_ref() {
+                        let mut client = RECT::default();
+                        let _ = GetClientRect(hwnd, &mut client);
+                        surface.blit_to(hdc, client.right, client.bottom);
+                    }
+                }
+                let _ = EndPaint(hwnd, &ps);
+            }
+            LRESULT(0)
+        }
+        WM_CLOSE => {
+            // SAFETY: our window.
+            unsafe {
+                let _ = DestroyWindow(hwnd);
+            }
+            LRESULT(0)
+        }
+        WM_DESTROY => {
+            let pointer = SETTINGS_WINDOW.swap(std::ptr::null_mut(), Ordering::Acquire);
+            if !pointer.is_null() {
+                // SAFETY: the pointer came from Box::into_raw in `open`, and
+                // this is the only place it is reclaimed.
+                drop(unsafe { Box::from_raw(pointer) });
+            }
+            log::info!("settings window closed");
+            LRESULT(0)
+        }
+        _ => {
+            // SAFETY: forwarding the exact arguments received by the procedure.
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intervals_cycle_through_every_option() {
+        let mut interval = INTERVALS_MS[0];
+        for expected in [
+            INTERVALS_MS[1],
+            INTERVALS_MS[2],
+            INTERVALS_MS[3],
+            INTERVALS_MS[0],
+        ] {
+            interval = next_interval(interval);
+            assert_eq!(interval, expected);
+        }
+    }
+
+    #[test]
+    fn unknown_interval_restarts_the_cycle() {
+        assert_eq!(next_interval(137), INTERVALS_MS[1]);
+    }
+}

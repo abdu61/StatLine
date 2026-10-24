@@ -7,54 +7,48 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
 {
   "schema_version": 1,
 
-  "modules": {
-    "order": ["cpu", "memory", "gpu", "disk", "network"],
-    "enabled": { "cpu": true, "memory": true, "gpu": true, "disk": true,
-                 "network": true, "battery": true, "system": false },
-    "options": {
-      "cpu":     { "meter": "bar", "warn": 85, "critical": 95, "color": null },
-      "memory":  { "meter": "bar", "warn": 85, "critical": 95, "color": null },
-      "gpu":     { "meter": "bar", "warn": 90, "critical": 98, "color": null },
-      "disk":    { "meter": "bar", "warn": 90, "critical": 98, "color": null },
-      "network": { "meter": "none", "warn": 0, "critical": 0, "color": null }
-    }
+  "general": {
+    "update_interval_ms": 1000,   // 500 | 1000 | 2000 | 5000
+    "run_at_startup": false,      // per-user Run key for portable builds
+    "strip_placement": "right"    // right | left
   },
 
   "appearance": {
-    "theme": "system",            // system | light | dark
-    "accent": "system",           // system | "#RRGGBB"
-    "density": "comfortable",     // comfortable | compact
-    "show_labels": true,
-    "strip_placement": "right",   // right | left
-    "strip_opacity": 1.0,         // 0.4 – 1.0
-    "use_tabular_figures": true
-  },
-
-  "behaviour": {
-    "interval_ms": 1000,          // 500 | 1000 | 2000 | 5000
-    "start_with_windows": true,
-    "hide_in_fullscreen": true,
-    "show_on_secondary": false,
-    "pause_on_battery_saver": false,
-    "double_click": "dashboard",  // dashboard | flyout | none
-    "safe_mode": false,
-    "units": "binary"             // binary (KiB) | decimal (kB)
-  },
-
-  "window": {
-    "dashboard": { "x": null, "y": null, "width": 960, "height": 640 }
-  },
-
-  "telemetry": { "enabled": false }   // exists only so it can never be turned on silently
+    "theme": "system"             // system | light | dark
+  }
 }
 ```
 
 ## Rules
 
-- Unknown keys at any level are preserved on save (forward compatibility).
+- Unknown keys at any level are **ignored** on load, so a newer build can write a
+  document an older build still opens. They are not preserved on save.
 - Missing keys fall back to defaults; no settings file is created until a setting
   actually changes.
-- Invalid values are clamped and logged, never rejected wholesale.
-- `telemetry.enabled` is read-only in the UI (always false in v1) and is documented in
-  the README. If that ever changes, it needs an ADR and a privacy-policy update.
-- Every save is atomic; failures are logged and surfaced once in the UI, not in a loop.
+- Invalid values are clamped (`update_interval_ms` snaps to a supported option) and
+  never reject the whole document.
+- Every save is atomic (temp file + rename); failures are logged and the window keeps
+  the old value rather than showing a change that did not persist.
+- `run_at_startup` mirrors the registry: the settings window reads the current `Run`
+  value on open and treats it as the truth, and every toggle writes the registry before
+  updating the document.
+
+## Planned (not in schema v1 yet)
+
+`modules` (enable/order/options), `behaviour.units`, `behaviour.hide_in_fullscreen`,
+`appearance.density`, `window.dashboard` bounds, and the read-only `telemetry` block.
+Adding any of them is a schema change with a migration path.
+
+## Where it is edited
+
+Tray icon or strip right-click → **Settings…**. Rows cycle on click:
+
+| Row | Values |
+|---|---|
+| Theme | System → Dark → Light |
+| Update interval | 500 → 1000 → 2000 → 5000 ms |
+| Strip placement | Right ↔ Left (left anchors past Start, clamped at the tray) |
+| Start with Windows | On ↔ Off (writes `HKCU\...\Run`) |
+
+Changes apply live: the strip palette, sampler cadence and anchor update on the next
+tick, and an open flyout/companion repaints with the new palette.

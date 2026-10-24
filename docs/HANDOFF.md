@@ -100,6 +100,9 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   deltas and working sets. Task Manager scale (share of all cores); `None` until a baseline
   exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
   zero when both are closed.
+- **Settings**: framed window from the tray/strip menu. Theme (system/light/dark),
+  interval, strip placement and autostart, applied live and saved atomically to
+  `%APPDATA%\Statline\settings.json`. The Run key is treated as the truth for startup.
 
 Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tray-only
 10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles, flat over
@@ -108,12 +111,12 @@ the 2 s cadence and only while a process surface is visible.
 
 ## Next work, in priority order
 
-1. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
-   units, which modules show, autostart toggle, safe mode. Live-apply through the host.
-2. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
+1. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
    `IOCTL_STORAGE_QUERY_PROPERTY`, battery temperature/health, ACPI thermal zone via PDH.
    Each degrades to hidden, never fakes a value. CPU package temp/fans are out of scope
    (no user-mode API; legal audit in the plan's §10).
+2. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
+   remembered window bounds, About pane.
 3. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
    CI (fmt/clippy/test/deny/build), README with snapshot images, MIT + third-party notices,
    local `v0.1.0` tag.
@@ -143,6 +146,10 @@ the 2 s cadence and only while a process surface is visible.
   behind `Reserved1: [u8; 48]`. Define the documented `repr(C)` prefix locally and walk
   the `NextEntryOffset` chain with `read_unaligned`. The query costs **~4.8 ms** for
   ~250 processes: never run it unless a surface showing processes is open.
+- **GUI-subsystem CLI output can vanish.** The release binary has no console; `--probe`
+  and friends attach to the parent console, and that output races process exit when the
+  command is run in a loop. An empty `--startup-status` line is not "disabled": read
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` or assert it in a Rust test.
 - **`Edit`-style PowerShell string surgery corrupts source files.** An array-flattening bug
   once replaced every `s` with `t`. Use the file tools; if using PowerShell, do single
   `.Replace()` calls and write with `UTF8Encoding($false)`. Never round-trip a file with

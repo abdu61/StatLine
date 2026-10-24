@@ -45,6 +45,11 @@ impl Flyout {
         &self.history
     }
 
+    /// Recolour the panel; the next tick repaints with the new palette.
+    pub fn set_palette(&mut self, palette: Palette) {
+        self.palette = palette;
+    }
+
     pub fn is_open(&self) -> bool {
         self.hwnd.is_some()
     }

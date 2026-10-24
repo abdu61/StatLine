@@ -28,6 +28,9 @@ process table sampling on
   the process table by working set.
 - **Companion**: framed resizable Windows 11 window with a two-column card grid and an
   eight-row, two-column process table.
+- **Settings**: a framed window from the tray menu (or the strip menu) with theme,
+  sampler interval, strip placement and start-with-Windows. Changes apply live and are
+  saved atomically to `%APPDATA%\Statline\settings.json`; unknown keys are ignored.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
   deltas; Task Manager scale (share of all cores); `—` until a baseline exists; sampled
   at 2 s only while the flyout or companion is open (~4.75 ms per query).
@@ -38,10 +41,10 @@ process table sampling on
 
 ## Next, in order
 
-1. **Settings UI** (`statline-config` is written but unwired): theme, interval,
-   placement, units, modules, autostart, safe mode; live-apply.
-2. **Driver-free sensors (M7)**: GPU temp/fan/power, drive temps, battery health,
+1. **Driver-free sensors (M7)**: GPU temp/fan/power, drive temps, battery health,
    ACPI thermal zone. Degrade to hidden; never fake a value.
+2. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
+   remembered window bounds, About pane.
 3. **Packaging (M9)**: MSIX, portable zip, CI, README with snapshots, notices,
    local `v0.1.0` tag.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,

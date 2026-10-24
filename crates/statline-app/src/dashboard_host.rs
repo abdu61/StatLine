@@ -41,6 +41,11 @@ impl Dashboard {
         self.hwnd.is_some()
     }
 
+    /// Recolour the companion; the next tick repaints with the new palette.
+    pub fn set_palette(&mut self, palette: Palette) {
+        self.palette = palette;
+    }
+
     pub fn toggle(
         &mut self,
         renderer: &mut Renderer,
@@ -59,7 +64,14 @@ impl Dashboard {
 
         let width = (WINDOW_WIDTH as f32 * self.scale) as i32;
         let height = (WINDOW_HEIGHT as f32 * self.scale) as i32;
-        match window::create_frame_window(CLASS, "Statline", Some(companion_proc), width, height) {
+        match window::create_frame_window(
+            CLASS,
+            "Statline",
+            Some(companion_proc),
+            width,
+            height,
+            self.palette.is_dark,
+        ) {
             Ok(hwnd) => {
                 self.hwnd = Some(hwnd);
                 COMPANION.store(self as *mut Dashboard, std::sync::atomic::Ordering::Release);

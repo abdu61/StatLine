@@ -116,15 +116,16 @@ pub fn taskbar_created_message() -> u32 {
 
 /// Create an ordinary framed window: caption, system menu, minimise and close.
 ///
-/// The companion app is a normal Windows app, so it gets a normal frame. The
-/// Windows 11 treatment is applied explicitly: immersive dark mode when the
-/// system theme is dark, and rounded corners.
+/// The companion and settings windows are normal Windows apps, so they get a
+/// normal frame. The Windows 11 treatment is applied explicitly: immersive dark
+/// mode when `dark` is set, and rounded corners.
 pub fn create_frame_window(
     class_name: &str,
     title: &str,
     wndproc: WNDPROC,
     width: i32,
     height: i32,
+    dark: bool,
 ) -> Result<HWND> {
     let class_wide = to_wide(OsStr::new(class_name));
     let instance = unsafe { GetModuleHandleW(None)? };
@@ -166,7 +167,7 @@ pub fn create_frame_window(
         )
     }?;
 
-    apply_frame_style(hwnd);
+    apply_frame_style(hwnd, dark);
 
     // SAFETY: our window; show it normally.
     unsafe {
@@ -178,11 +179,11 @@ pub fn create_frame_window(
     Ok(hwnd)
 }
 
-fn apply_frame_style(hwnd: HWND) {
+fn apply_frame_style(hwnd: HWND, dark: bool) {
     use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
 
     // DWMWA_USE_IMMERSIVE_DARK_MODE = 20, DWMWA_WINDOW_CORNER_PREFERENCE = 33.
-    let dark: i32 = 1;
+    let dark = i32::from(dark);
     let round: u32 = 2; // DWMWCP_ROUND
     // SAFETY: attribute writes only; unsupported attributes fail harmlessly on
     // older builds, which is why the results are ignored.

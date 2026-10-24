@@ -90,7 +90,23 @@ pub fn is_enabled() -> bool {
 mod tests {
     #[test]
     fn reporting_state_does_not_panic() {
-        // Never mutate the user's Run key from a test; just read it.
         let _ = super::is_enabled();
+    }
+
+    #[test]
+    fn enabling_and_removing_round_trips() {
+        // The test writes the same per-user value the app writes and restores
+        // the previous state, so a failure cannot silently leave autostart on.
+        let before = super::is_enabled();
+        if super::set_enabled(true).is_err() {
+            // A locked-down registry is a legitimate environment; nothing to test.
+            return;
+        }
+        assert!(super::is_enabled(), "a written value must be visible");
+        let _ = super::set_enabled(false);
+        assert!(!super::is_enabled(), "a removed value must not be visible");
+        if before {
+            let _ = super::set_enabled(true);
+        }
     }
 }

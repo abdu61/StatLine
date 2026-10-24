@@ -15,6 +15,7 @@ pub mod shell;
 pub mod single_instance;
 pub mod strip_window;
 pub mod taskbar;
+pub mod theme;
 pub mod tray;
 pub mod window;
 

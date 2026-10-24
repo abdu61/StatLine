@@ -6,6 +6,7 @@
 
 use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
+use statline_config::{Settings, StripPlacement};
 use statline_core::model::Snapshot;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
@@ -52,6 +53,8 @@ pub struct Host {
     parented: bool,
     /// Last process-sampling request, so transitions are logged once.
     process_visible: bool,
+    /// Which side of the taskbar the strip is anchored to.
+    placement: taskbar::Placement,
 }
 
 impl Host {
@@ -90,6 +93,7 @@ impl Host {
             dashboard: Dashboard::new(palette, scale),
             parented,
             process_visible: false,
+            placement: taskbar::Placement::Right,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -171,7 +175,7 @@ impl Host {
             .refresh(&mut self.renderer, &snapshot, self.flyout.history());
 
         let padding = (4.0 * self.scale) as i32;
-        let screen_left = geometry.strip_left(width as i32, padding);
+        let screen_left = geometry.strip_left_for(width as i32, padding, self.placement);
         let screen_top =
             geometry.rect.top + ((geometry.height() as f32 - self.height) / 2.0) as i32;
 
@@ -357,6 +361,29 @@ pub fn toggle_strip() -> Option<bool> {
     let host = host()?;
     host.toggle_strip();
     Some(!host.user_hidden)
+}
+
+/// Apply settings that affect the live strip.
+///
+/// Called at startup and whenever the settings window changes something. The
+/// palette is shared with the flyout and companion so an open surface recolours
+/// on the next tick.
+pub fn apply_settings(settings: &Settings, dark: bool) {
+    let Some(host) = host() else {
+        return;
+    };
+    let palette = default_palette(dark);
+    host.palette = palette;
+    host.flyout.set_palette(palette);
+    host.dashboard.set_palette(palette);
+    host.placement = match settings.general.strip_placement {
+        StripPlacement::Right => taskbar::Placement::Right,
+        StripPlacement::Left => taskbar::Placement::Left,
+    };
+    host.sampler.set_interval(Duration::from_millis(
+        settings.general.update_interval_ms as u64,
+    ));
+    host.tick();
 }
 
 /// Destroy and rebuild the strip after Explorer restarts.
