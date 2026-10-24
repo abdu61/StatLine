@@ -83,6 +83,7 @@ impl Flyout {
                 Ok(hwnd) => {
                     self.hwnd = Some(hwnd);
                     FLYOUT.store(self as *mut Flyout, Ordering::Release);
+                    log::info!("flyout window created");
                 }
                 Err(error) => {
                     log::error!("could not create flyout: {error}");

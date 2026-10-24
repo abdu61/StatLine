@@ -8,7 +8,7 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowExW, FindWindowW, GetWindowRect, IsWindowVisible,
 };
-use windows::core::{Result, w};
+use windows::core::w;
 
 /// Everything the strip needs to place itself.
 #[derive(Debug, Clone, Copy)]
@@ -92,11 +92,4 @@ pub fn fullscreen_active() -> bool {
         }
         Err(_) => false,
     }
-}
-
-/// Parent a window to the taskbar so it stacks with shell content.
-pub fn adopt(parent: HWND, child: HWND) -> Result<()> {
-    // SAFETY: both handles are owned by this process or the shell; `SetParent`
-    // only changes the parent link and does not take ownership.
-    unsafe { windows::Win32::UI::WindowsAndMessaging::SetParent(child, Some(parent)) }.map(|_| ())
 }

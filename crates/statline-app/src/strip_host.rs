@@ -11,7 +11,7 @@ use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
 use statline_ui::{render, strip};
 use statline_win::menus::MenuState;
-use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar, window};
+use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::time::Duration;
 use windows::Win32::Foundation::RECT;
@@ -48,6 +48,8 @@ pub struct Host {
     flyout: Flyout,
     last_rect: Option<RECT>,
     dashboard: Dashboard,
+    /// `true` when the strip is a child of `Shell_TrayWnd` (ADR tier 1).
+    parented: bool,
 }
 
 impl Host {
@@ -64,7 +66,7 @@ impl Host {
 
         let renderer = Renderer::new()?;
         let sampler = SamplerThread::start(Duration::from_millis(1000));
-        let hwnd = create_window(height)?;
+        let (hwnd, parented) = create_window(height)?;
 
         let mut host = Box::new(Self {
             renderer,
@@ -84,6 +86,7 @@ impl Host {
             flyout: Flyout::new(palette, scale),
             last_rect: None,
             dashboard: Dashboard::new(palette, scale),
+            parented,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -177,21 +180,44 @@ impl Host {
             .unwrap_or(true);
         if moved {
             self.last_rect = Some(rect);
-            strip_window::move_window(self.hwnd, rect);
-            strip_window::keep_on_top(self.hwnd);
+            if self.parented {
+                // Child windows are positioned in the taskbar's client area.
+                strip_window::move_window(
+                    self.hwnd,
+                    strip_window::parent_client_rect(geometry.taskbar, rect),
+                );
+            } else {
+                strip_window::move_window(self.hwnd, rect);
+                strip_window::keep_on_top(self.hwnd);
+            }
         }
 
+        let mut presented = true;
         if let Some(surface) = self.surface.as_ref() {
             // A null destination in UPDATELAYEREDWINDOWINFO makes Windows use
             // the window's own position.
-            let presented = surface.present_layered(self.hwnd, 0, 0);
+            presented = surface.present_layered(self.hwnd, 0, 0);
             if !self.logged_first_frame {
                 self.logged_first_frame = true;
                 log::info!(
-                    "strip {}x{} at ({screen_left},{screen_top}) presented={presented}",
+                    "strip {}x{} at ({screen_left},{screen_top}) presented={presented} tier={}",
                     surface.width(),
-                    surface.height()
+                    surface.height(),
+                    if self.parented { "child" } else { "topmost" }
                 );
+            }
+        }
+
+        // A layered child can still refuse ULW on some shell builds. Revert to
+        // the topmost tier rather than leave an invisible strip attached.
+        if !presented && self.parented {
+            log::warn!("parented strip cannot present; reverting to topmost");
+            strip_window::detach(self.hwnd);
+            self.parented = false;
+            strip_window::move_window(self.hwnd, rect);
+            strip_window::keep_on_top(self.hwnd);
+            if let Some(surface) = self.surface.as_ref() {
+                surface.present_layered(self.hwnd, 0, 0);
             }
         }
     }
@@ -201,13 +227,15 @@ impl Host {
         log::info!("taskbar restarted; recreating strip");
         strip_window::destroy(self.hwnd);
         match create_window(self.height) {
-            Ok(hwnd) => {
+            Ok((hwnd, parented)) => {
                 self.hwnd = hwnd;
+                self.parented = parented;
                 self.surface = None;
                 self.logged_first_frame = false;
                 self.visible = true;
                 self.hovered = None;
                 self.segment_rects.clear();
+                self.last_rect = None;
                 self.tick();
             }
             Err(error) => log::error!("could not recreate strip: {error}"),
@@ -317,19 +345,44 @@ pub fn toggle_strip() -> Option<bool> {
     Some(!host.user_hidden)
 }
 
-fn create_window(height: f32) -> windows::core::Result<HWND> {
+/// Destroy and rebuild the strip after Explorer restarts.
+///
+/// `TaskbarCreated` is broadcast to top-level windows only, and a parented
+/// strip is a child, so the app's message window forwards the event here.
+pub fn recreate() {
+    if let Some(host) = host() {
+        host.recreate();
+    }
+}
+
+fn create_window(height: f32) -> windows::core::Result<(HWND, bool)> {
     let rect = RECT {
         left: 0,
         top: 0,
         right: 1,
         bottom: height as i32,
     };
-    strip_window::create_strip_window(
+    let hwnd = strip_window::create_strip_window(
         strip_window::STRIP_CLASS,
         "Statline",
         Some(strip_proc),
         rect,
-    )
+    )?;
+
+    // Tier 1: a child of the taskbar inherits the shell's z-order, so the Start
+    // menu and other shell surfaces can no longer cover the strip.
+    let parented = match taskbar::primary() {
+        Some(geometry) if strip_window::adopt(hwnd, geometry.taskbar) => {
+            log::info!("strip hosted by Shell_TrayWnd (tier 1)");
+            true
+        }
+        Some(_) => {
+            log::warn!("taskbar refused the strip; using topmost placement (tier 2)");
+            false
+        }
+        None => false,
+    };
+    Ok((hwnd, parented))
 }
 
 fn host() -> Option<&'static mut Host> {
@@ -351,16 +404,9 @@ pub unsafe extern "system" fn strip_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     use windows::Win32::UI::WindowsAndMessaging::{
-        DefWindowProcW, KillTimer, SetTimer, WM_CREATE, WM_DESTROY, WM_LBUTTONUP, WM_MOUSEMOVE,
-        WM_RBUTTONUP, WM_TIMER,
+        DefWindowProcW, KillTimer, MA_NOACTIVATE, SetTimer, WM_CREATE, WM_DESTROY, WM_LBUTTONUP,
+        WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_RBUTTONUP, WM_TIMER,
     };
-
-    if msg == window::taskbar_created_message() {
-        if let Some(host) = host() {
-            host.recreate();
-        }
-        return LRESULT(0);
-    }
 
     match msg {
         WM_CREATE => {
@@ -375,6 +421,10 @@ pub unsafe extern "system" fn strip_proc(
                 host.tick();
             }
             LRESULT(0)
+        }
+        WM_MOUSEACTIVATE => {
+            // Clicking the strip must not deactivate the user's foreground window.
+            LRESULT(MA_NOACTIVATE as isize)
         }
         WM_MOUSEMOVE => {
             let x = (lparam.0 & 0xFFFF) as i16 as f32;

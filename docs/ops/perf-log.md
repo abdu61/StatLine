@@ -10,6 +10,21 @@ Append one line per measured run. Machine: see `environment.md`.
 | 2026-10-24 | M1c | bench | 1000 ms | 0.78 ms | 14.3 | 6.2 | — | + GPU + battery + thread |
 | 2026-10-24 | M3 | `--tray-only` | — | — | 10.6 | 1.8 | 145 | no strip, no sampler |
 | 2026-10-24 | M3 | strip live | 1000 ms | ~0.8 ms | 30.2 | 14.2 | 310 | steady state after 60 s |
+| 2026-10-24 | M3b | strip live, parented child | 1000 ms | ~0.8 ms | 30.0 | 14.5 | 314 | tier 1: `WS_CHILD` of `Shell_TrayWnd` |
+
+## 90-second soak (M3b, parented strip)
+
+```
+ 15s  WS=29.9  private=13.9  handles=314
+ 30s  WS=30.0  private=13.9  handles=314
+ 45s  WS=30.0  private=13.9  handles=314
+ 60s  WS=30.0  private=13.9  handles=314
+ 75s  WS=30.0  private=13.9  handles=314
+ 90s  WS=30.0  private=13.9  handles=310
+```
+
+Flat. The parent link costs one `GetParent` at startup and a `ScreenToClient` pair only
+when the rect changes; there is no per-tick cost on the sampling path.
 
 ## 60-second soak (M3, strip live)
 

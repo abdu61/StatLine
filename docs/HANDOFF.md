@@ -41,12 +41,24 @@ from a screenshot.
 
 - Review the design with `--render-snapshots <dir>` and read the PNGs (they render the
   real drawing code, composited over a taskbar colour).
-- Verify live windows logically: `FindWindow("StatlineStripWindow")`,
-  `FindWindow("StatlineFlyoutWindow")`, `FindWindow("StatlineCompanionWindow")`,
-  `IsWindowVisible`, `GetWindowRect`, `GetWindowLongPtr(GWL_EXSTYLE)`.
-- Post synthetic input to test interaction: `PostMessage(hwnd, 0x0202 /*LBUTTONUP*/, 0,
-  MAKELPARAM(x, y))`. Clicking the strip must create the flyout; verify by FindWindow
-  and the log.
+- Verify live windows logically. The strip is now a **child** of the taskbar, so
+  `FindWindow` (which skips children) will not find it:
+
+  ```powershell
+  $taskbar = [User32]::FindWindow("Shell_TrayWnd", $null)
+  $strip   = [User32]::FindWindowEx($taskbar, [IntPtr]::Zero, "StatlineStripWindow", "Statline")
+  ```
+
+  Pass the real title: an empty string matches only windows whose title is empty, which
+  is a confusing way to get a zero handle.
+
+  `FindWindow("StatlineFlyoutWindow", "Statline")` and
+  `FindWindow("StatlineCompanionWindow", "Statline")` still work: both are top-level.
+- Check `GetParent(strip)`, `IsWindowVisible`, `GetWindowRect`, the `WS_CHILD` and
+  `WS_EX_LAYERED` style bits, and the log line `presented=true tier=child`.
+- Post synthetic input to test interaction: `PostMessage(strip, 0x0202 /*LBUTTONUP*/, 0,
+  MAKELPARAM(x, y))`. Clicking the strip must create the flyout; a second click closes
+  it. Reading the log alone is enough: `flyout window created` / `flyout closed`.
 
 ## Layout
 
@@ -62,47 +74,45 @@ crates/statline-app      bin: main, cli, profile, strip_host, flyout_host, dashb
 docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 ```
 
-## State (all committed, 93 tests green, clippy clean)
+## State (all committed, 99 tests green, clippy clean)
 
 - **M0–M2 done**: workspace, docs, tray shell; metrics (CPU total/per-core/MHz, memory,
   PDH disk, per-adapter network, GPU util+VRAM, battery); software Direct2D renderer
   with headless PNG snapshots.
 - **M3 done**: strip renders in the taskbar beside the tray at 237x42 (125 %), segments
   CPU/MEM/GPU/DISK + two-line NET, per-segment hover, right-click menu, hides for
-  fullscreen and a hidden taskbar, recreates on `TaskbarCreated`.
+  fullscreen and a hidden taskbar, recreates on `TaskbarCreated`. **Parented into
+  `Shell_TrayWnd`** (`WS_CHILD`, tier 1) with a verified parent link; if the parent link
+  is refused or the first present on the child fails, the host detaches to the topmost
+  tier automatically.
 - **M4 done**: single instance, autostart commands, log rotation, panic hook, tray menu
   with Pause/Resume (parks the sampler on its condvar), Show/Hide strip, Dashboard, Exit.
-- **M5 partial**: flyout opens on strip click and closes on focus loss/Esc; renders as a
-  layered panel with interpolation-smoothed area charts.
+- **M5 verified**: flyout opens on strip click, toggles on a second click, closes on Esc
+  or focus loss; renders as a layered panel with interpolation-smoothed area charts.
 - **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
   resizable, Windows 11 dark frame + rounded corners), painting a two-column card grid.
 
 Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tray-only
-10.6 MB WS / 1.8 MB private; strip live 30.2 MB / 14.2 MB / 310 handles, flat over 60 s.
+10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles, flat over
+90 s.
 
 ## Next work, in priority order
 
-1. **Parent the strip into `Shell_TrayWnd` (ADR tier 1).** This was abandoned when ULW
-   appeared broken, but the real cause was a null `BLENDFUNCTION`. Now that ULW works,
-   retest `SetParent(hwnd, taskbar)` + `WS_CHILD`; if `present_layered` still returns
-   false, revert to topmost. Parenting fixes both remaining strip bugs: the Start menu
-   covering it, and fragile click handling. Remember child windows are positioned in
-   parent-client coordinates (`docs/spec/taskbar-integration.md`).
-2. **Process provider + per-app breakdown.** `NtQuerySystemInformation(SystemProcessInformation)`
+1. **Process provider + per-app breakdown.** `NtQuerySystemInformation(SystemProcessInformation)`
    with CPU-time deltas and working sets, sampled at 2 s only while a surface showing
    processes is visible. Then: click a segment → flyout opens focused on that module with
    its top processes; same table in the companion window. This is the feature the user
    asked for explicitly ("press CPU, shows CPU usage of apps").
-3. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
+2. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
    units, which modules show, autostart toggle, safe mode. Live-apply through the host.
-4. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
+3. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
    `IOCTL_STORAGE_QUERY_PROPERTY`, battery temperature/health, ACPI thermal zone via PDH.
    Each degrades to hidden, never fakes a value. CPU package temp/fans are out of scope
    (no user-mode API; legal audit in the plan's §10).
-5. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
+4. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
    CI (fmt/clippy/test/deny/build), README with snapshot images, MIT + third-party notices,
    local `v0.1.0` tag.
-6. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
+5. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
    `WM_DPICHANGED`, Mica/acrylic on the companion (needs a non-layered window + DWM
    backdrop; today it paints an opaque background).
 
@@ -110,8 +120,12 @@ Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tr
 
 - **`UPDATELAYEREDWINDOWINFO.pblend` must not be null** with `ULW_ALPHA`. A null pointer
   makes `UpdateLayeredWindowIndirect` fail with `ERROR_GEN_FAILURE (0x8007001F)`, which
-  reads like a broken display driver. Pass `BLENDFUNCTION { AC_SRC_OVER, 0, 255,
-  AC_SRC_ALPHA }`.
+  reads like a broken display driver. It also made tier 1 look impossible for a while —
+  the parented child was blamed. Pass `BLENDFUNCTION { AC_SRC_OVER, 0, 255,
+  AC_SRC_ALPHA }` before concluding anything about the window hierarchy.
+- **A parented strip is a child window.** Position it in taskbar-client coordinates
+  (`ScreenToClient`), handle `TaskbarCreated` in a top-level window (broadcasts skip
+  children), and look it up with `FindWindowEx`, not `FindWindow`.
 - **Never store a pointer to a value you then move.** The strip host is boxed exactly
   because the window procedure reads it through a static pointer.
 - **GDI destruction must follow Direct2D teardown.** `GdiSurface` drops after the D2D

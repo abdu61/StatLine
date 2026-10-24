@@ -76,3 +76,20 @@ The active tier is visible in Settings → About and in the log at startup.
 - `SetParent` without handling Explorer restart → orphaned invisible window.
 - Assuming a centered taskbar → strip overlaps app icons on left-aligned layouts.
 - Continuous animation over the taskbar → measurable battery drain.
+
+## Verifying the live strip
+
+The strip is a child of `Shell_TrayWnd`, so `FindWindow` (top-level only) will not find
+it. Use `FindWindowEx` and pass the real title; an empty title matches only windows
+whose title is empty:
+
+```powershell
+$taskbar = FindWindow("Shell_TrayWnd", $null)
+$strip   = FindWindowEx($taskbar, 0, "StatlineStripWindow", "Statline")
+GetParent($strip) -eq $taskbar          # must be true
+GetWindowLongPtr($strip, GWL_STYLE)     # WS_CHILD | WS_CLIPSIBLINGS, no WS_POPUP
+GetWindowLongPtr($strip, GWL_EXSTYLE)   # WS_EX_LAYERED | NOACTIVATE | TOOLWINDOW
+```
+
+Position in the log is in physical pixels; a DPI-unaware PowerShell session reports
+virtualized coordinates, so do not treat the two as a mismatch.

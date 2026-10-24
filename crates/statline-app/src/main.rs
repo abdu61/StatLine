@@ -138,6 +138,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    // Broadcast to top-level windows only; a parented strip is a child, so the
+    // restart is handled here for both placement tiers.
+    if msg == window::taskbar_created_message() {
+        strip_host::recreate();
+        return LRESULT(0);
+    }
+
     if msg == tray::WM_TRAY {
         match tray::TrayEvent::from_callback(lparam) {
             Some(tray::TrayEvent::Activate) => open_data_dir(),
