@@ -99,8 +99,9 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   re-anchors upward when the process table arrives; Mica makes the panel translucent.
 - **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
   resizable, Windows 11 dark frame + rounded corners). Left nav with Dashboard, CPU,
-  Memory, GPU, Disk, Network, Battery, System and Settings; each module has a page built
-  from the focused flyout model. Optional DWM Mica backdrop on the framed windows.
+  Memory, GPU, Disk, Network, Battery, System, Settings and About; each module has a page
+  built from the focused flyout model. CPU adds 1/5/15-minute averages; the battery card
+  shows health, temperature and cycle count. Optional DWM Mica backdrop on framed windows.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
   deltas and working sets. Task Manager scale (share of all cores); `None` until a baseline
   exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
@@ -128,10 +129,10 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
 
 ## Next work, in priority order
 
-1. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
-   remembered window bounds, About pane.
+1. **Settings, remaining**: module enable/order, density, safe mode, remembered window
+   bounds.
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power. The current build
-   shows utilization and VRAM only. This machine is AMD integrated, so ADL needs an AMD
+   shows utilization and VRAM only. This machine is an AMD APU, so ADL needs an AMD
    discrete GPU to verify; NVML can be exercised on any NVIDIA machine.
 3. **Packaging, remaining**: a multi-size `.ico` for the executable/tray, the one-hour
    soak and `--bench 300`, then the local annotated `v0.1.0` tag. Store/trademark checks

@@ -5,9 +5,10 @@
 //! testable without a window.
 
 use crate::flyout::{Focus, Model, Row, core_bars, sparkline};
+use statline_core::{APP_NAME, VERSION};
 use statline_render::{Align, Palette, Surface, TextEngine, TextStyle, radius, space};
 
-/// Pages in nav order. Settings is the ninth item and opens its own window.
+/// Pages in nav order. Settings and About are the last two nav items.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Page {
     #[default]
@@ -19,6 +20,7 @@ pub enum Page {
     Network,
     Battery,
     System,
+    About,
 }
 
 impl Page {
@@ -43,10 +45,17 @@ impl Page {
             Self::Network => 5,
             Self::Battery => 6,
             Self::System => 7,
+            Self::About => ABOUT_ITEM,
         }
     }
 
     pub fn from_index(index: usize) -> Option<Self> {
+        if index == ABOUT_ITEM {
+            return Some(Self::About);
+        }
+        if index == SETTINGS_ITEM {
+            return None;
+        }
         Self::ALL.get(index).copied()
     }
 
@@ -60,13 +69,14 @@ impl Page {
             Self::Network => "Network",
             Self::Battery => "Battery",
             Self::System => "System",
+            Self::About => "About",
         }
     }
 
     /// Focus passed to the flyout model builder for this page.
     pub fn focus(self) -> Option<Focus> {
         match self {
-            Self::Dashboard => None,
+            Self::Dashboard | Self::About => None,
             Self::Cpu => Some(Focus::Cpu),
             Self::Memory => Some(Focus::Memory),
             Self::Gpu => Some(Focus::Gpu),
@@ -78,7 +88,7 @@ impl Page {
     }
 }
 
-pub const NAV_ITEMS: [&str; 9] = [
+pub const NAV_ITEMS: [&str; 10] = [
     "Dashboard",
     "CPU",
     "Memory",
@@ -88,8 +98,10 @@ pub const NAV_ITEMS: [&str; 9] = [
     "Battery",
     "System",
     "Settings",
+    "About",
 ];
 pub const SETTINGS_ITEM: usize = 8;
+pub const ABOUT_ITEM: usize = 9;
 
 pub const NAV_WIDTH: f32 = 168.0;
 const NAV_TOP: f32 = 96.0;
@@ -559,6 +571,56 @@ fn render_module(
     );
 }
 
+/// Static information about the build and its privacy posture.
+fn render_about(
+    surface: &mut Surface,
+    text: &mut TextEngine,
+    palette: &Palette,
+    scale: f32,
+    x: f32,
+    width: f32,
+) {
+    let subtitle = format!("{APP_NAME} {VERSION} \u{00b7} native Rust + Win32 + Direct2D");
+    let mut y = draw_header(surface, text, palette, "About", &subtitle, x, width, scale);
+
+    let entries = [
+        (
+            "Privacy",
+            "No network access, no telemetry, no driver, no elevated helper.",
+        ),
+        ("Settings", "%APPDATA%\\Statline\\settings.json"),
+        ("Logs", "%LOCALAPPDATA%\\Statline\\logs"),
+        (
+            "Licence",
+            "MIT. Third-party notices and the Apache/MIT texts ship with the app.",
+        ),
+        (
+            "Sensors",
+            "ACPI, drive and battery readings where Windows exposes them; missing values hide.",
+        ),
+        ("Not yet", "GPU vendor temperature/fan/power (NVML/ADL)."),
+    ];
+
+    for (label, value) in entries {
+        let _ = text.draw(
+            surface,
+            label,
+            (x, y, width, 14.0 * scale),
+            label_style(scale),
+            palette.text_muted,
+        );
+        y += 16.0 * scale;
+        let _ = text.draw(
+            surface,
+            value,
+            (x, y, width, 14.0 * scale),
+            detail_style(scale),
+            palette.text_primary,
+        );
+        y += 22.0 * scale;
+    }
+}
+
 /// Draw the window. `page` selects the content; the nav is always drawn.
 pub fn render(
     surface: &mut Surface,
@@ -587,6 +649,7 @@ pub fn render(
             content_x,
             content_width,
         ),
+        Page::About => render_about(surface, text, palette, scale, content_x, content_width),
         _ => render_module(
             surface,
             text,
@@ -638,11 +701,14 @@ mod tests {
         assert_eq!(Page::Dashboard.index(), 0);
         assert_eq!(Page::Cpu.index(), 1);
         assert_eq!(Page::System.index(), 7);
+        assert_eq!(Page::About.index(), ABOUT_ITEM);
         assert_eq!(Page::from_index(0), Some(Page::Dashboard));
         assert_eq!(Page::from_index(SETTINGS_ITEM), None);
+        assert_eq!(Page::from_index(ABOUT_ITEM), Some(Page::About));
         assert_eq!(Page::Cpu.focus(), Some(Focus::Cpu));
         assert_eq!(Page::System.focus(), Some(Focus::System));
         assert_eq!(Page::Dashboard.focus(), None);
+        assert_eq!(Page::About.focus(), None);
     }
 
     #[test]

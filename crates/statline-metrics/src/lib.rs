@@ -42,6 +42,11 @@ pub struct Sampler {
     process: ProcessState,
     thermal: ThermalState,
     battery: BatteryState,
+    /// Smoothed CPU percentages for the 1/5/15 minute figures.
+    average_1m: f32,
+    average_5m: f32,
+    average_15m: f32,
+    averages_initialized: bool,
     /// Set by the UI while a surface that shows processes or sensors is open.
     details_visible: bool,
 }
@@ -66,6 +71,10 @@ impl Sampler {
             process: ProcessState::new(),
             thermal: ThermalState::new(),
             battery: BatteryState::new(),
+            average_1m: 0.0,
+            average_5m: 0.0,
+            average_15m: 0.0,
+            averages_initialized: false,
             details_visible: false,
         }
     }
@@ -99,7 +108,7 @@ impl Sampler {
 
         Snapshot {
             taken_at: Some(SystemTime::now()),
-            cpu: self.sample_cpu(),
+            cpu: self.sample_cpu(elapsed),
             memory: sample_memory(),
             gpu: self.gpu.sample(now),
             disk: self.disk.sample(now, self.details_visible),
@@ -124,7 +133,7 @@ impl Sampler {
         self.process.sample(now, metrics::logical_core_count())
     }
 
-    fn sample_cpu(&mut self) -> Option<CpuSample> {
+    fn sample_cpu(&mut self, elapsed: Option<Duration>) -> Option<CpuSample> {
         let total = metrics::system_times()?;
         let cores = metrics::per_core_times();
 
@@ -139,6 +148,26 @@ impl Sampler {
             Vec::new()
         };
 
+        let valid_delta = self.previous_total.is_some();
+        let dt = elapsed
+            .map(|elapsed| elapsed.as_secs_f32())
+            .unwrap_or(1.0)
+            .clamp(0.1, 60.0);
+        if !self.averages_initialized {
+            // The first snapshot has no CPU delta; seed the averages from the
+            // first real reading instead of smoothing up from zero.
+            if valid_delta {
+                self.average_1m = total_percent;
+                self.average_5m = total_percent;
+                self.average_15m = total_percent;
+                self.averages_initialized = true;
+            }
+        } else {
+            self.average_1m = cpu::smooth(self.average_1m, total_percent, dt, 60.0);
+            self.average_5m = cpu::smooth(self.average_5m, total_percent, dt, 300.0);
+            self.average_15m = cpu::smooth(self.average_15m, total_percent, dt, 900.0);
+        }
+
         self.previous_total = Some(total);
         self.previous_cores = cores;
 
@@ -146,6 +175,9 @@ impl Sampler {
             total_percent,
             per_core_percent,
             mhz: metrics::current_mhz(),
+            average_1m_percent: self.average_1m,
+            average_5m_percent: self.average_5m,
+            average_15m_percent: self.average_15m,
         })
     }
 

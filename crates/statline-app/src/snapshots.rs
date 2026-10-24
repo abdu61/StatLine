@@ -20,6 +20,9 @@ fn synthetic() -> Snapshot {
             total_percent: 23.0,
             per_core_percent: vec![12.0, 44.0, 8.0, 31.0, 5.0, 61.0, 17.0, 9.0],
             mhz: Some(2400),
+            average_1m_percent: 21.0,
+            average_5m_percent: 19.0,
+            average_15m_percent: 17.0,
         }),
         memory: Some(MemorySample {
             used_bytes: 9_800_000_000,
@@ -64,6 +67,7 @@ fn synthetic() -> Snapshot {
             designed_mwh: Some(50_000),
             full_mwh: Some(46_000),
             temperature_c: Some(31.0),
+            cycle_count: Some(312),
             ..Default::default()
         }),
         processes: Some(ProcessSample {
@@ -325,6 +329,20 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
             Page::Cpu,
         );
         let path = dir.join("dashboard-cpu-100.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+
+        // About page.
+        let mut surface = renderer.surface(width, height)?;
+        dashboard::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            Page::About,
+        );
+        let path = dir.join("dashboard-about-100.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
     }

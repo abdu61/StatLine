@@ -20,9 +20,9 @@ The place to configure and to explore, in one window.
 - [ ] Window shell: custom title area, remembered bounds
 - [ ] Overview: 5-minute chart with hover readout, sortable process table
 - [ ] Modules: enable, reorder (drag), per-module meter/threshold/colour
-- [ ] Appearance: accent, density, labels, opacity
+- [ ] Appearance: density, labels, opacity
 - [ ] Behaviour: secondary monitors, fullscreen, safe mode
-- [ ] About: versions, active tier, folders, copy diagnostics, reset, licences
+- [x] About: version, privacy posture, folders, licence, sensor scope
 - [ ] Keyboard navigation + focus rings; Esc closes
 - [ ] Live preview of strip changes while editing
 

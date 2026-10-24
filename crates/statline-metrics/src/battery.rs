@@ -48,6 +48,7 @@ impl BatteryState {
             designed_mwh: details.and_then(|details| details.designed_mwh),
             full_mwh: details.and_then(|details| details.full_mwh),
             temperature_c: details.and_then(|details| details.temperature_c),
+            cycle_count: details.and_then(|details| details.cycle_count),
         })
     }
 

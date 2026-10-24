@@ -170,6 +170,15 @@ pub fn model_focused(
             });
             if focus == Some(Focus::Cpu) {
                 cores = cpu.per_core_percent.clone();
+                detail_rows.push(DetailRow {
+                    label: String::from("Averages"),
+                    value: format!(
+                        "1m {}  \u{00b7}  5m {}  \u{00b7}  15m {}",
+                        format_percent(cpu.average_1m_percent),
+                        format_percent(cpu.average_5m_percent),
+                        format_percent(cpu.average_15m_percent)
+                    ),
+                });
             }
         }
     }
@@ -344,6 +353,9 @@ pub fn model_focused(
         }
         if let Some(celsius) = battery.temperature_c {
             detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
+        }
+        if let Some(cycles) = battery.cycle_count {
+            detail.push_str(&format!(" \u{00b7} {cycles} cycles"));
         }
         Row {
             label: "Battery",
@@ -791,6 +803,7 @@ mod tests {
                 total_percent: 23.0,
                 per_core_percent: vec![10.0, 20.0],
                 mhz: Some(2400),
+                ..CpuSample::default()
             }),
             memory: Some(MemorySample {
                 used_bytes: 8,
@@ -988,7 +1001,8 @@ mod tests {
         assert_eq!(labels, vec!["CPU", "Battery", "System"]);
         assert_eq!(model.cores.len(), 2, "per-core values feed the bars");
         assert_eq!(model.processes.len(), 1);
-        assert!(model.detail_rows.is_empty());
+        assert_eq!(model.detail_rows.len(), 1);
+        assert_eq!(model.detail_rows[0].label, "Averages");
     }
 
     #[test]

@@ -34,6 +34,8 @@ accent colour.
 - **Disk** — capacity/rate card, then per-volume used/total and temperature rows.
 - **Network** — compact down/up card, then per-adapter rates and session totals.
 - **Battery / System** — the two always-on cards, ordered for the page.
+- **About** — version, privacy statement, settings/log folders, licence, and what the
+  sensor stack does and does not provide.
 
 Module pages are built from the same `flyout::Model` focused on the page's module, so
 the flyout and companion never disagree.

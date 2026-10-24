@@ -32,9 +32,9 @@ detail sampling on
   final anchored rect and re-anchors upward when the process table arrives. With Mica
   on, the panel is lightly translucent.
 - **Companion**: framed resizable window with a left nav (Dashboard, CPU, Memory, GPU,
-  Disk, Network, Battery, System, Settings) and a page per module: CPU cores and process
-  table, memory cache and top memory apps, per-volume and per-adapter rows. Optional
-  Mica DWM backdrop on the framed windows.
+  Disk, Network, Battery, System, Settings, About). Module pages show CPU cores,
+  1/5/15-minute averages and processes; memory cache and top memory apps; per-volume
+  and per-adapter rows. Optional Mica DWM backdrop on the framed windows.
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
   with theme, accent presets, sampler interval, byte units, Mica, strip placement and
   start-with-Windows. Mica shows a GPU/battery caution. Changes apply live and are saved
@@ -46,9 +46,11 @@ detail sampling on
   deltas; Task Manager scale (share of all cores); `—` until a baseline exists; sampled
   at 2 s only while the flyout or companion is open (~4.75 ms per query).
 - **Sensors**: ACPI "System" temperature via PDH (5 s), drive temperatures via
-  `IOCTL_STORAGE_QUERY_PROPERTY` (5 min cache, volume → disk mapping), battery health and
-  temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). Every source degrades to
-  hidden; they share the process table's surface-visibility gate.
+  `IOCTL_STORAGE_QUERY_PROPERTY` (5 min cache, volume → disk mapping), battery health,
+  temperature and cycle count via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). Every source
+  degrades to hidden; they share the process table's surface-visibility gate.
+- **CPU detail**: current load plus 1/5/15-minute exponentially smoothed averages
+  computed from real elapsed time, per-core bars and the CPU process table.
 - **Sampling**: 0.46 ms per sample in a tight loop with detail providers off; WS ~30 MB,
   private ~14.5 MB, handles flat.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic
@@ -56,11 +58,11 @@ detail sampling on
 
 ## Next, in order
 
-1. **Settings, remaining**: module enable/order, density/accent, safe mode,
-   remembered window bounds, About pane.
+1. **Settings, remaining**: module enable/order, density/accent (accent done), safe mode,
+   remembered window bounds.
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power; current builds show
-   utilization and VRAM only. This machine is AMD integrated, so an AMD discrete GPU is
-   needed to verify the ADL path.
+   utilization and VRAM only. This machine is an AMD APU, so an AMD discrete GPU is
+   needed to verify the ADL path; NVML can be exercised on any NVIDIA machine.
 3. **Packaging, remaining**: app `.ico`, icon in the executable/tray, a 1-hour soak and
    `--bench 300`, then the local `v0.1.0` tag.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,

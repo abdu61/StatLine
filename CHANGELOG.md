@@ -8,6 +8,11 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- About page in the companion: version, privacy posture, settings/log folders, licence
+  and the sensor scope.
+- CPU 1/5/15-minute smoothed averages (real elapsed time, not fixed ticks), shown on the
+  CPU page and in `--probe`.
+- Battery cycle count on the battery card when the firmware reports it.
 - Accent presets (System, Blue, Green, Purple, Orange, Teal, Pink) applied to the strip,
   flyout, companion and settings; System reads the Windows DWM accent.
 - Charts and meters use the accent normally and switch to warning yellow or critical

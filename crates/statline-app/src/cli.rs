@@ -74,8 +74,11 @@ pub fn probe(count: u32, interval: Duration) {
                 };
                 let mhz = cpu.mhz.map(format_frequency).unwrap_or_default();
                 format!(
-                    "cpu {:>4} {mhz:>9}  {cores}",
-                    format_percent(cpu.total_percent)
+                    "cpu {:>4} {mhz:>9}  {cores}  avg {} / {} / {}",
+                    format_percent(cpu.total_percent),
+                    format_percent(cpu.average_1m_percent),
+                    format_percent(cpu.average_5m_percent),
+                    format_percent(cpu.average_15m_percent)
                 )
             }
             None => String::from("cpu  n/a"),
@@ -157,8 +160,12 @@ pub fn probe(count: u32, interval: Duration) {
                     .temperature_c
                     .map(|celsius| format!("  {}", format_temperature(celsius)))
                     .unwrap_or_default();
+                let cycles = battery
+                    .cycle_count
+                    .map(|count| format!("  {count} cycles"))
+                    .unwrap_or_default();
                 format!(
-                    "  battery {} {}{health}{temperature}",
+                    "  battery {} {}{health}{temperature}{cycles}",
                     format_percent(battery.percent),
                     if battery.on_ac { "on AC" } else { "on battery" }
                 )

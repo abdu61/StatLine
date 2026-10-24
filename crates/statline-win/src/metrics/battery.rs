@@ -65,6 +65,7 @@ pub struct BatteryDetails {
     pub designed_mwh: Option<u32>,
     pub full_mwh: Option<u32>,
     pub temperature_c: Option<f32>,
+    pub cycle_count: Option<u32>,
 }
 
 /// Handle that closes itself, so every early return releases the device.
@@ -124,6 +125,7 @@ pub fn details() -> Option<BatteryDetails> {
         designed_mwh: (information.DesignedCapacity > 0).then_some(information.DesignedCapacity),
         full_mwh: (information.FullChargedCapacity > 0).then_some(information.FullChargedCapacity),
         temperature_c,
+        cycle_count: (information.CycleCount > 0).then_some(information.CycleCount),
     })
 }
 

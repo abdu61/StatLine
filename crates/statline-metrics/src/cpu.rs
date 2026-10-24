@@ -40,12 +40,41 @@ pub fn per_core_percent(previous: &[CpuTimes], current: &[CpuTimes]) -> Vec<f32>
         .collect()
 }
 
+/// Exponential moving average used for the 1/5/15 minute CPU figures.
+///
+/// `elapsed_secs` is the real gap between samples, so a changed interval or a
+/// sleep/resume gap does not skew the average the way a fixed tick would.
+pub fn smooth(previous: f32, current: f32, elapsed_secs: f32, tau_secs: f32) -> f32 {
+    if tau_secs <= 0.0 {
+        return current.clamp(0.0, 100.0);
+    }
+    let alpha = 1.0 - (-elapsed_secs.max(0.0) / tau_secs).exp();
+    (previous + (current - previous) * alpha).clamp(0.0, 100.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn times(idle: u64, kernel: u64, user: u64) -> CpuTimes {
         CpuTimes { idle, kernel, user }
+    }
+
+    #[test]
+    fn smoothing_moves_towards_the_current_value() {
+        let next = smooth(20.0, 60.0, 1.0, 60.0);
+        assert!(next > 20.0 && next < 60.0);
+        assert!((next - 20.65).abs() < 0.1);
+    }
+
+    #[test]
+    fn a_long_gap_jumps_to_the_current_value() {
+        assert!((smooth(20.0, 60.0, 600.0, 60.0) - 60.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn smoothed_values_are_clamped() {
+        assert_eq!(smooth(0.0, 200.0, 1000.0, 60.0), 100.0);
     }
 
     #[test]

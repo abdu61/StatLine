@@ -28,6 +28,12 @@ pub struct CpuSample {
     pub per_core_percent: Vec<f32>,
     /// Current average core clock, if the platform reports it.
     pub mhz: Option<u32>,
+    /// Exponentially smoothed busy percentage over the last minute.
+    pub average_1m_percent: f32,
+    /// Exponentially smoothed busy percentage over the last five minutes.
+    pub average_5m_percent: f32,
+    /// Exponentially smoothed busy percentage over the last fifteen minutes.
+    pub average_15m_percent: f32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -119,6 +125,8 @@ pub struct BatterySample {
     pub designed_mwh: Option<u32>,
     pub full_mwh: Option<u32>,
     pub temperature_c: Option<f32>,
+    /// Manufacturer cycle count, when the battery reports it.
+    pub cycle_count: Option<u32>,
 }
 
 impl BatterySample {
