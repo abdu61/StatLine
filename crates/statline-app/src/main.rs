@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cli;
+mod profile;
 
 use log::{LevelFilter, error, info};
 use statline_core::{APP_NAME, VERSION};
@@ -38,12 +39,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         cli::probe(5, Duration::from_millis(DEFAULT_INTERVAL_MS));
         return Ok(());
     }
+    if let Some(index) = args.iter().position(|a| a == "--profile") {
+        let count = args
+            .get(index + 1)
+            .and_then(|value| value.parse::<u32>().ok())
+            .unwrap_or(20);
+        profile::run(count);
+        return Ok(());
+    }
     if let Some(index) = args.iter().position(|a| a == "--bench") {
         let count = args
             .get(index + 1)
             .and_then(|value| value.parse::<u32>().ok())
             .unwrap_or(60);
-        cli::bench(count, Duration::from_millis(DEFAULT_INTERVAL_MS));
+        let interval_ms = args
+            .get(index + 2)
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(DEFAULT_INTERVAL_MS);
+        cli::bench(count, Duration::from_millis(interval_ms));
         return Ok(());
     }
 

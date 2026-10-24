@@ -8,7 +8,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 authors = ["Statline contributors"]
-description = "Statline â€” a live system monitor for the Windows 11 taskbar"
+description = "Statline - a live system monitor for the Windows 11 taskbar"
 
 [workspace.dependencies]
 statline-core = { path = "crates/statline-core" }
@@ -22,6 +22,8 @@ windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
     "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Storage_FileSystem",
     "Win32_System_Console",
     "Win32_System_LibraryLoader",
     "Win32_System_Performance",
@@ -49,4 +51,3 @@ strip = true
 
 [profile.release.package."*"]
 opt-level = 3
-

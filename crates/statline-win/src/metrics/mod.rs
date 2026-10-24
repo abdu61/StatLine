@@ -5,7 +5,10 @@
 //! Windowstation. Keeping the split strict is what makes the sampler testable.
 
 pub mod cpu;
+pub mod disk;
 pub mod memory;
+pub mod net;
+pub mod pdh;
 
 pub use cpu::{CpuTimes, current_mhz, logical_core_count, per_core_times, system_times};
 pub use memory::{

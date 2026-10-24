@@ -1,4 +1,4 @@
-﻿//! CPU percentage math.
+//! CPU percentage math.
 //!
 //! Windows reports `kernel` time that **includes** idle time, so the busy
 //! fraction is `(kernel + user - idle) / (kernel + user)`. Getting this wrong
@@ -108,4 +108,3 @@ mod tests {
         assert!((0.0..=100.0).contains(&value));
     }
 }
-

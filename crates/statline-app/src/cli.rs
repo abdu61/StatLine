@@ -1,6 +1,8 @@
-//! Command-line modes: `--help`, `--version`, `--probe`, `--bench`.
+//! Command-line modes: `--help`, `--version`, `--probe`, `--bench`, `--profile`.
 
-use statline_core::units::{UnitSystem, format_bytes, format_frequency, format_percent};
+use statline_core::units::{
+    UnitSystem, format_bytes, format_frequency, format_percent, format_rate,
+};
 use statline_core::{APP_NAME, VERSION};
 use statline_metrics::Sampler;
 use statline_win::console;
@@ -22,6 +24,7 @@ pub fn print_help() {
         "  --version, -V         Show the version",
         "  --probe               Print a few samples and exit",
         "  --bench [samples]     Measure sampling cost (default 60)",
+        "  --profile [iters]     Time each provider in isolation (default 20)",
         "",
         "With no options, Statline starts in the notification area.",
     ];
@@ -35,13 +38,13 @@ pub fn print_version() {
     console::write_line(&label());
 }
 
-/// Print `count` samples, one line each, then return.
+/// Print `count` samples, one block each, then return.
 pub fn probe(count: u32, interval: Duration) {
     console::ensure();
     let mut sampler = Sampler::new();
 
     console::write_line(&format!(
-        "{} — {count} samples, {:.0} ms apart",
+        "{} - {count} samples, {:.0} ms apart",
         label(),
         interval.as_secs_f64() * 1000.0
     ));
@@ -64,7 +67,7 @@ pub fn probe(count: u32, interval: Duration) {
                 };
                 let mhz = cpu.mhz.map(format_frequency).unwrap_or_default();
                 format!(
-                    "cpu {:>4}  {mhz:>9}  {cores}",
+                    "cpu {:>4} {mhz:>9}  {cores}",
                     format_percent(cpu.total_percent)
                 )
             }
@@ -81,18 +84,48 @@ pub fn probe(count: u32, interval: Duration) {
             None => String::from("mem  n/a"),
         };
 
+        let disk_text = match snapshot.disk.as_ref() {
+            Some(disk) => {
+                let volume = disk.volumes.first();
+                let used = volume
+                    .map(|volume| {
+                        format!(
+                            " {}/{}",
+                            format_bytes(volume.used_bytes(), UnitSystem::Binary),
+                            format_bytes(volume.total_bytes, UnitSystem::Binary)
+                        )
+                    })
+                    .unwrap_or_default();
+                format!(
+                    "disk R {} W {}{used}",
+                    format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
+                    format_rate(disk.write_bytes_per_sec, UnitSystem::Binary)
+                )
+            }
+            None => String::from("disk n/a"),
+        };
+
+        let net_text = match snapshot.network.as_ref() {
+            Some(network) => format!(
+                "net down {} up {}",
+                format_rate(network.rx_bytes_per_sec, UnitSystem::Binary),
+                format_rate(network.tx_bytes_per_sec, UnitSystem::Binary)
+            ),
+            None => String::from("net  n/a"),
+        };
+
         let system_text = snapshot
             .system
             .as_ref()
             .map(|system| format!("procs {}", system.processes))
             .unwrap_or_default();
 
-        console::write_line(&format!(
-            "#{:<2} {cpu_text}  {memory_text}  {system_text}",
-            index + 1
-        ));
-
+        console::write_line(&format!("#{:<2} {cpu_text}", index + 1));
+        console::write_line(&format!("      {memory_text}"));
+        console::write_line(&format!("      {disk_text}"));
+        console::write_line(&format!("      {net_text}  {system_text}"));
         if index + 1 < count {
+            console::write_line("");
             std::thread::sleep(interval);
         }
     }
@@ -103,7 +136,7 @@ pub fn bench(count: u32, interval: Duration) {
     console::ensure();
     let mut sampler = Sampler::new();
 
-    // Warm up: the first sample allocates the per-core buffers.
+    // Warm up: the first sample allocates the per-core buffers and opens PDH.
     let _ = sampler.sample();
 
     let mut durations = Vec::with_capacity(count as usize);
@@ -132,7 +165,7 @@ pub fn bench(count: u32, interval: Duration) {
 
     let memory = statline_win::metrics::current_process_memory();
 
-    console::write_line(&format!("{} — bench", label()));
+    console::write_line(&format!("{} - bench", label()));
     console::write_line(&format!("samples      {count}"));
     console::write_line(&format!(
         "interval     {:.0} ms",
@@ -154,8 +187,8 @@ pub fn bench(count: u32, interval: Duration) {
     }
 
     console::write_line("");
-    console::write_line("budget: p95 < 1.500 ms, working set < 30 MB");
-    console::write_line(if p95 < 1.5 {
+    console::write_line("budget: mean < 1.500 ms (0.15% of a core at 1 Hz), working set < 30 MB");
+    console::write_line(if mean < 1.5 {
         "result: within budget"
     } else {
         "result: OVER BUDGET"

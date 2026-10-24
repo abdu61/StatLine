@@ -1,19 +1,38 @@
 //! The sampling engine: turns raw Win32 readings into a `Snapshot`.
 
 use statline_core::model::{CpuSample, MemorySample, Snapshot, SystemSample};
+use statline_win::metrics::net::InterfaceRef;
 use statline_win::metrics::{self, CpuTimes};
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 pub mod cpu;
+pub mod disk;
+pub mod network;
+
+use disk::DiskState;
+use network::NetworkState;
+
+/// Interface enumeration costs ~1.2 ms; the list changes rarely.
+const INTERFACE_REFRESH: Duration = Duration::from_secs(60);
 
 /// Holds the previous counter readings needed to compute rates.
 ///
 /// One `Sampler` per process: the delta state is not shareable, which keeps the
 /// math honest (two consumers cannot accidentally interleave readings).
-#[derive(Debug, Default)]
 pub struct Sampler {
     previous_total: Option<CpuTimes>,
     previous_cores: Vec<CpuTimes>,
+    last_tick: Option<Instant>,
+    network: NetworkState,
+    interfaces: Vec<InterfaceRef>,
+    interfaces_at: Option<Instant>,
+    disk: DiskState,
+}
+
+impl Default for Sampler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Sampler {
@@ -21,18 +40,29 @@ impl Sampler {
         Self {
             previous_total: None,
             previous_cores: Vec::new(),
+            last_tick: None,
+            network: NetworkState::new(),
+            interfaces: Vec::new(),
+            interfaces_at: None,
+            disk: DiskState::new(),
         }
     }
 
     /// Take one reading of everything M1 knows about.
     ///
     /// This is a direct set of cheap syscalls on the calling thread; the
-    /// sampling thread wrapper arrives with the timer in a later slice.
+    /// sampling-thread wrapper arrives in a later slice.
     pub fn sample(&mut self) -> Snapshot {
+        let now = Instant::now();
+        let elapsed = self.last_tick.map(|previous| now - previous);
+        self.last_tick = Some(now);
+
         Snapshot {
             taken_at: Some(SystemTime::now()),
             cpu: self.sample_cpu(),
             memory: sample_memory(),
+            disk: self.disk.sample(now),
+            network: Some(self.sample_network(now, elapsed)),
             system: sample_system(),
             ..Snapshot::default()
         }
@@ -61,6 +91,31 @@ impl Sampler {
             per_core_percent,
             mhz: metrics::current_mhz(),
         })
+    }
+
+    fn sample_network(
+        &mut self,
+        now: Instant,
+        elapsed: Option<Duration>,
+    ) -> statline_core::NetworkSample {
+        let stale = self
+            .interfaces_at
+            .map(|at| now.duration_since(at) >= INTERFACE_REFRESH)
+            .unwrap_or(true);
+        if stale || self.interfaces.is_empty() {
+            self.interfaces = metrics::net::interfaces();
+            self.interfaces_at = Some(now);
+        }
+
+        let counters = self
+            .interfaces
+            .iter()
+            .filter_map(|interface| {
+                metrics::net::counters(interface).map(|(rx, tx)| (interface.name.clone(), rx, tx))
+            })
+            .collect();
+
+        self.network.update(counters, elapsed)
     }
 }
 
@@ -119,6 +174,13 @@ mod tests {
         let memory = snapshot.memory.expect("memory sample");
         assert!(memory.total_bytes > 0);
         assert!(memory.used_bytes <= memory.total_bytes);
+
+        let network = snapshot.network.expect("network sample");
+        assert!(network.rx_bytes_per_sec >= 0.0);
+
+        if let Some(disk) = snapshot.disk {
+            assert!(!disk.volumes.is_empty());
+        }
 
         let system = snapshot.system.expect("system sample");
         assert!(system.uptime_secs > 0);
