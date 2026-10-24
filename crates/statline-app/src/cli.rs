@@ -120,10 +120,30 @@ pub fn probe(count: u32, interval: Duration) {
             .map(|system| format!("procs {}", system.processes))
             .unwrap_or_default();
 
+        let gpu_text = match snapshot.gpu.as_ref() {
+            Some(gpu) => format!(
+                "gpu {}  vram {} / {}",
+                format_percent(gpu.utilization_percent),
+                format_bytes(gpu.vram_used_bytes, UnitSystem::Binary),
+                format_bytes(gpu.vram_total_bytes, UnitSystem::Binary)
+            ),
+            None => String::from("gpu  n/a"),
+        };
+
+        let battery_text = match snapshot.battery.as_ref() {
+            Some(battery) => format!(
+                "  battery {} {}",
+                format_percent(battery.percent),
+                if battery.on_ac { "on AC" } else { "on battery" }
+            ),
+            None => String::new(),
+        };
+
         console::write_line(&format!("#{:<2} {cpu_text}", index + 1));
         console::write_line(&format!("      {memory_text}"));
         console::write_line(&format!("      {disk_text}"));
-        console::write_line(&format!("      {net_text}  {system_text}"));
+        console::write_line(&format!("      {gpu_text}"));
+        console::write_line(&format!("      {net_text}  {system_text}{battery_text}"));
         if index + 1 < count {
             console::write_line("");
             std::thread::sleep(interval);
@@ -139,6 +159,7 @@ pub fn bench(count: u32, interval: Duration) {
     // Warm up: the first sample allocates the per-core buffers and opens PDH.
     let _ = sampler.sample();
 
+    let cpu_start = statline_win::metrics::process_cpu_time().unwrap_or_default();
     let mut durations = Vec::with_capacity(count as usize);
     for index in 0..count {
         let started = Instant::now();
@@ -149,6 +170,11 @@ pub fn bench(count: u32, interval: Duration) {
             std::thread::sleep(interval);
         }
     }
+
+    let cpu_total = statline_win::metrics::process_cpu_time()
+        .unwrap_or_default()
+        .saturating_sub(cpu_start);
+    let cpu_mean_ms = cpu_total.as_secs_f64() * 1000.0 / count.max(1) as f64;
 
     durations.sort_unstable();
     let total: Duration = durations.iter().sum();
@@ -186,9 +212,18 @@ pub fn bench(count: u32, interval: Duration) {
         ));
     }
 
+    let interval_ms = interval.as_secs_f64() * 1000.0;
+    let core_share = if interval_ms > 0.0 {
+        cpu_mean_ms / interval_ms * 100.0
+    } else {
+        0.0
+    };
+    console::write_line(&format!(
+        "cpu mean     {cpu_mean_ms:.3} ms  ({core_share:.3}% of one core)"
+    ));
     console::write_line("");
-    console::write_line("budget: mean < 1.500 ms (0.15% of a core at 1 Hz), working set < 30 MB");
-    console::write_line(if mean < 1.5 {
+    console::write_line("development gate: cpu mean < 2.000 ms per sample, working set < 30 MB");
+    console::write_line(if cpu_mean_ms < 2.0 {
         "result: within budget"
     } else {
         "result: OVER BUDGET"

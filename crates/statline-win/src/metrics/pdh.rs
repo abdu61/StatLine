@@ -9,10 +9,14 @@
 
 use crate::to_wide;
 use windows::Win32::System::Performance::{
-    PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW,
-    PdhCloseQuery, PdhCollectQueryData, PdhGetFormattedCounterValue, PdhOpenQueryA,
+    PDH_FMT_COUNTERVALUE, PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY,
+    PdhAddEnglishCounterW, PdhCloseQuery, PdhCollectQueryData, PdhGetFormattedCounterArrayW,
+    PdhGetFormattedCounterValue, PdhOpenQueryA,
 };
 use windows::core::{PCSTR, PCWSTR};
+
+/// `PDH_MORE_DATA`: the caller's buffer was too small, size has been updated.
+const PDH_MORE_DATA: u32 = 0x8000_07D2;
 
 /// An open PDH query. Closes itself on drop.
 pub struct PdhQuery {
@@ -34,6 +38,8 @@ impl PdhQuery {
     }
 
     /// Add a counter using its English path, e.g. `\PhysicalDisk(_Total)\Disk Read Bytes/sec`.
+    ///
+    /// Wildcards are allowed; read them with [`PdhCounter::values`].
     pub fn add_english(&self, path: &str) -> Option<PdhCounter> {
         let wide = to_wide(path.as_ref());
         let mut counter = PDH_HCOUNTER::default();
@@ -82,6 +88,59 @@ impl PdhCounter {
         // SAFETY: PDH_FMT_DOUBLE was requested, so the double member is active.
         Some(unsafe { value.Anonymous.doubleValue })
     }
+
+    /// Every instance value for a wildcard counter.
+    ///
+    /// PDH is called twice: once to learn the buffer size, once to fill it.
+    /// Items without valid data (`CStatus != 0`) are skipped.
+    pub fn values(&self) -> Option<Vec<f64>> {
+        let mut size = 0u32;
+        let mut count = 0u32;
+
+        // SAFETY: a null buffer asks PDH for the required size; both
+        // out-parameters are valid.
+        let first = unsafe {
+            PdhGetFormattedCounterArrayW(self.handle, PDH_FMT_DOUBLE, &mut size, &mut count, None)
+        };
+        if first != PDH_MORE_DATA && first != 0 {
+            return None;
+        }
+        if size == 0 || count == 0 {
+            return Some(Vec::new());
+        }
+
+        // Back the buffer with u64 words so the allocation is 8-byte aligned,
+        // which is what PDH_FMT_COUNTERVALUE_ITEM_W requires.
+        let words = size.div_ceil(8) as usize;
+        let mut buffer = vec![0u64; words];
+        let items = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
+
+        // SAFETY: the buffer is at least `size` bytes and suitably aligned.
+        let status = unsafe {
+            PdhGetFormattedCounterArrayW(
+                self.handle,
+                PDH_FMT_DOUBLE,
+                &mut size,
+                &mut count,
+                Some(items),
+            )
+        };
+        if status != 0 {
+            return None;
+        }
+
+        let mut values = Vec::with_capacity(count as usize);
+        for index in 0..count as usize {
+            // SAFETY: PDH wrote `count` items into the buffer.
+            let item = unsafe { &*items.add(index) };
+            if item.FmtValue.CStatus != 0 {
+                continue;
+            }
+            // SAFETY: PDH_FMT_DOUBLE was requested.
+            values.push(unsafe { item.FmtValue.Anonymous.doubleValue });
+        }
+        Some(values)
+    }
 }
 
 #[cfg(test)]
@@ -97,6 +156,18 @@ mod tests {
         assert!(query.collect());
         let value = counter.value().expect("process count");
         assert!(value > 0.0);
+    }
+
+    #[test]
+    fn reads_wildcard_instances() {
+        let query = PdhQuery::open().expect("PdhOpenQuery");
+        let counter = query
+            .add_english("\\GPU Engine(*)\\Utilization Percentage")
+            .expect("GPU engine counter");
+        assert!(query.collect());
+        if let Some(values) = counter.values() {
+            assert!(values.iter().all(|v| *v >= 0.0));
+        }
     }
 
     #[test]

@@ -10,3 +10,4 @@ description = "System metric providers and sampling engine for Statline"
 statline-core.workspace = true
 statline-win.workspace = true
 log.workspace = true
+arc-swap.workspace = true

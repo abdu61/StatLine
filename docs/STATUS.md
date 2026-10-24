@@ -1,25 +1,24 @@
 # Status
 
-**Milestone:** M1 — metrics engine (CPU, memory, disk, network done) · **Updated:** 2026-10-24
+**Milestone:** M1 complete — metrics engine · **Updated:** 2026-10-24
 
 ## Now
 
 - [x] `Snapshot` model, units/formatting, ring buffer
-- [x] CPU total/per-core/MHz, memory, commit, cache
-- [x] Disk: PDH aggregate rates + per-volume capacity (30 s cache)
-- [x] Network: per-interface deltas via `GetIfEntry2` (list cached 60 s)
-- [x] `--probe`, `--bench`, `--profile` (per-provider timing)
-- [x] 62 tests green, clippy clean, bench mean 1.43 ms / WS 12.4 MB
-- [ ] GPU (PDH `GPU Engine` + DXGI VRAM)
-- [ ] Battery + thermal
-- [ ] Sampler thread with waitable timer + `ArcSwap` publish
+- [x] CPU total/per-core/MHz, memory/commit/cache, disk, network
+- [x] GPU utilization + VRAM (PDH `GPU Engine` + `GPU Process Memory`, DXGI budget)
+- [x] Battery percent/AC/rate; desktops correctly report `None`
+- [x] Sampler thread: condvar-paced, `ArcSwap` publish, live interval change, clean stop
+- [x] `--probe`, `--bench` (CPU-time gate), `--profile` (per-provider cost)
+- [x] 68 tests green, clippy clean
+- [ ] M2: Direct2D software surface, design tokens, widget kit, headless snapshots
 
 ## Next (in order)
 
-1. GPU utilization via one PDH wildcard query; VRAM via `IDXGIAdapter3`.
-2. Battery via `GetSystemPowerStatus` + `CallNtPowerInformation`, ACPI thermal zone.
-3. Sampler thread: waitable timer, `ArcSwap<Snapshot>`, pause/resume, interval change.
-4. M2: Direct2D software surface + design tokens + headless snapshot harness.
+1. M2: `statline-render` — D2D/DWrite/WIC factories, DIB surface, palette + type scale.
+2. M2: widget kit (text, meter, sparkline, card, button, toggle) + `--render-snapshots`.
+3. M3: taskbar strip window lifecycle, placement, fallbacks, live capture QA.
+4. M4: tray menu, single instance, autostart, crash handling.
 
 ## Blockers / decisions needed
 
@@ -27,17 +26,20 @@
 
 ## Measured facts (this machine)
 
-Ryzen 7 4700U (8C/8T), 7.4 GiB RAM · Windows 11 25H2 build 26220.9568 · 1536×864
-logical @125 % · taskbar bottom, left-aligned, 48 logical px · `MSTaskSwWClass` absent
-(XAML taskbar) · `PrintWindow` captures the taskbar, `CopyFromScreen` does not.
+Ryzen 7 4700U (8C/8T), 7.4 GiB RAM, Radeon iGPU · Windows 11 25H2 build 26220.9568 ·
+1536x864 logical @125 % · taskbar bottom, left-aligned, 48 logical px · `MSTaskSwWClass`
+absent (XAML taskbar) · `PrintWindow` captures the taskbar, `CopyFromScreen` does not.
 
-Bench (release, 60 samples @ 1 s): mean 1.426 ms, p95 2.008 ms, WS 12.4 MB, private
-5.4 MB. Provider profile: `GetIfTable2` 1.2-1.4 ms (cached 60 s), `GetIfEntry2` x7
-~0.3 ms, PDH disk ~50 us, full sample ~0.47 ms in a tight loop.
+Sampling cost (release, 60 samples @ 1 s): **cpu mean 0.78 ms/sample = 0.078 % of one
+core**, WS 14.3 MB, private 6.2 MB. Tight-loop full sample ~0.56 ms.
+
+Provider costs (release, tight loop): `GetIfTable2` 1.16-1.4 ms (cached 60 s),
+`GetIfEntry2` x7 ~0.27-0.33 ms, GPU PDH+DXGI ~0.65 ms (cached 3 s), PDH disk ~50 us,
+battery ~12 us, volumes ~76 us (cached 30 s).
 
 ## Log
 
 - 2026-10-24 — M0 committed: workspace, tray shell, docs index, capture tooling.
 - 2026-10-24 — M1 slice 1: core model/units/ring, CPU+memory providers, probe/bench.
-- 2026-10-24 — M1 slice 2: disk (PDH) and network providers, per-provider profile,
-  interface/volume caching to stay inside the sampling budget.
+- 2026-10-24 — M1 slice 2: disk (PDH) + network providers, interface/volume caching.
+- 2026-10-24 — M1 slice 3: GPU (PDH + DXGI), battery, sampler thread; CPU-time bench gate.

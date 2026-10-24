@@ -4,8 +4,11 @@
 //! history live in `statline-metrics`, where they can be tested without a
 //! Windowstation. Keeping the split strict is what makes the sampler testable.
 
+pub mod battery;
 pub mod cpu;
 pub mod disk;
+pub mod dxgi;
+pub mod gpu;
 pub mod memory;
 pub mod net;
 pub mod pdh;
@@ -13,7 +16,7 @@ pub mod pdh;
 pub use cpu::{CpuTimes, current_mhz, logical_core_count, per_core_times, system_times};
 pub use memory::{
     MemoryStatus, PerformanceCounters, ProcessMemory, current_process_memory, memory_status,
-    performance_counters, uptime_secs,
+    performance_counters, process_cpu_time, uptime_secs,
 };
 
 use windows::Win32::Foundation::FILETIME;

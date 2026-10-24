@@ -5,11 +5,15 @@ use statline_win::metrics::net::InterfaceRef;
 use statline_win::metrics::{self, CpuTimes};
 use std::time::{Duration, Instant, SystemTime};
 
+pub mod battery;
 pub mod cpu;
 pub mod disk;
+pub mod gpu;
 pub mod network;
+pub mod thread;
 
 use disk::DiskState;
+use gpu::GpuState;
 use network::NetworkState;
 
 /// Interface enumeration costs ~1.2 ms; the list changes rarely.
@@ -27,6 +31,7 @@ pub struct Sampler {
     interfaces: Vec<InterfaceRef>,
     interfaces_at: Option<Instant>,
     disk: DiskState,
+    gpu: GpuState,
 }
 
 impl Default for Sampler {
@@ -45,13 +50,14 @@ impl Sampler {
             interfaces: Vec::new(),
             interfaces_at: None,
             disk: DiskState::new(),
+            gpu: GpuState::new(),
         }
     }
 
-    /// Take one reading of everything M1 knows about.
+    /// Take one reading of everything v1 measures.
     ///
-    /// This is a direct set of cheap syscalls on the calling thread; the
-    /// sampling-thread wrapper arrives in a later slice.
+    /// Every provider is optional: a machine without a battery, GPU counters or
+    /// PDH simply produces `None` for that field.
     pub fn sample(&mut self) -> Snapshot {
         let now = Instant::now();
         let elapsed = self.last_tick.map(|previous| now - previous);
@@ -61,8 +67,10 @@ impl Sampler {
             taken_at: Some(SystemTime::now()),
             cpu: self.sample_cpu(),
             memory: sample_memory(),
+            gpu: self.gpu.sample(now),
             disk: self.disk.sample(now),
             network: Some(self.sample_network(now, elapsed)),
+            battery: battery::sample(),
             system: sample_system(),
             ..Snapshot::default()
         }
@@ -180,6 +188,14 @@ mod tests {
 
         if let Some(disk) = snapshot.disk {
             assert!(!disk.volumes.is_empty());
+        }
+
+        if let Some(gpu) = snapshot.gpu {
+            assert!((0.0..=100.0).contains(&gpu.utilization_percent));
+        }
+
+        if let Some(battery) = snapshot.battery {
+            assert!((0.0..=100.0).contains(&battery.percent));
         }
 
         let system = snapshot.system.expect("system sample");

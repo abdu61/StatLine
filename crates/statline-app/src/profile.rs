@@ -1,4 +1,4 @@
-﻿//! Per-provider timing, for finding where a sampling budget is being spent.
+//! Per-provider timing, for finding where a sampling budget is being spent.
 
 use statline_metrics::Sampler;
 use statline_win::console;
@@ -55,6 +55,14 @@ pub fn run(iterations: u32) {
     if let Some(disk) = disk.as_ref() {
         time("disk sample (PDH)", iterations, || {
             black_box(disk.sample());
+        });
+    }
+    time("battery (GetSystemPowerStatus)", iterations, || {
+        black_box(statline_win::metrics::battery::battery());
+    });
+    if let Some(gpu) = statline_win::metrics::gpu::GpuCounters::open() {
+        time("gpu sample (PDH + DXGI)", iterations, || {
+            black_box(gpu.sample());
         });
     }
     time("volumes", iterations, || {
