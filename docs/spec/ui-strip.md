@@ -5,13 +5,16 @@ The strip is the product. Everything else is optional depth.
 ## Anatomy
 
 ```
-┌────────┬────────┬────────┬────────┬──────────────┐
-│ ◉ CPU  │ ▤ MEM  │ ▦ GPU  │ ⛁ DISK │  ↓ ↑  NET    │   ~40 dip tall
-│  23%   │  62%   │  8%    │  4%    │ 1.2M / 84K   │
-│ ▁▂▃▂▅  │ ▅▅▆▇█  │ ▁▁▂▁▁  │ ▁▁▁▂▁  │              │   meter strip, 2 dip
-└────────┴────────┴────────┴────────┴──────────────┘
+┌──────────────┬────────┬────────┬────────┬────────┐
+│  ↓ ↑  NET    │ ◉ CPU  │ ▤ MEM  │ ▦ GPU  │ ⛁ DISK │   ~40 dip tall
+│ 1.2M / 84K   │  23%   │  62%   │  8%    │  4%    │
+│              │ ▁▂▃▂▅  │ ▅▅▆▇█  │ ▁▁▂▁▁  │ ▁▁▁▂▁  │   meter strip, 2 dip
+└──────────────┴────────┴────────┴────────┴────────┘
 ```
 
+- Network is **first** on purpose. The strip is right-anchored to the tray, so the only
+  variable-width segment changes the strip's left edge; CPU/MEM/GPU/DISK keep their
+  screen positions instead of shifting sideways when the rate text changes.
 - Height: `taskbar_height − 8 dip`, vertically centred.
 - Horizontal padding: 6 dip per segment; 2 dip gap between segments.
 - Minimum segment width: 44 dip. Width grows with the measured text.
@@ -57,9 +60,10 @@ Numeric values use tabular figures so digits do not jitter between frames.
 
 ## Interaction
 
-- Left click on a segment → flyout opens anchored to that segment, scrolled to that
-  module's card.
-- Left click on the strip background → flyout opens at the top card.
+- Left click on a segment → the flyout opens focused on that module: only its card,
+  its detail rows (per-core bars, volumes, adapters), plus System and Battery. CPU and
+  Memory also show the matching process table.
+- Left click on the strip background → flyout opens with every module.
 - Right click → context menu: Pause / Resume · Placement ▸ Left / Right · Modules ▸ ·
   Settings · Dashboard · About · Exit.
 - Double click → dashboard.

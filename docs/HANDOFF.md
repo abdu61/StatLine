@@ -92,7 +92,10 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **M4 done**: single instance, autostart commands, log rotation, panic hook, tray menu
   with Pause/Resume (parks the sampler on its condvar), Show/Hide strip, Dashboard, Exit.
 - **M5 partial**: flyout opens on strip click, toggles on a second click, closes on Esc
-  or focus loss; layered panel with smoothed area charts and the top five processes.
+  or focus loss. A segment focuses one module (CPU per-core bars and CPU process table,
+  Memory commit/cache and top memory apps, Disk volumes, Network adapters) plus System
+  and Battery; the background click shows the overview. It is created at its final
+  anchored rect and re-anchors upward when the process table arrives.
 - **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
   resizable, Windows 11 dark frame + rounded corners), painting a two-column card grid and
   an eight-row process table.

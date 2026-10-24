@@ -9,13 +9,15 @@ One glance gives the whole picture, without opening a window.
 ## Checklist
 
 - [x] Layered popup window, 12 dip radius, drawn shadow, anchored above the strip
-- [x] Cards: CPU (sparkline + total), memory, GPU, disk, network, battery
-- [x] Top-process list (5 rows) with live CPU/RAM, `—` until a CPU baseline exists
+- [x] A segment click shows only that module, plus System and Battery
+- [x] CPU detail: per-core bars, frequency, CPU process table
+- [x] Memory detail: used/total, commit, cache, top memory apps
+- [x] Disk/Network detail: per-volume and per-adapter rows
+- [x] Re-anchors when the process table makes the panel taller; screen-clamped
 - [x] Open/close rules: focus loss, Esc, click-outside, strip click again
-- [x] Segment click focuses that card (accent bar); MEM sorts processes by working set
 - [x] Only samples processes while visible (`set_process_table` gate)
-- [ ] Per-core mini bars on the CPU card
-- [ ] System card (uptime, threads, handles, ACPI "System" temperature)
+- [ ] Overview click (strip padding) needs a deliberate hit target; the strip is fully
+      covered by segments today
 - [ ] Footer actions: Dashboard, Settings
 - [ ] Wheel scrolling with no permanent scrollbar chrome
 - [ ] Reduce-motion respected (no fade)

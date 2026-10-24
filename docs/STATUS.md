@@ -18,14 +18,18 @@ detail sampling on
 
 ## Working
 
-- **Strip**: CPU / MEM / GPU / DISK / NET with meters, hover plate per segment,
-  right-click menu, parented into the taskbar (`WS_CHILD`), `WM_MOUSEACTIVATE`
+- **Strip**: network first, then CPU / MEM / GPU / DISK with meters, hover plate per
+  segment, right-click menu, parented into the taskbar (`WS_CHILD`), `WM_MOUSEACTIVATE`
   suppressed, hides for fullscreen and a hidden taskbar, recreates after an Explorer
   restart via the app message window. Topmost popup remains as an automatic fallback.
+  Network leads so its varying rate text changes the strip's left edge instead of
+  shifting the other segments.
 - **Flyout**: opens on strip click, toggles closed on a second click, closes on Esc or
-  focus loss, renders smoothed area charts, and lists the top five processes with CPU
-  share and working set. Clicking a segment focuses that card (accent bar); MEM sorts
-  the process table by working set.
+  focus loss. A segment click shows only that module — CPU with per-core bars and the
+  CPU process table, Memory with commit/cache and top memory apps, Disk with volumes,
+  Network with adapters — plus System and Battery. It is created at its final anchored
+  rect and re-anchors upward when the process table arrives, so it never grows over
+  the strip.
 - **Companion**: framed resizable Windows 11 window with a two-column card grid and an
   eight-row, two-column process table.
 - **Settings**: a framed window from the tray menu (or the strip menu) with theme,

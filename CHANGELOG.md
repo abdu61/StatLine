@@ -9,6 +9,16 @@ All notable changes to Statline are recorded here. The format follows
 ### Added
 
 - Binary/decimal units setting, applied live to the strip, flyout and companion.
+- Module-focused flyout: clicking a segment shows only that module's detail (per-core
+  CPU bars, memory commit/cache, per-volume and per-adapter rows) plus System and
+  Battery. CPU and Memory include their matching process tables.
+- Network segment moved to the front of the strip so its variable rate text no longer
+  shifts the other segments.
+
+### Fixed
+
+- The flyout now opens at its final anchored position and grows upward when the process
+  table arrives, instead of appearing under the strip or being clipped.
 
 ## [0.1.0] - 2026-10-24
 

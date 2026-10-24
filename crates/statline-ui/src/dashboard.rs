@@ -256,14 +256,12 @@ mod tests {
         let two = Model {
             header: String::new(),
             rows: vec![row.clone(), row.clone()],
-            processes: Vec::new(),
-            focus: None,
+            ..Model::default()
         };
         let three = Model {
             header: String::new(),
             rows: vec![row.clone(), row.clone(), row],
-            processes: Vec::new(),
-            focus: None,
+            ..Model::default()
         };
         assert!(height(&three, 1.0) > height(&two, 1.0));
     }
@@ -279,8 +277,7 @@ mod tests {
         let plain = Model {
             header: String::new(),
             rows: vec![row],
-            processes: Vec::new(),
-            focus: None,
+            ..Model::default()
         };
         let mut with_processes = plain.clone();
         with_processes.processes = vec![ProcessRow::default(); PROCESS_ROWS];

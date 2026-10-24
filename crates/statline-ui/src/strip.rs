@@ -49,6 +49,30 @@ pub fn segments(snapshot: &Snapshot) -> Vec<Segment> {
 pub fn segments_with(snapshot: &Snapshot, units: UnitSystem) -> Vec<Segment> {
     let mut segments = Vec::new();
 
+    // Network goes first on purpose: the strip is right-anchored to the tray,
+    // so the only variable-width segment changes the strip's left edge. Every
+    // other segment keeps its screen position instead of shifting.
+    if let Some(network) = snapshot.network.as_ref() {
+        // Two stacked lines, no label: the arrows say which direction is which,
+        // and dropping the label keeps the segment narrow and stable.
+        segments.push(Segment {
+            label: "",
+            value: format!(
+                "\u{2193} {}",
+                format_rate_short(network.rx_bytes_per_sec, units)
+            ),
+            extra: Some(format!(
+                "\u{2191} {}",
+                format_rate_short(network.tx_bytes_per_sec, units)
+            )),
+            percent: None,
+            width_sample: match units {
+                UnitSystem::Binary => RATE_SAMPLE_BINARY,
+                UnitSystem::Decimal => RATE_SAMPLE_DECIMAL,
+            },
+        });
+    }
+
     if let Some(cpu) = snapshot.cpu.as_ref() {
         segments.push(Segment::new(
             "CPU",
@@ -76,27 +100,6 @@ pub fn segments_with(snapshot: &Snapshot, units: UnitSystem) -> Vec<Segment> {
             format_percent(disk.busy_percent),
             Some(disk.busy_percent),
         ));
-    }
-
-    if let Some(network) = snapshot.network.as_ref() {
-        // Two stacked lines, no label: the arrows say which direction is which,
-        // and dropping the label keeps the segment narrow and stable.
-        segments.push(Segment {
-            label: "",
-            value: format!(
-                "\u{2193} {}",
-                format_rate_short(network.rx_bytes_per_sec, units)
-            ),
-            extra: Some(format!(
-                "\u{2191} {}",
-                format_rate_short(network.tx_bytes_per_sec, units)
-            )),
-            percent: None,
-            width_sample: match units {
-                UnitSystem::Binary => RATE_SAMPLE_BINARY,
-                UnitSystem::Decimal => RATE_SAMPLE_DECIMAL,
-            },
-        });
     }
 
     segments
@@ -129,10 +132,10 @@ mod tests {
 
         let segments = segments(&snapshot);
         let labels: Vec<&str> = segments.iter().map(|s| s.label).collect();
-        assert_eq!(labels, vec!["CPU", "MEM", ""]);
-        assert_eq!(segments[0].value, "23%");
-        assert_eq!(segments[1].value, "50%");
-        assert_eq!(segments[2].percent, None);
+        assert_eq!(labels, vec!["", "CPU", "MEM"]);
+        assert_eq!(segments[1].value, "23%");
+        assert_eq!(segments[2].value, "50%");
+        assert_eq!(segments[0].percent, None);
     }
 
     #[test]

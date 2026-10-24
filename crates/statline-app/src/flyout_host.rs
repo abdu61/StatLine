@@ -7,6 +7,7 @@ use statline_ui::flyout::{self, History, Model};
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, strip_window};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use windows::Win32::Foundation::RECT;
+use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN};
 
 /// Pointer to the live flyout, for its window procedure.
 static FLYOUT: AtomicPtr<Flyout> = AtomicPtr::new(std::ptr::null_mut());
@@ -23,6 +24,8 @@ pub struct Flyout {
     /// Module the panel was opened from; drives the highlight and sort order.
     focus: Option<flyout::Focus>,
     units: UnitSystem,
+    /// Strip rectangle the panel is anchored to, kept for height changes.
+    anchor: RECT,
     scale: f32,
     palette: Palette,
     last_sample: Option<std::time::SystemTime>,
@@ -37,6 +40,7 @@ impl Flyout {
             model: Model::default(),
             focus: None,
             units: UnitSystem::Binary,
+            anchor: RECT::default(),
             scale,
             palette,
             last_sample: None,
@@ -89,18 +93,20 @@ impl Flyout {
         focus: Option<flyout::Focus>,
     ) {
         self.focus = focus;
+        self.anchor = anchor;
         self.record(snapshot);
         self.model = flyout::model_focused(snapshot, &self.history, focus, self.units);
 
-        let width = flyout::width(self.scale);
-        let height = flyout::height(&self.model, self.scale);
+        let (left, top, width, height) = self.placement();
 
         if self.hwnd.is_none() {
+            // Create at the final position: showing at (0,0) and moving after
+            // the fact flashes in the corner and can be mistaken for "under".
             let rect = RECT {
-                left: 0,
-                top: 0,
-                right: width as i32,
-                bottom: height as i32,
+                left,
+                top,
+                right: left + width,
+                bottom: top + height,
             };
             match strip_window::create_popup_window(CLASS, "Statline", Some(flyout_proc), rect) {
                 Ok(hwnd) => {
@@ -113,26 +119,42 @@ impl Flyout {
                     return;
                 }
             }
-        }
-
-        // Anchor above the strip, clamped to the taskbar's horizontal span.
-        let margin = (8.0 * self.scale) as i32;
-        let preferred = anchor.left + ((anchor.right - anchor.left) / 2) - (width as i32 / 2);
-        let left = preferred.max(anchor.left - width as i32 + margin);
-        let top = anchor.top - height as i32 - margin;
-
-        if let Some(hwnd) = self.hwnd {
+        } else if let Some(hwnd) = self.hwnd {
             strip_window::move_window(
                 hwnd,
                 RECT {
                     left,
                     top,
-                    right: left + width as i32,
-                    bottom: top + height as i32,
+                    right: left + width,
+                    bottom: top + height,
                 },
             );
         }
+
+        if let Some(hwnd) = self.hwnd {
+            // The taskbar is topmost too; re-assert within the topmost band
+            // after creation or a move.
+            strip_window::keep_on_top(hwnd);
+        }
         self.paint(renderer);
+    }
+
+    /// Anchored rectangle above the strip, clamped to the screen.
+    fn placement(&self) -> (i32, i32, i32, i32) {
+        let width = flyout::width(self.scale).ceil() as i32;
+        let height = flyout::height(&self.model, self.scale).ceil() as i32;
+        let margin = (8.0 * self.scale) as i32;
+
+        let preferred =
+            self.anchor.left + ((self.anchor.right - self.anchor.left) / 2) - (width / 2);
+        // SAFETY: no arguments; returns the primary display width.
+        let screen_width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let min_left = margin;
+        let max_left = (screen_width - width - margin).max(min_left);
+        let left = preferred.clamp(min_left, max_left);
+        let top = (self.anchor.top - height - margin).max(margin);
+
+        (left, top, width, height)
     }
 
     /// Redraw the panel at the current size.
@@ -186,6 +208,32 @@ impl Flyout {
     pub fn refresh(&mut self, renderer: &mut Renderer, snapshot: &Snapshot) {
         self.record(snapshot);
         self.model = flyout::model_focused(snapshot, &self.history, self.focus, self.units);
+
+        // The process table arrives a tick or two after opening, which makes
+        // the panel taller. Re-anchor so it grows upward instead of over the
+        // strip (or off the old window's bottom edge).
+        let Some(hwnd) = self.hwnd else {
+            return;
+        };
+        let (left, top, width, height) = self.placement();
+        let current = strip_window::window_rect(hwnd);
+        if current.left != left
+            || current.top != top
+            || current.right != left + width
+            || current.bottom != top + height
+        {
+            strip_window::move_window(
+                hwnd,
+                RECT {
+                    left,
+                    top,
+                    right: left + width,
+                    bottom: top + height,
+                },
+            );
+            strip_window::keep_on_top(hwnd);
+        }
+
         self.paint(renderer);
     }
 }

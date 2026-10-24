@@ -2,8 +2,8 @@
 
 use statline_core::model::{ProcessEntry, Snapshot};
 use statline_core::units::{
-    UnitSystem, format_bytes, format_duration, format_percent, format_percent_precise, format_rate,
-    format_rate_short, format_temperature,
+    UnitSystem, format_bytes, format_duration, format_frequency, format_percent,
+    format_percent_precise, format_rate, format_rate_short, format_temperature,
 };
 use statline_render::{Align, Color, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -56,11 +56,22 @@ pub struct ProcessRow {
     pub memory: String,
 }
 
+/// One line of per-module detail, e.g. a volume or an adapter.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DetailRow {
+    pub label: String,
+    pub value: String,
+}
+
 /// Everything the panel shows.
 #[derive(Debug, Clone, Default)]
 pub struct Model {
     pub header: String,
     pub rows: Vec<Row>,
+    /// Focused-module lines under the first card (volumes, adapters).
+    pub detail_rows: Vec<DetailRow>,
+    /// Per-core busy percentages; drawn as bars under the CPU card.
+    pub cores: Vec<f32>,
     /// Busiest processes, already sorted; empty hides the section.
     pub processes: Vec<ProcessRow>,
     /// Module the panel was opened from, highlighted and used to sort processes.
@@ -94,7 +105,10 @@ pub fn model_focused(
     focus: Option<Focus>,
     units: UnitSystem,
 ) -> Model {
+    let overview = focus.is_none();
     let mut rows = Vec::new();
+    let mut detail_rows = Vec::new();
+    let mut cores = Vec::new();
 
     let header = match snapshot.system.as_ref() {
         Some(system) => format!(
@@ -106,93 +120,169 @@ pub fn model_focused(
     };
 
     if let Some(cpu) = snapshot.cpu.as_ref() {
-        let detail = match cpu.mhz {
-            Some(mhz) => format!("{} cores · {} MHz", cpu.per_core_percent.len().max(1), mhz),
-            None => format!("{} cores", cpu.per_core_percent.len().max(1)),
-        };
-        rows.push(Row {
-            label: "CPU",
-            value: format_percent(cpu.total_percent),
-            detail,
-            series: series(&history.cpu, cpu.total_percent),
-        });
+        if overview || focus == Some(Focus::Cpu) {
+            let detail = match cpu.mhz {
+                Some(mhz) => format!(
+                    "{} cores \u{00b7} {}",
+                    cpu.per_core_percent.len().max(1),
+                    format_frequency(mhz)
+                ),
+                None => format!("{} cores", cpu.per_core_percent.len().max(1)),
+            };
+            rows.push(Row {
+                label: "CPU",
+                value: format_percent(cpu.total_percent),
+                detail,
+                series: series(&history.cpu, cpu.total_percent),
+            });
+            if focus == Some(Focus::Cpu) {
+                cores = cpu.per_core_percent.clone();
+            }
+        }
     }
 
     if let Some(memory) = snapshot.memory.as_ref() {
-        rows.push(Row {
-            label: "Memory",
-            value: format_percent(memory.percent()),
-            detail: format!(
-                "{} of {} · commit {}",
+        if overview || focus == Some(Focus::Memory) {
+            let mut detail = format!(
+                "{} of {} \u{00b7} commit {}",
                 format_bytes(memory.used_bytes, units),
                 format_bytes(memory.total_bytes, units),
                 format_bytes(memory.commit_bytes, units)
-            ),
-            series: series(&history.memory, memory.percent()),
-        });
+            );
+            if memory.cached_bytes > 0 {
+                detail.push_str(&format!(
+                    " \u{00b7} cached {}",
+                    format_bytes(memory.cached_bytes, units)
+                ));
+            }
+            rows.push(Row {
+                label: "Memory",
+                value: format_percent(memory.percent()),
+                detail,
+                series: series(&history.memory, memory.percent()),
+            });
+        }
     }
 
     if let Some(gpu) = snapshot.gpu.as_ref() {
-        let detail = if gpu.vram_total_bytes > 0 {
-            format!(
-                "VRAM {} of {}",
-                format_bytes(gpu.vram_used_bytes, units),
-                format_bytes(gpu.vram_total_bytes, units)
-            )
-        } else {
-            String::from("VRAM unavailable")
-        };
-        rows.push(Row {
-            label: "GPU",
-            value: format_percent(gpu.utilization_percent),
-            detail,
-            series: series(&history.gpu, gpu.utilization_percent),
-        });
+        if overview || focus == Some(Focus::Gpu) {
+            let mut detail = if gpu.vram_total_bytes > 0 {
+                format!(
+                    "VRAM {} of {}",
+                    format_bytes(gpu.vram_used_bytes, units),
+                    format_bytes(gpu.vram_total_bytes, units)
+                )
+            } else {
+                String::from("VRAM unavailable")
+            };
+            if let Some(celsius) = gpu.temperature_c {
+                detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
+            }
+            if let Some(fan) = gpu.fan_percent {
+                detail.push_str(&format!(" \u{00b7} fan {fan:.0}%"));
+            }
+            if let Some(power) = gpu.power_w {
+                detail.push_str(&format!(" \u{00b7} {power:.0} W"));
+            }
+            rows.push(Row {
+                label: "GPU",
+                value: format_percent(gpu.utilization_percent),
+                detail,
+                series: series(&history.gpu, gpu.utilization_percent),
+            });
+        }
     }
 
     if let Some(disk) = snapshot.disk.as_ref() {
-        let detail = match disk.volumes.first() {
-            Some(volume) => {
-                let temperature = volume
-                    .temperature_c
-                    .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
-                    .unwrap_or_default();
-                format!(
-                    "{} free of {} \u{00b7} read {} write {}{temperature}",
-                    format_bytes(volume.free_bytes, units),
-                    format_bytes(volume.total_bytes, units),
+        if overview || focus == Some(Focus::Disk) {
+            let detail = match disk.volumes.first() {
+                Some(volume) => {
+                    let temperature = volume
+                        .temperature_c
+                        .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
+                        .unwrap_or_default();
+                    format!(
+                        "{} free of {} \u{00b7} read {} write {}{temperature}",
+                        format_bytes(volume.free_bytes, units),
+                        format_bytes(volume.total_bytes, units),
+                        format_rate(disk.read_bytes_per_sec, units),
+                        format_rate(disk.write_bytes_per_sec, units)
+                    )
+                }
+                None => format!(
+                    "read {} write {}",
                     format_rate(disk.read_bytes_per_sec, units),
                     format_rate(disk.write_bytes_per_sec, units)
-                )
+                ),
+            };
+            rows.push(Row {
+                label: "Disk",
+                value: format_percent(disk.busy_percent),
+                detail,
+                series: Vec::new(),
+            });
+
+            if focus == Some(Focus::Disk) {
+                for volume in &disk.volumes {
+                    let label = if volume.label.is_empty() {
+                        volume.mount.clone()
+                    } else {
+                        format!("{} {}", volume.mount, volume.label)
+                    };
+                    let temperature = volume
+                        .temperature_c
+                        .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
+                        .unwrap_or_default();
+                    detail_rows.push(DetailRow {
+                        label,
+                        value: format!(
+                            "{} used of {}{temperature}",
+                            format_bytes(volume.used_bytes(), units),
+                            format_bytes(volume.total_bytes, units)
+                        ),
+                    });
+                }
             }
-            None => format!(
-                "read {} write {}",
-                format_rate(disk.read_bytes_per_sec, units),
-                format_rate(disk.write_bytes_per_sec, units)
-            ),
-        };
-        rows.push(Row {
-            label: "Disk",
-            value: format_percent(disk.busy_percent),
-            detail,
-            series: Vec::new(),
-        });
+        }
     }
 
     if let Some(network) = snapshot.network.as_ref() {
-        rows.push(Row {
-            label: "Network",
-            value: format!(
-                "\u{2193} {}  \u{2191} {}",
-                format_rate_short(network.rx_bytes_per_sec, units),
-                format_rate_short(network.tx_bytes_per_sec, units)
-            ),
-            detail: match network.adapters.first() {
-                Some(adapter) => adapter.name.clone(),
-                None => String::from("no active adapter"),
-            },
-            series: Vec::new(),
-        });
+        if overview || focus == Some(Focus::Network) {
+            rows.push(Row {
+                label: "Network",
+                value: format!(
+                    "\u{2193} {}  \u{2191} {}",
+                    format_rate_short(network.rx_bytes_per_sec, units),
+                    format_rate_short(network.tx_bytes_per_sec, units)
+                ),
+                detail: match network.adapters.first() {
+                    Some(adapter) => adapter.name.clone(),
+                    None => String::from("no active adapter"),
+                },
+                series: Vec::new(),
+            });
+
+            if focus == Some(Focus::Network) {
+                for adapter in &network.adapters {
+                    detail_rows.push(DetailRow {
+                        label: adapter.name.clone(),
+                        value: format!(
+                            "\u{2193} {}  \u{2191} {}",
+                            format_rate_short(adapter.rx_bytes_per_sec, units),
+                            format_rate_short(adapter.tx_bytes_per_sec, units)
+                        ),
+                    });
+                }
+                detail_rows.push(DetailRow {
+                    label: String::from("Session"),
+                    value: format!(
+                        "\u{2193} {}  \u{2191} {}",
+                        format_bytes(network.session_rx_bytes, units),
+                        format_bytes(network.session_tx_bytes, units)
+                    ),
+                });
+            }
+        }
     }
 
     if let Some(battery) = snapshot.battery.as_ref() {
@@ -236,37 +326,44 @@ pub fn model_focused(
         });
     }
 
-    let processes = snapshot
-        .processes
-        .as_ref()
-        .map(|sample| {
-            let mut entries: Vec<&ProcessEntry> = sample.top.iter().collect();
-            if focus == Some(Focus::Memory) {
-                entries.sort_by(|a, b| {
-                    b.working_set_bytes.cmp(&a.working_set_bytes).then_with(|| {
-                        b.cpu_percent
-                            .unwrap_or(0.0)
-                            .total_cmp(&a.cpu_percent.unwrap_or(0.0))
+    // Only CPU and Memory ask "which app is responsible"; the other modules
+    // have no per-app data, so their focused view has no process table.
+    let processes = match focus {
+        Some(Focus::Gpu) | Some(Focus::Disk) | Some(Focus::Network) => Vec::new(),
+        _ => snapshot
+            .processes
+            .as_ref()
+            .map(|sample| {
+                let mut entries: Vec<&ProcessEntry> = sample.top.iter().collect();
+                if focus == Some(Focus::Memory) {
+                    entries.sort_by(|a, b| {
+                        b.working_set_bytes.cmp(&a.working_set_bytes).then_with(|| {
+                            b.cpu_percent
+                                .unwrap_or(0.0)
+                                .total_cmp(&a.cpu_percent.unwrap_or(0.0))
+                        })
+                    });
+                }
+                entries
+                    .into_iter()
+                    .map(|entry| ProcessRow {
+                        name: entry.name.clone(),
+                        cpu: entry
+                            .cpu_percent
+                            .map(format_percent_precise)
+                            .unwrap_or_else(|| String::from("\u{2014}")),
+                        memory: format_bytes(entry.working_set_bytes, units),
                     })
-                });
-            }
-            entries
-                .into_iter()
-                .map(|entry| ProcessRow {
-                    name: entry.name.clone(),
-                    cpu: entry
-                        .cpu_percent
-                        .map(format_percent_precise)
-                        .unwrap_or_else(|| String::from("\u{2014}")),
-                    memory: format_bytes(entry.working_set_bytes, units),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+                    .collect()
+            })
+            .unwrap_or_default(),
+    };
 
     Model {
         header,
         rows,
+        detail_rows,
+        cores,
         processes,
         focus,
     }
@@ -310,15 +407,25 @@ fn process_section(model: &Model, scale: f32, limit: usize) -> f32 {
     (space::M + 1.0 + space::XS + 12.0 + space::XXS + count as f32 * PROCESS_ROW_HEIGHT) * scale
 }
 
+const DETAIL_ROW_HEIGHT: f32 = 17.0;
+const CORES_HEIGHT: f32 = 24.0;
+
 /// Height needed for a model.
 pub fn height(model: &Model, scale: f32) -> f32 {
     let padding = space::L * scale;
     let header = 18.0 * scale;
     let row = 52.0 * scale;
+    let cores = if model.cores.is_empty() {
+        0.0
+    } else {
+        CORES_HEIGHT * scale
+    };
     padding * 2.0
         + header
         + row * model.rows.len() as f32
         + space::S * scale
+        + cores
+        + model.detail_rows.len() as f32 * DETAIL_ROW_HEIGHT * scale
         + process_section(model, scale, PROCESS_ROWS)
 }
 
@@ -361,6 +468,36 @@ fn sparkline(
     }
 }
 
+/// One bar per logical core, height = busy percentage.
+fn core_bars(
+    surface: &mut Surface,
+    values: &[f32],
+    (x, y, width, height): (f32, f32, f32, f32),
+    color: Color,
+    track: Color,
+) {
+    if values.is_empty() || width < 4.0 || height < 2.0 {
+        return;
+    }
+
+    let count = values.len() as f32;
+    let gap = (2.0_f32).min(width / count * 0.25);
+    let bar_width = ((width - gap * (count - 1.0)) / count).max(1.0);
+
+    surface.fill_rect(x, y + height - 1.0, width, 1.0, track.scaled_alpha(0.5));
+    for (index, value) in values.iter().enumerate() {
+        let normalized = value.clamp(0.0, 100.0) / 100.0;
+        let bar = (height * normalized).max(1.0);
+        surface.fill_rect(
+            x + index as f32 * (bar_width + gap),
+            y + height - bar,
+            bar_width,
+            bar,
+            color,
+        );
+    }
+}
+
 /// Draw the panel. Returns its size in physical pixels.
 pub fn render(
     surface: &mut Surface,
@@ -393,7 +530,7 @@ pub fn render(
     );
     y += 18.0 * scale + space::S * scale;
 
-    for row in &model.rows {
+    for (index, row) in model.rows.iter().enumerate() {
         let row_height = 52.0 * scale;
         let focused = model.focus.is_some_and(|focus| focus.label() == row.label);
 
@@ -459,6 +596,55 @@ pub fn render(
         }
 
         y += row_height;
+
+        if index == 0 {
+            if !model.cores.is_empty() {
+                let _ = text.draw(
+                    surface,
+                    "CORES",
+                    (padding, y + 3.0 * scale, 40.0 * scale, 10.0 * scale),
+                    TextStyle::new(7.5 * scale, true, Align::Left),
+                    palette.text_muted,
+                );
+                core_bars(
+                    surface,
+                    &model.cores,
+                    (
+                        padding + 40.0 * scale,
+                        y + 2.0 * scale,
+                        width - padding * 2.0 - 40.0 * scale,
+                        12.0 * scale,
+                    ),
+                    palette.accent.scaled_alpha(0.8),
+                    palette.meter_track,
+                );
+                y += CORES_HEIGHT * scale;
+            }
+
+            for detail in &model.detail_rows {
+                let value_width = 190.0 * scale;
+                let _ = text.draw(
+                    surface,
+                    &detail.label,
+                    (
+                        padding,
+                        y,
+                        width - padding * 2.0 - value_width - space::S * scale,
+                        14.0 * scale,
+                    ),
+                    process_style(scale, false),
+                    palette.text_primary,
+                );
+                let _ = text.draw(
+                    surface,
+                    &detail.value,
+                    (width - padding - value_width, y, value_width, 14.0 * scale),
+                    process_value_style(scale),
+                    palette.text_muted,
+                );
+                y += DETAIL_ROW_HEIGHT * scale;
+            }
+        }
     }
 
     if !model.processes.is_empty() {
@@ -473,6 +659,7 @@ pub fn render(
         y += 1.0 + space::XS * scale;
 
         let heading = match model.focus {
+            Some(Focus::Cpu) => "TOP PROCESSES \u{00b7} CPU",
             Some(Focus::Memory) => "TOP PROCESSES \u{00b7} MEMORY",
             _ => "TOP PROCESSES",
         };
@@ -709,6 +896,88 @@ mod tests {
             "detail: {}",
             battery.detail
         );
+    }
+
+    #[test]
+    fn focused_cpu_shows_only_cpu_plus_system_and_battery() {
+        let mut snapshot = snapshot();
+        snapshot.battery = Some(BatterySample {
+            percent: 80.0,
+            on_ac: true,
+            ..Default::default()
+        });
+        snapshot.thermal = Some(statline_core::model::ThermalSample { system_c: 60.0 });
+        snapshot.processes = Some(ProcessSample {
+            total: 1,
+            top: vec![ProcessEntry {
+                pid: 9,
+                name: String::from("busy.exe"),
+                cpu_percent: Some(12.0),
+                working_set_bytes: 1_000,
+            }],
+        });
+
+        let model = model_focused(
+            &snapshot,
+            &History::default(),
+            Some(Focus::Cpu),
+            UnitSystem::Binary,
+        );
+        let labels: Vec<&str> = model.rows.iter().map(|row| row.label).collect();
+        assert_eq!(labels, vec!["CPU", "Battery", "System"]);
+        assert_eq!(model.cores.len(), 2, "per-core values feed the bars");
+        assert_eq!(model.processes.len(), 1);
+        assert!(model.detail_rows.is_empty());
+    }
+
+    #[test]
+    fn focused_disk_lists_volumes_without_a_process_table() {
+        let mut snapshot = snapshot();
+        snapshot.disk = Some(statline_core::model::DiskSample {
+            read_bytes_per_sec: 1.0,
+            write_bytes_per_sec: 2.0,
+            busy_percent: 3.0,
+            volumes: vec![
+                statline_core::model::VolumeSample {
+                    mount: String::from("C:"),
+                    label: String::from("System"),
+                    free_bytes: 40,
+                    total_bytes: 100,
+                    temperature_c: Some(41.0),
+                },
+                statline_core::model::VolumeSample {
+                    mount: String::from("D:"),
+                    label: String::new(),
+                    free_bytes: 10,
+                    total_bytes: 100,
+                    temperature_c: None,
+                },
+            ],
+        });
+        snapshot.processes = Some(ProcessSample {
+            total: 1,
+            top: vec![ProcessEntry {
+                pid: 9,
+                name: String::from("busy.exe"),
+                cpu_percent: Some(12.0),
+                working_set_bytes: 1_000,
+            }],
+        });
+
+        let model = model_focused(
+            &snapshot,
+            &History::default(),
+            Some(Focus::Disk),
+            UnitSystem::Binary,
+        );
+        assert_eq!(model.detail_rows.len(), 2);
+        assert_eq!(model.detail_rows[0].label, "C: System");
+        assert!(model.detail_rows[0].value.contains("41 °C"));
+        assert!(
+            model.processes.is_empty(),
+            "disk detail has no per-app data"
+        );
+        assert_eq!(model.rows[0].label, "Disk");
     }
 
     #[test]

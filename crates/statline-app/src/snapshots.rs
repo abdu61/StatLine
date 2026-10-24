@@ -227,6 +227,20 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let path = dir.join("flyout-dark-125-memory.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
+
+        // Focused on CPU, with per-core bars and the CPU process table.
+        let model = flyout::model_focused(
+            &snapshot,
+            &history,
+            Some(flyout::Focus::Cpu),
+            statline_core::units::UnitSystem::Binary,
+        );
+        let height = flyout::height(&model, scale).ceil() as u32;
+        let mut surface = renderer.surface(width, height)?;
+        flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        let path = dir.join("flyout-dark-125-cpu.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
     }
     // Companion window at 100 %.
     {
