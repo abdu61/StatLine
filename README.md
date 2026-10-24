@@ -14,19 +14,20 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 - **Strip in the taskbar**: CPU, memory, GPU, disk and a two-line network readout,
   anchored beside the tray (or after Start). It is a real child of `Shell_TrayWnd`, so
   the Start menu no longer covers it, and clicking it never steals focus.
-- **Flyout**: click the strip for 60-second area charts, per-module cards and the top
-  five processes by CPU share.
+- **Flyout**: clicking a segment opens just that module — CPU shows per-core bars and
+  the CPU process table, Memory shows commit/cache and the top memory apps, Disk and
+  Network add per-volume and per-adapter rows. System and Battery stay visible.
 
   ![Flyout](docs/images/flyout.jpg)
-
-  Clicking MEM sorts the process table by working set; the clicked module is highlighted.
-- **Companion window**: a normal resizable Windows 11 window with the full card grid and
-  an eight-row process table.
+- **Companion window**: a normal resizable Windows 11 window with a left navigation —
+  Dashboard, CPU, Memory, GPU, Disk, Network, Battery, System and Settings — and a
+  detail page for each module.
 
   ![Companion window](docs/images/dashboard.jpg)
 
-- **Settings**: theme (system/light/dark), sampler interval, strip placement and
-  start-with-Windows. Changes apply live and are written atomically.
+- **Settings**: theme (system/light/dark), sampler interval, byte units, strip placement,
+  start-with-Windows and an optional Mica window effect. Changes apply live and are
+  written atomically.
 
   ![Settings](docs/images/settings.jpg)
 

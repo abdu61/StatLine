@@ -118,7 +118,7 @@ pub fn taskbar_created_message() -> u32 {
 ///
 /// The companion and settings windows are normal Windows apps, so they get a
 /// normal frame. The Windows 11 treatment is applied explicitly: immersive dark
-/// mode when `dark` is set, and rounded corners.
+/// mode when `dark` is set, rounded corners, and an optional Mica backdrop.
 pub fn create_frame_window(
     class_name: &str,
     title: &str,
@@ -126,6 +126,7 @@ pub fn create_frame_window(
     width: i32,
     height: i32,
     dark: bool,
+    mica: bool,
 ) -> Result<HWND> {
     let class_wide = to_wide(OsStr::new(class_name));
     let instance = unsafe { GetModuleHandleW(None)? };
@@ -167,7 +168,7 @@ pub fn create_frame_window(
         )
     }?;
 
-    apply_frame_style(hwnd, dark);
+    apply_frame_style(hwnd, dark, mica);
 
     // SAFETY: our window; show it normally.
     unsafe {
@@ -179,7 +180,7 @@ pub fn create_frame_window(
     Ok(hwnd)
 }
 
-fn apply_frame_style(hwnd: HWND, dark: bool) {
+fn apply_frame_style(hwnd: HWND, dark: bool, mica: bool) {
     use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
 
     // DWMWA_USE_IMMERSIVE_DARK_MODE = 20, DWMWA_WINDOW_CORNER_PREFERENCE = 33.
@@ -199,6 +200,26 @@ fn apply_frame_style(hwnd: HWND, dark: bool) {
             DWMWINDOWATTRIBUTE(33),
             (&round as *const u32).cast(),
             std::mem::size_of::<u32>() as u32,
+        );
+    }
+    set_backdrop(hwnd, mica);
+}
+
+/// Turn the Windows 11 Mica system backdrop on or off for a framed window.
+///
+/// `DWMWA_SYSTEMBACKDROP_TYPE` is attribute 38; 2 is Mica, 1 is none. The call
+/// is a no-op on Windows 10 and on machines where the compositor disables it.
+pub fn set_backdrop(hwnd: HWND, mica: bool) {
+    use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
+
+    let value: i32 = if mica { 2 } else { 1 };
+    // SAFETY: attribute write only; the value is a valid i32 for this attribute.
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWINDOWATTRIBUTE(38),
+            (&value as *const i32).cast(),
+            std::mem::size_of::<i32>() as u32,
         );
     }
 }

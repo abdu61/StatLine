@@ -97,16 +97,17 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   and Battery; the background click shows the overview. It is created at its final
   anchored rect and re-anchors upward when the process table arrives.
 - **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
-  resizable, Windows 11 dark frame + rounded corners), painting a two-column card grid and
-  an eight-row process table.
+  resizable, Windows 11 dark frame + rounded corners). Left nav with Dashboard, CPU,
+  Memory, GPU, Disk, Network, Battery, System and Settings; each module has a page built
+  from the focused flyout model. Optional DWM Mica backdrop on the framed windows.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
   deltas and working sets. Task Manager scale (share of all cores); `None` until a baseline
   exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
   zero when both are closed.
-- **Settings**: framed window from the tray/strip menu. Theme (system/light/dark),
-  interval, byte units (binary/decimal), strip placement and autostart, applied live and
-  saved atomically to `%APPDATA%\Statline\settings.json`. The Run key is treated as the
-  truth for startup.
+- **Settings**: framed window from the tray/strip menu or the companion nav. Theme
+  (system/light/dark), interval, byte units (binary/decimal), Mica, strip placement and
+  autostart, applied live and saved atomically to `%APPDATA%\Statline\settings.json`. The
+  Run key is treated as the truth for startup.
 - **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
   `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
   battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
@@ -175,6 +176,10 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
   declared, and `runFullTrust` is required for a full-trust desktop app. The script finds
   `makeappx.exe` under `Windows Kits\10\bin\...\x64`. Sideloading an unsigned package
   fails; sign with a trusted dev certificate.
+- **Mica is frame-only on Win32.** `DWMWA_SYSTEMBACKDROP_TYPE = 2` applies to normal
+  framed windows (companion/settings). The strip and flyout are layered (ULW); DWM
+  backdrops do not apply to them, and per-pixel blur would require a composition
+  swapchain. The setting is labelled "Mica window effect", not a card blur.
 - **GUI-subsystem CLI output can vanish.** The release binary has no console; `--probe`
   and friends attach to the parent console, and that output races process exit when the
   command is run in a loop. An empty `--startup-status` line is not "disabled": read

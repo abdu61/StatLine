@@ -3,20 +3,20 @@
 use statline_core::model::Snapshot;
 use statline_core::units::UnitSystem;
 use statline_render::{Palette, Renderer, Surface};
-use statline_ui::dashboard;
+use statline_ui::dashboard::{self, Page};
 use statline_ui::flyout::{self, Model};
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, window};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetClientRect, WM_CLOSE, WM_PAINT, WM_SIZE,
+    DefWindowProcW, GetClientRect, WM_CLOSE, WM_LBUTTONUP, WM_PAINT, WM_SIZE,
 };
 
 const CLASS: &str = "StatlineCompanionWindow";
 
 /// Logical size of the window, in DIPs. Tall enough for the card grid plus the
 /// process table at 100 %.
-const WINDOW_WIDTH: i32 = 760;
+const WINDOW_WIDTH: i32 = 880;
 const WINDOW_HEIGHT: i32 = 680;
 
 pub struct Dashboard {
@@ -24,6 +24,10 @@ pub struct Dashboard {
     surface: Option<Surface>,
     model: Model,
     units: UnitSystem,
+    page: Page,
+    mica: bool,
+    /// Scale used by the last paint, for nav hit-testing.
+    render_scale: f32,
     scale: f32,
     palette: Palette,
 }
@@ -35,6 +39,9 @@ impl Dashboard {
             surface: None,
             model: Model::default(),
             units: UnitSystem::Binary,
+            page: Page::Dashboard,
+            mica: false,
+            render_scale: 1.0,
             scale,
             palette,
         }
@@ -54,6 +61,19 @@ impl Dashboard {
         self.units = units;
     }
 
+    /// Switch page; the caller repaints with the next refresh.
+    pub fn set_page(&mut self, page: Page) {
+        self.page = page;
+    }
+
+    /// Enable or disable the Mica frame; applies immediately when open.
+    pub fn set_mica(&mut self, mica: bool) {
+        self.mica = mica;
+        if let Some(hwnd) = self.hwnd {
+            window::set_backdrop(hwnd, mica);
+        }
+    }
+
     pub fn toggle(
         &mut self,
         renderer: &mut Renderer,
@@ -68,7 +88,7 @@ impl Dashboard {
     }
 
     fn open(&mut self, renderer: &mut Renderer, snapshot: &Snapshot, history: &flyout::History) {
-        self.model = flyout::model_focused(snapshot, history, None, self.units);
+        self.model = flyout::model_focused(snapshot, history, self.page.focus(), self.units);
 
         let width = (WINDOW_WIDTH as f32 * self.scale) as i32;
         let height = (WINDOW_HEIGHT as f32 * self.scale) as i32;
@@ -79,6 +99,7 @@ impl Dashboard {
             width,
             height,
             self.palette.is_dark,
+            self.mica,
         ) {
             Ok(hwnd) => {
                 self.hwnd = Some(hwnd);
@@ -99,7 +120,7 @@ impl Dashboard {
         let Some(hwnd) = self.hwnd else {
             return;
         };
-        self.model = flyout::model_focused(snapshot, history, None, self.units);
+        self.model = flyout::model_focused(snapshot, history, self.page.focus(), self.units);
         self.render_surface(_renderer, hwnd);
         // SAFETY: our window; a null rect invalidates the whole client area.
         unsafe {
@@ -133,14 +154,16 @@ impl Dashboard {
         }
 
         if let Some(surface) = self.surface.as_mut() {
-            // Fill the whole client area, then draw the panel on top of it.
+            // Fill the whole client area, then draw the nav and page.
             let scale = (width as f32 / WINDOW_WIDTH as f32).max(0.75);
+            self.render_scale = scale;
             dashboard::render(
                 surface,
                 &mut renderer.text,
                 &self.palette,
                 &self.model,
                 scale,
+                self.page,
             );
         }
     }
@@ -164,9 +187,22 @@ unsafe extern "system" fn companion_proc(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
-    _lparam: LPARAM,
+    lparam: LPARAM,
 ) -> LRESULT {
     match msg {
+        WM_LBUTTONUP => {
+            let x = (lparam.0 & 0xFFFF) as i16 as f32;
+            let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as f32;
+            let pointer = COMPANION.load(std::sync::atomic::Ordering::Acquire);
+            if !pointer.is_null() {
+                // SAFETY: the pointer is a live companion owned by this thread.
+                let scale = unsafe { (*pointer).render_scale };
+                if let Some(index) = dashboard::nav_at(x, y, scale) {
+                    crate::strip_host::select_dashboard_item(index);
+                }
+            }
+            LRESULT(0)
+        }
         WM_SIZE => {
             // The surface is rebuilt on the next paint from the new client size.
             // SAFETY: our window.
@@ -218,7 +254,7 @@ unsafe extern "system" fn companion_proc(
         }
         _ => {
             // SAFETY: forwarding the exact arguments received by the procedure.
-            unsafe { DefWindowProcW(hwnd, msg, wparam, _lparam) }
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
     }
 }

@@ -98,6 +98,8 @@ impl Units {
 #[serde(default)]
 pub struct Appearance {
     pub theme: Theme,
+    /// Windows 11 Mica system backdrop on the framed companion/settings windows.
+    pub mica: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

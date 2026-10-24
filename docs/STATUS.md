@@ -30,12 +30,14 @@ detail sampling on
   Network with adapters — plus System and Battery. It is created at its final anchored
   rect and re-anchors upward when the process table arrives, so it never grows over
   the strip.
-- **Companion**: framed resizable Windows 11 window with a two-column card grid and an
-  eight-row, two-column process table.
-- **Settings**: a framed window from the tray menu (or the strip menu) with theme,
-  sampler interval, byte units, strip placement and start-with-Windows. Changes apply
-  live and are saved atomically to `%APPDATA%\Statline\settings.json`; unknown keys are
-  ignored.
+- **Companion**: framed resizable window with a left nav (Dashboard, CPU, Memory, GPU,
+  Disk, Network, Battery, System, Settings) and a page per module: CPU cores and process
+  table, memory cache and top memory apps, per-volume and per-adapter rows. Optional
+  Mica DWM backdrop on the framed windows.
+- **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
+  with theme, sampler interval, byte units, Mica, strip placement and start-with-Windows.
+  Changes apply live and are saved atomically to `%APPDATA%\Statline\settings.json`;
+  unknown keys are ignored.
 - **Packaging**: portable zip script (exe, README, changelog, licence texts) and an
   MSIX manifest with `runFullTrust` + a user-toggleable startup task. Both build locally;
   CI verifies fmt/clippy/test/deny/build and produces tag artifacts.
@@ -53,7 +55,7 @@ detail sampling on
 
 ## Next, in order
 
-1. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
+1. **Settings, remaining**: module enable/order, density/accent, safe mode,
    remembered window bounds, About pane.
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power; current builds show
    utilization and VRAM only. This machine is AMD integrated, so an AMD discrete GPU is
@@ -61,7 +63,7 @@ detail sampling on
 3. **Packaging, remaining**: app `.ico`, icon in the executable/tray, a 1-hour soak and
    `--bench 300`, then the local `v0.1.0` tag.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
-   `WM_DPICHANGED`, Mica on the companion.
+   `WM_DPICHANGED`, per-pixel blur behind the flyout (needs a composition swapchain).
 
 ## Measured
 

@@ -242,9 +242,9 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
     }
-    // Companion window at 100 %.
+    // Companion window at 100 %: dashboard and a module page.
     {
-        use statline_ui::dashboard;
+        use statline_ui::dashboard::{self, Page};
         use statline_ui::flyout::{self, History};
 
         let mut history = History::default();
@@ -254,15 +254,42 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
             history.gpu.push(7.0 + 5.0 * (index as f32 / 4.0).cos());
         }
 
-        let model = flyout::model(&snapshot, &history);
+        let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
         let scale = 1.0_f32;
         let width = dashboard::width(scale).ceil() as u32;
-        let height = dashboard::height(&model, scale).ceil() as u32;
-        let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
 
+        let model = flyout::model(&snapshot, &history);
+        let height = dashboard::height(&model, scale).ceil() as u32;
         let mut surface = renderer.surface(width, height)?;
-        dashboard::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        dashboard::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            Page::Dashboard,
+        );
         let path = dir.join("dashboard-dark-100.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+
+        let model = flyout::model_focused(
+            &snapshot,
+            &history,
+            Some(flyout::Focus::Cpu),
+            statline_core::units::UnitSystem::Binary,
+        );
+        let height = dashboard::height(&model, scale).ceil() as u32;
+        let mut surface = renderer.surface(width, height)?;
+        dashboard::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            Page::Cpu,
+        );
+        let path = dir.join("dashboard-cpu-100.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
     }
@@ -283,6 +310,10 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                 settings_ui::Row {
                     label: "Units",
                     value: String::from("Binary (KiB)"),
+                },
+                settings_ui::Row {
+                    label: "Mica window effect",
+                    value: String::from("Off"),
                 },
                 settings_ui::Row {
                     label: "Strip placement",

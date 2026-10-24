@@ -9,6 +9,10 @@ All notable changes to Statline are recorded here. The format follows
 ### Added
 
 - Binary/decimal units setting, applied live to the strip, flyout and companion.
+- Companion left navigation: Dashboard, CPU, Memory, GPU, Disk, Network, Battery,
+  System and Settings, with a dedicated detail page per module.
+- Optional Mica window effect on the framed companion and settings windows
+  (`appearance.mica`).
 - Module-focused flyout: clicking a segment shows only that module's detail (per-core
   CPU bars, memory commit/cache, per-volume and per-adapter rows) plus System and
   Battery. CPU and Memory include their matching process tables.

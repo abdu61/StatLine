@@ -15,7 +15,8 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
   },
 
   "appearance": {
-    "theme": "system"             // system | light | dark
+    "theme": "system",            // system | light | dark
+    "mica": false                 // DWM Mica backdrop on framed windows
   }
 }
 ```
@@ -49,9 +50,13 @@ Tray icon or strip right-click → **Settings…**. Rows cycle on click:
 | Theme | System → Dark → Light |
 | Update interval | 500 → 1000 → 2000 → 5000 ms |
 | Units | Binary (KiB) ↔ Decimal (kB) |
+| Mica window effect | On ↔ Off (`DWMWA_SYSTEMBACKDROP_TYPE` on the framed windows) |
 | Strip placement | Right ↔ Left (left anchors past Start, clamped at the tray) |
 | Start with Windows | On ↔ Off (writes `HKCU\...\Run`) |
 
 Changes apply live: the strip palette, sampler cadence, byte units and anchor update on
 the next tick, and an open flyout/companion repaints with the new palette and units.
 Binary is the default (KiB/MiB); decimal switches every surface to kB/MB.
+
+Mica applies to the framed companion and settings windows. The strip and flyout are
+layered windows and cannot host a DWM backdrop, so they keep their opaque panels.

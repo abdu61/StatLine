@@ -88,6 +88,7 @@ fn open() -> windows::core::Result<()> {
         width,
         height,
         dark,
+        settings.appearance.mica,
     )?;
     let mut window = Box::new(SettingsWindow {
         hwnd,
@@ -119,6 +120,14 @@ fn build_model(settings: &Settings) -> settings::Model {
             settings::Row {
                 label: "Units",
                 value: String::from(settings.general.units.label()),
+            },
+            settings::Row {
+                label: "Mica window effect",
+                value: String::from(if settings.appearance.mica {
+                    "On"
+                } else {
+                    "Off"
+                }),
             },
             settings::Row {
                 label: "Strip placement",
@@ -163,10 +172,11 @@ impl SettingsWindow {
                     next_interval(self.settings.general.update_interval_ms)
             }
             2 => self.settings.general.units = self.settings.general.units.next(),
-            3 => {
+            3 => self.settings.appearance.mica = !self.settings.appearance.mica,
+            4 => {
                 self.settings.general.strip_placement = self.settings.general.strip_placement.next()
             }
-            4 => {
+            5 => {
                 let enabled = !self.settings.general.run_at_startup;
                 match autostart::set_enabled(enabled) {
                     Ok(()) => self.settings.general.run_at_startup = enabled,
@@ -189,6 +199,7 @@ impl SettingsWindow {
             .resolve_dark(theme::is_dark_mode());
         self.palette = strip_host::default_palette(dark);
         strip_host::apply_settings(&self.settings, dark);
+        window::set_backdrop(self.hwnd, self.settings.appearance.mica);
     }
 
     fn render(&mut self) {

@@ -9,12 +9,15 @@ The place to configure and to explore, in one window.
 ## Checklist
 
 - [x] Window shell: DWM rounded corners, native resize, dark frame
-- [x] Overview: live cards
+- [x] Left navigation: Dashboard / CPU / Memory / GPU / Disk / Network / Battery /
+      System / Settings, with a page per module
+- [x] Overview: live cards with sparklines
 - [x] Overview: top-process table (8 rows, two columns, CPU + working set)
-- [x] Settings window: theme, interval, units, strip placement, autostart; changes
+- [x] Module pages: CPU cores/processes, memory cache/top apps, disk volumes, network
+      adapters, GPU/battery/system detail
+- [x] Settings window: theme, interval, units, Mica, strip placement, autostart; changes
       live-apply and persist atomically
 - [ ] Window shell: custom title area, remembered bounds
-- [ ] Left navigation: Overview / Modules / Appearance / Behaviour / About
 - [ ] Overview: 5-minute chart with hover readout, sortable process table
 - [ ] Modules: enable, reorder (drag), per-module meter/threshold/colour
 - [ ] Appearance: accent, density, labels, opacity

@@ -3,7 +3,8 @@
 use statline_core::model::{ProcessEntry, Snapshot};
 use statline_core::units::{
     UnitSystem, format_bytes, format_duration, format_frequency, format_percent,
-    format_percent_precise, format_rate, format_rate_short, format_temperature,
+    format_percent_precise, format_rate, format_rate_compact, format_rate_short,
+    format_temperature,
 };
 use statline_render::{Align, Color, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -23,6 +24,8 @@ pub enum Focus {
     Gpu,
     Disk,
     Network,
+    Battery,
+    System,
 }
 
 impl Focus {
@@ -34,6 +37,8 @@ impl Focus {
             Self::Gpu => "GPU",
             Self::Disk => "Disk",
             Self::Network => "Network",
+            Self::Battery => "Battery",
+            Self::System => "System",
         }
     }
 }
@@ -143,24 +148,25 @@ pub fn model_focused(
 
     if let Some(memory) = snapshot.memory.as_ref() {
         if overview || focus == Some(Focus::Memory) {
-            let mut detail = format!(
+            let detail = format!(
                 "{} of {} \u{00b7} commit {}",
                 format_bytes(memory.used_bytes, units),
                 format_bytes(memory.total_bytes, units),
                 format_bytes(memory.commit_bytes, units)
             );
-            if memory.cached_bytes > 0 {
-                detail.push_str(&format!(
-                    " \u{00b7} cached {}",
-                    format_bytes(memory.cached_bytes, units)
-                ));
-            }
             rows.push(Row {
                 label: "Memory",
                 value: format_percent(memory.percent()),
                 detail,
                 series: series(&history.memory, memory.percent()),
             });
+
+            if focus == Some(Focus::Memory) && memory.cached_bytes > 0 {
+                detail_rows.push(DetailRow {
+                    label: String::from("Cached"),
+                    value: format_bytes(memory.cached_bytes, units),
+                });
+            }
         }
     }
 
@@ -202,18 +208,12 @@ pub fn model_focused(
                         .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
                         .unwrap_or_default();
                     format!(
-                        "{} free of {} \u{00b7} read {} write {}{temperature}",
+                        "{} free of {}{temperature}",
                         format_bytes(volume.free_bytes, units),
-                        format_bytes(volume.total_bytes, units),
-                        format_rate(disk.read_bytes_per_sec, units),
-                        format_rate(disk.write_bytes_per_sec, units)
+                        format_bytes(volume.total_bytes, units)
                     )
                 }
-                None => format!(
-                    "read {} write {}",
-                    format_rate(disk.read_bytes_per_sec, units),
-                    format_rate(disk.write_bytes_per_sec, units)
-                ),
+                None => String::from("no volumes"),
             };
             rows.push(Row {
                 label: "Disk",
@@ -223,6 +223,14 @@ pub fn model_focused(
             });
 
             if focus == Some(Focus::Disk) {
+                detail_rows.push(DetailRow {
+                    label: String::from("Read / write"),
+                    value: format!(
+                        "{}  \u{00b7}  {}",
+                        format_rate(disk.read_bytes_per_sec, units),
+                        format_rate(disk.write_bytes_per_sec, units)
+                    ),
+                });
                 for volume in &disk.volumes {
                     let label = if volume.label.is_empty() {
                         volume.mount.clone()
@@ -252,8 +260,8 @@ pub fn model_focused(
                 label: "Network",
                 value: format!(
                     "\u{2193} {}  \u{2191} {}",
-                    format_rate_short(network.rx_bytes_per_sec, units),
-                    format_rate_short(network.tx_bytes_per_sec, units)
+                    format_rate_compact(network.rx_bytes_per_sec, units),
+                    format_rate_compact(network.tx_bytes_per_sec, units)
                 ),
                 detail: match network.adapters.first() {
                     Some(adapter) => adapter.name.clone(),
@@ -285,7 +293,7 @@ pub fn model_focused(
         }
     }
 
-    if let Some(battery) = snapshot.battery.as_ref() {
+    let battery_row = snapshot.battery.as_ref().map(|battery| {
         let mut detail = match battery.seconds_left {
             Some(seconds) => format!(
                 "{} remaining{}",
@@ -300,15 +308,15 @@ pub fn model_focused(
         if let Some(celsius) = battery.temperature_c {
             detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
         }
-        rows.push(Row {
+        Row {
             label: "Battery",
             value: format_percent(battery.percent),
             detail,
             series: Vec::new(),
-        });
-    }
+        }
+    });
 
-    if let Some(thermal) = snapshot.thermal.as_ref() {
+    let system_row = snapshot.thermal.as_ref().map(|thermal| {
         let detail = match snapshot.system.as_ref() {
             Some(system) => format!(
                 "Up {} \u{00b7} {} threads \u{00b7} {} handles",
@@ -318,18 +326,29 @@ pub fn model_focused(
             ),
             None => String::from("ACPI thermal zone"),
         };
-        rows.push(Row {
+        Row {
             label: "System",
             value: format_temperature(thermal.system_c),
             detail,
             series: Vec::new(),
-        });
+        }
+    });
+
+    // Battery and System stay visible in every focused view. The System page
+    // puts its own card first; everything else keeps Battery then System.
+    if focus == Some(Focus::System) {
+        rows.extend(system_row);
+        rows.extend(battery_row);
+    } else {
+        rows.extend(battery_row);
+        rows.extend(system_row);
     }
 
     // Only CPU and Memory ask "which app is responsible"; the other modules
     // have no per-app data, so their focused view has no process table.
     let processes = match focus {
-        Some(Focus::Gpu) | Some(Focus::Disk) | Some(Focus::Network) => Vec::new(),
+        Some(Focus::Gpu) | Some(Focus::Disk) | Some(Focus::Network) | Some(Focus::Battery)
+        | Some(Focus::System) => Vec::new(),
         _ => snapshot
             .processes
             .as_ref()
@@ -433,7 +452,7 @@ pub fn height(model: &Model, scale: f32) -> f32 {
 ///
 /// One column per physical pixel with linear interpolation between samples, so
 /// the curve reads smoothly even with only a minute of history.
-fn sparkline(
+pub(crate) fn sparkline(
     surface: &mut Surface,
     values: &[f32],
     (x, y, width, height): (f32, f32, f32, f32),
@@ -469,7 +488,7 @@ fn sparkline(
 }
 
 /// One bar per logical core, height = busy percentage.
-fn core_bars(
+pub(crate) fn core_bars(
     surface: &mut Surface,
     values: &[f32],
     (x, y, width, height): (f32, f32, f32, f32),
@@ -970,9 +989,10 @@ mod tests {
             Some(Focus::Disk),
             UnitSystem::Binary,
         );
-        assert_eq!(model.detail_rows.len(), 2);
-        assert_eq!(model.detail_rows[0].label, "C: System");
-        assert!(model.detail_rows[0].value.contains("41 °C"));
+        assert_eq!(model.detail_rows.len(), 3);
+        assert_eq!(model.detail_rows[0].label, "Read / write");
+        assert_eq!(model.detail_rows[1].label, "C: System");
+        assert!(model.detail_rows[1].value.contains("41 °C"));
         assert!(
             model.processes.is_empty(),
             "disk detail has no per-app data"

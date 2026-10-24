@@ -361,6 +361,27 @@ pub fn toggle_dashboard() -> Option<bool> {
     }
 }
 
+/// Switch the companion page (or open Settings) from its left nav.
+pub fn select_dashboard_item(index: usize) {
+    use statline_ui::dashboard::{Page, SETTINGS_ITEM};
+
+    if index == SETTINGS_ITEM {
+        crate::settings_host::toggle();
+        return;
+    }
+    let Some(page) = Page::from_index(index) else {
+        return;
+    };
+    let Some(host) = host() else {
+        return;
+    };
+    host.dashboard.set_page(page);
+    let snapshot = host.sampler.snapshot();
+    host.dashboard
+        .refresh(&mut host.renderer, &snapshot, host.flyout.history());
+    log::info!("companion page: {}", page.label());
+}
+
 /// Show or hide the strip on user request.
 pub fn toggle_strip() -> Option<bool> {
     let host = host()?;
@@ -391,6 +412,7 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
     };
     host.flyout.set_units(host.units);
     host.dashboard.set_units(host.units);
+    host.dashboard.set_mica(settings.appearance.mica);
     host.sampler.set_interval(Duration::from_millis(
         settings.general.update_interval_ms as u64,
     ));
