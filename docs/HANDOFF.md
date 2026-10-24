@@ -108,6 +108,10 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
   the process table's visibility gate and hide when unavailable. GPU vendor
   temperature/fan/power (NVML/ADL) is still pending.
+- **Packaging**: `scripts/package.ps1` builds `dist/Statline-<v>-x64.zip` (exe, README,
+  changelog, licence texts) plus a SHA-256. `scripts/build-msix.ps1` stages the layout and
+  runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and
+  the tile assets live under `packaging/msix/Assets`. CI has a tag-only packaging job.
 
 Measured (release): 0.46 ms CPU per sample in a tight loop with detail providers off;
 tray-only 10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles,
@@ -122,9 +126,9 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power. The current build
    shows utilization and VRAM only. This machine is AMD integrated, so ADL needs an AMD
    discrete GPU to verify; NVML can be exercised on any NVIDIA machine.
-3. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
-   CI (fmt/clippy/test/deny/build), README with snapshot images, MIT + third-party notices,
-   local `v0.1.0` tag.
+3. **Packaging, remaining**: a multi-size `.ico` for the executable/tray, the one-hour
+   soak and `--bench 300`, then the local annotated `v0.1.0` tag. Store/trademark checks
+   are human tasks.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
    `WM_DPICHANGED`, Mica/acrylic on the companion (needs a non-layered window + DWM
    backdrop; today it paints an opaque background).
@@ -162,6 +166,11 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
 - **Gate every expensive provider behind surface visibility.** Process table, ACPI zones,
   battery health and drive temps share `set_detail_surfaces`; with only the strip visible
   the tight-loop sample is 0.46 ms. Opening a detail surface costs ~2.3 ms/sample.
+- **MSIX/MakeAppx details**: manifests are schema-validated, so the identity version must
+  have four parts (`0.1.0.0`), the three namespaces (`uap`, `desktop`, `rescap`) must be
+  declared, and `runFullTrust` is required for a full-trust desktop app. The script finds
+  `makeappx.exe` under `Windows Kits\10\bin\...\x64`. Sideloading an unsigned package
+  fails; sign with a trusted dev certificate.
 - **GUI-subsystem CLI output can vanish.** The release binary has no console; `--probe`
   and friends attach to the parent console, and that output races process exit when the
   command is run in a loop. An empty `--startup-status` line is not "disabled": read

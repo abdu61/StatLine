@@ -31,6 +31,9 @@ detail sampling on
 - **Settings**: a framed window from the tray menu (or the strip menu) with theme,
   sampler interval, strip placement and start-with-Windows. Changes apply live and are
   saved atomically to `%APPDATA%\Statline\settings.json`; unknown keys are ignored.
+- **Packaging**: portable zip script (exe, README, changelog, licence texts) and an
+  MSIX manifest with `runFullTrust` + a user-toggleable startup task. Both build locally;
+  CI verifies fmt/clippy/test/deny/build and produces tag artifacts.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
   deltas; Task Manager scale (share of all cores); `—` until a baseline exists; sampled
   at 2 s only while the flyout or companion is open (~4.75 ms per query).
@@ -50,8 +53,8 @@ detail sampling on
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power; current builds show
    utilization and VRAM only. This machine is AMD integrated, so an AMD discrete GPU is
    needed to verify the ADL path.
-3. **Packaging (M9)**: MSIX, portable zip, CI, README with snapshots, notices,
-   local `v0.1.0` tag.
+3. **Packaging, remaining**: app `.ico`, icon in the executable/tray, a 1-hour soak and
+   `--bench 300`, then the local `v0.1.0` tag.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
    `WM_DPICHANGED`, Mica on the companion.
 
@@ -73,4 +76,4 @@ the average to ~2.3 ms/sample (process table dominates).
 
 - M0 scaffold · M1 metrics · M2 renderer · M3 strip live, parented into the taskbar ·
   M4 lifecycle · M5 flyout verified, top processes · M6 companion window + process table ·
-  M7 drive/battery/ACPI sensors (GPU vendor sensors pending).
+  M7 drive/battery/ACPI sensors (GPU vendor sensors pending) · M9 portable zip + MSIX.

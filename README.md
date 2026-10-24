@@ -3,31 +3,63 @@
 A live system monitor that lives in the Windows 11 taskbar. Native Rust + Win32 +
 Direct2D — no Electron, no WebView, no driver, no telemetry, no network access.
 
-> **Status: early development.** The tray shell and the documentation set exist; the
-> taskbar strip, flyout and dashboard are being built milestone by milestone. See
-> [`docs/STATUS.md`](docs/STATUS.md) for exactly where things stand.
+![Statline strip in the taskbar](docs/images/strip.jpg)
 
-## What it will do
+> **Status: 0.1.0 preview.** The strip, flyout, companion window, settings and
+> driver-free sensors work. See [`docs/STATUS.md`](docs/STATUS.md) for the exact state
+> and [`CHANGELOG.md`](CHANGELOG.md) for what shipped.
 
-- Compact strip in the taskbar: CPU, memory, GPU, disk and network at a glance
-- Click for a flyout with 60-second charts, per-core CPU, VRAM, per-volume disk,
-  per-adapter network, battery and top processes
-- A dashboard for deeper charts, reordering modules and configuring everything
-- GPU temperature/fan/power and drive temperatures where Windows exposes them
-  without a kernel driver
+## What it does
 
-## What it deliberately does not do
+- **Strip in the taskbar**: CPU, memory, GPU, disk and a two-line network readout,
+  anchored beside the tray (or after Start). It is a real child of `Shell_TrayWnd`, so
+  the Start menu no longer covers it, and clicking it never steals focus.
+- **Flyout**: click the strip for 60-second area charts, per-module cards and the top
+  five processes by CPU share.
 
-- No kernel driver, no elevated helper, no third-party app dependency
-- No network requests, no telemetry, no analytics
-- No CPU package temperature or fan RPM — Windows has no user-mode API for those.
-  The UI says so instead of showing a made-up number.
+  ![Flyout](docs/images/flyout.jpg)
 
-## Requirements
+  Clicking MEM sorts the process table by working set; the clicked module is highlighted.
+- **Companion window**: a normal resizable Windows 11 window with the full card grid and
+  an eight-row process table.
 
-Windows 11 (build 22000 or later), x64.
+  ![Companion window](docs/images/dashboard.jpg)
+
+- **Settings**: theme (system/light/dark), sampler interval, strip placement and
+  start-with-Windows. Changes apply live and are written atomically.
+
+  ![Settings](docs/images/settings.jpg)
+
+- **Sensors without a driver**: ACPI "System" temperature, drive temperature, and battery
+  health/temperature where the firmware exposes them. Anything unavailable is hidden,
+  never faked.
+- **Per-app detail**: process CPU is a share of total capacity (the Task Manager scale),
+  with working set. Sampling only runs while a surface showing processes is open.
+
+## Privacy and footprint
+
+- No network access, no telemetry, no update check, no analytics.
+- No kernel driver, no elevated helper, no third-party runtime.
+- Writes only to `%APPDATA%\Statline` (settings), `%LOCALAPPDATA%\Statline` (logs), and
+  the per-user `Run` key when you enable "Start with Windows".
+- Idle cost measured on a Ryzen laptop: **0.46 ms CPU per 1 s sample** with detail
+  surfaces closed, ~30 MB working set / ~14.5 MB private with the strip live.
+  See [`docs/ops/perf-budget.md`](docs/ops/perf-budget.md).
+
+## Install (portable)
+
+1. Build or unpack `Statline-<version>-x64.zip`.
+2. Run `statline.exe`. It starts in the notification area and attaches the strip.
+3. Right-click the strip or the tray icon for Settings, Dashboard, Pause and Exit.
+
+The portable build needs no installer and no administrator rights. Build the MSIX
+package with `scripts/build-msix.ps1` if you need a packaged deployment; it declares
+`runFullTrust` and a user-toggleable startup task.
 
 ## Build
+
+Requirements: Windows 11, the Rust MSVC toolchain, and the Visual Studio C++ build tools
+(for `link.exe`). See [`docs/ops/build.md`](docs/ops/build.md).
 
 ```powershell
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
@@ -35,14 +67,48 @@ cargo build --release
 .\target\release\statline.exe
 ```
 
-Requires the Rust MSVC toolchain and the Visual Studio C++ build tools (for `link.exe`).
-See [`docs/ops/build.md`](docs/ops/build.md).
+Verification (the same checks CI runs):
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings
+cargo test --all
+cargo build --release
+```
+
+Package a portable zip:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1 -Version 0.1.0
+```
+
+Debug and measurement modes:
+
+```powershell
+.\target\release\statline.exe --probe          # live values, top processes, exit
+.\target\release\statline.exe --bench 60       # sampling cost + memory
+.\target\release\statline.exe --profile 200    # per-provider cost
+.\target\release\statline.exe --render-snapshots .\snapshots-out
+.\target\release\statline.exe --tray-only
+```
+
+Logs: `%LOCALAPPDATA%\Statline\logs\statline.log` (1 MB, three rotations).
+
+## What it deliberately does not do
+
+- No CPU package temperature or fan RPM: Windows has no user-mode API, and shipping a
+  driver is out of scope. GPU vendor temperature/fan/power is planned but not in 0.1.0;
+  GPU utilization and VRAM do work.
+- No network requests of any kind.
+- No code from other monitor projects; Win32 usage is implemented from the public API
+  documentation.
 
 ## Documentation
 
 Everything lives in [`docs/`](docs/INDEX.md), indexed by task. Start with
-[`docs/STATUS.md`](docs/STATUS.md).
+[`docs/STATUS.md`](docs/STATUS.md), then the ADRs under [`docs/adr/`](docs/adr/).
 
 ## Licence
 
-MIT. Third-party notices are generated into `THIRD_PARTY_NOTICES.md`.
+MIT. Third-party notices and the Apache/MIT texts are in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`licenses/`](licenses/).

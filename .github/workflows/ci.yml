@@ -2,7 +2,8 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -49,3 +50,34 @@ jobs:
           name: snapshots
           path: snapshots-out
           if-no-files-found: warn
+
+  package:
+    # Local tags only for now; this job is ready for a release remote.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Portable zip
+        shell: powershell
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          .\scripts\package.ps1 -Version $version
+
+      - name: MSIX (unsigned)
+        shell: powershell
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          .\scripts\build-msix.ps1 -Version $version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: statline-packages
+          path: |
+            dist/*.zip
+            dist/*.sha256
+            dist/*.msix
+          if-no-files-found: error
