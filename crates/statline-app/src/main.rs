@@ -131,7 +131,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         match tray::TrayEvent::from_callback(lparam) {
             Some(tray::TrayEvent::Activate) => open_data_dir(),
             Some(tray::TrayEvent::ContextMenu) => {
-                if let Err(err) = menus::show_tray_menu(hwnd) {
+                if let Err(err) = menus::show_tray_menu(hwnd, strip_host::menu_state()) {
                     error!("context menu failed: {err}");
                 }
             }
@@ -144,6 +144,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         match id {
             menus::MENU_OPEN_DATA => open_data_dir(),
             menus::MENU_EXIT => destroy_window(hwnd),
+            menus::MENU_PAUSE => {
+                if let Some(paused) = strip_host::toggle_paused() {
+                    info!("monitoring paused: {paused}");
+                }
+            }
+            menus::MENU_TOGGLE_STRIP => {
+                if let Some(visible) = strip_host::toggle_strip() {
+                    info!("strip visible: {visible}");
+                }
+            }
+            menus::MENU_DASHBOARD => {
+                info!("dashboard requested (M6)");
+            }
             _ => {}
         }
         return LRESULT(0);

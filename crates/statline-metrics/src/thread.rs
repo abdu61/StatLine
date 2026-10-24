@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 struct Control {
     interval: Duration,
     stopping: bool,
+    paused: bool,
 }
 
 /// Handle to the running sampler. Dropping it stops the thread.
@@ -29,6 +30,7 @@ impl SamplerThread {
             Mutex::new(Control {
                 interval: interval.max(Duration::from_millis(100)),
                 stopping: false,
+                paused: false,
             }),
             Condvar::new(),
         ));
@@ -59,6 +61,17 @@ impl SamplerThread {
         let (lock, cvar) = &*self.control;
         let mut control = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         control.interval = interval.max(Duration::from_millis(100));
+        cvar.notify_all();
+    }
+
+    /// Pause or resume sampling. The last snapshot stays readable.
+    ///
+    /// While paused the thread waits on the same condition variable, so a paused
+    /// app costs no sampling CPU at all.
+    pub fn set_paused(&self, paused: bool) {
+        let (lock, cvar) = &*self.control;
+        let mut control = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        control.paused = paused;
         cvar.notify_all();
     }
 
@@ -94,6 +107,13 @@ fn run(control: Arc<(Mutex<Control>, Condvar)>, snapshot: Arc<ArcSwap<Snapshot>>
         loop {
             if state.stopping {
                 return;
+            }
+            // Paused means "no work at all until someone wakes us".
+            if state.paused {
+                state = cvar
+                    .wait(state)
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                continue;
             }
             // Recompute the deadline from the current interval so a settings
             // change takes effect without restarting the thread.
@@ -149,6 +169,33 @@ mod tests {
         let mut thread = SamplerThread::start(Duration::from_secs(30));
         thread.set_interval(Duration::from_millis(100));
         let _ = wait_for_sample(&thread);
+        thread.stop();
+    }
+
+    #[test]
+    fn pausing_stops_publishing_until_resumed() {
+        let mut thread = SamplerThread::start(Duration::from_millis(80));
+        let _ = wait_for_sample(&thread);
+
+        thread.set_paused(true);
+        // Let any in-flight tick land, then take a reference point.
+        std::thread::sleep(Duration::from_millis(200));
+        let paused_at = thread.snapshot().taken_at;
+
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(
+            thread.snapshot().taken_at,
+            paused_at,
+            "no snapshot should be published while paused"
+        );
+
+        thread.set_paused(false);
+        std::thread::sleep(Duration::from_millis(300));
+        assert_ne!(
+            thread.snapshot().taken_at,
+            paused_at,
+            "sampling should resume"
+        );
         thread.stop();
     }
 }

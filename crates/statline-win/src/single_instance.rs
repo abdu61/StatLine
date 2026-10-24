@@ -6,7 +6,9 @@
 
 use crate::to_wide;
 use std::ffi::OsStr;
-use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, HANDLE, SetLastError, WIN32_ERROR};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_ALREADY_EXISTS, HANDLE, SetLastError, WIN32_ERROR,
+};
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::core::PCWSTR;
 

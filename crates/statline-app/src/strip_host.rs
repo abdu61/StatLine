@@ -8,6 +8,7 @@ use statline_core::model::Snapshot;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
 use statline_ui::{render, strip};
+use statline_win::menus::MenuState;
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar, window};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::time::Duration;
@@ -37,6 +38,8 @@ pub struct Host {
     height: f32,
     logged_first_frame: bool,
     visible: bool,
+    user_hidden: bool,
+    paused: bool,
     hovered: Option<usize>,
     segment_rects: Vec<(f32, f32)>,
     tracking_leave: bool,
@@ -68,6 +71,8 @@ impl Host {
             height,
             logged_first_frame: false,
             visible: true,
+            user_hidden: false,
+            paused: false,
             hovered: None,
             segment_rects: Vec::new(),
             tracking_leave: false,
@@ -87,7 +92,7 @@ impl Host {
         // Hide for anything that owns the screen: fullscreen games, video,
         // presentation mode, or an auto-hidden taskbar.
         let should_hide = taskbar::is_hidden(geometry.taskbar) || taskbar::fullscreen_active();
-        self.set_visible(!should_hide);
+        self.set_visible(!should_hide && !self.user_hidden);
         if should_hide {
             return;
         }
@@ -119,11 +124,12 @@ impl Host {
             }
         }
 
+        let palette = self.active_palette();
         if let Some(surface) = self.surface.as_mut() {
             let metrics = render::render(
                 surface,
                 &mut self.renderer.text,
-                &self.palette,
+                &palette,
                 &segments,
                 self.hovered,
                 self.scale,
@@ -181,6 +187,40 @@ impl Host {
         }
     }
 
+    /// Palette to draw with: dimmed while sampling is paused.
+    fn active_palette(&self) -> Palette {
+        let mut palette = self.palette;
+        if self.paused {
+            palette.text_primary = palette.text_primary.with_alpha(120);
+            palette.text_muted = palette.text_muted.with_alpha(90);
+            palette.accent = palette.accent.with_alpha(110);
+            palette.meter_track = palette.meter_track.scaled_alpha(0.6);
+        }
+        palette
+    }
+
+    fn menu_state(&self) -> MenuState {
+        MenuState {
+            paused: self.paused,
+            strip_visible: !self.user_hidden,
+        }
+    }
+
+    fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
+        self.sampler.set_paused(paused);
+        self.tick();
+    }
+
+    fn toggle_strip(&mut self) {
+        self.user_hidden = !self.user_hidden;
+        let visible = !self.user_hidden;
+        self.set_visible(visible);
+        if visible {
+            self.tick();
+        }
+    }
+
     fn set_hover(&mut self, x: f32) {
         let hovered = render::hit_test(&self.segment_rects, x);
         if hovered != self.hovered {
@@ -210,6 +250,26 @@ impl Drop for Host {
     fn drop(&mut self) {
         HOST.store(std::ptr::null_mut(), Ordering::Release);
     }
+}
+
+/// Current menu state, for callers outside this module.
+pub fn menu_state() -> MenuState {
+    host().map(|host| host.menu_state()).unwrap_or_default()
+}
+
+/// Toggle pause. Returns the new state when a strip exists.
+pub fn toggle_paused() -> Option<bool> {
+    let host = host()?;
+    let paused = !host.paused;
+    host.set_paused(paused);
+    Some(paused)
+}
+
+/// Show or hide the strip on user request.
+pub fn toggle_strip() -> Option<bool> {
+    let host = host()?;
+    host.toggle_strip();
+    Some(!host.user_hidden)
 }
 
 fn create_window(height: f32) -> windows::core::Result<HWND> {
@@ -306,7 +366,8 @@ pub unsafe extern "system" fn strip_proc(
             LRESULT(0)
         }
         WM_RBUTTONUP => {
-            if let Err(error) = menus::show_tray_menu(hwnd) {
+            let state = host().map(|host| host.menu_state()).unwrap_or_default();
+            if let Err(error) = menus::show_tray_menu(hwnd, state) {
                 log::warn!("strip context menu failed: {error}");
             }
             LRESULT(0)
