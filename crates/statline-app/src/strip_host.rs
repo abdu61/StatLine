@@ -4,6 +4,7 @@
 //! published through a process-wide pointer that the strip's window procedure
 //! reads on every timer tick and mouse message.
 
+use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
 use statline_core::model::Snapshot;
 use statline_metrics::thread::SamplerThread;
@@ -46,6 +47,7 @@ pub struct Host {
     tracking_leave: bool,
     flyout: Flyout,
     last_rect: Option<RECT>,
+    dashboard: Dashboard,
 }
 
 impl Host {
@@ -81,6 +83,7 @@ impl Host {
             tracking_leave: false,
             flyout: Flyout::new(palette, scale),
             last_rect: None,
+            dashboard: Dashboard::new(palette, scale),
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -147,6 +150,8 @@ impl Host {
         if self.flyout.is_open() {
             self.flyout.refresh(&mut self.renderer, &snapshot);
         }
+        self.dashboard
+            .refresh(&mut self.renderer, &snapshot, self.flyout.history());
 
         let padding = (4.0 * self.scale) as i32;
         let screen_left = geometry.strip_left(width as i32, padding);
@@ -288,6 +293,21 @@ pub fn toggle_paused() -> Option<bool> {
     let paused = !host.paused;
     host.set_paused(paused);
     Some(paused)
+}
+
+/// Open or close the companion window.
+pub fn toggle_dashboard() -> Option<bool> {
+    let host = host()?;
+    let snapshot = host.sampler.snapshot();
+    let history_is_open = host.dashboard.is_open();
+    if history_is_open {
+        host.dashboard.close();
+        Some(false)
+    } else {
+        host.dashboard
+            .toggle(&mut host.renderer, &snapshot, host.flyout.history());
+        Some(true)
+    }
 }
 
 /// Show or hide the strip on user request.

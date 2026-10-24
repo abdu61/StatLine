@@ -158,6 +158,30 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
     }
+    // Companion window at 100 %.
+    {
+        use statline_ui::dashboard;
+        use statline_ui::flyout::{self, History};
+
+        let mut history = History::default();
+        for index in 0..48 {
+            history.cpu.push(24.0 + 10.0 * (index as f32 / 6.0).sin());
+            history.memory.push(58.0 + 4.0 * (index as f32 / 9.0).sin());
+            history.gpu.push(7.0 + 5.0 * (index as f32 / 4.0).cos());
+        }
+
+        let model = flyout::model(&snapshot, &history);
+        let scale = 1.0_f32;
+        let width = dashboard::width(scale).ceil() as u32;
+        let height = dashboard::height(&model, scale).ceil() as u32;
+        let palette = Palette::for_theme(true, Color::rgb(0x4C, 0xC2, 0xFF));
+
+        let mut surface = renderer.surface(width, height)?;
+        dashboard::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        let path = dir.join("dashboard-dark-100.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+    }
     for path in written {
         println!("{}", path.display());
     }

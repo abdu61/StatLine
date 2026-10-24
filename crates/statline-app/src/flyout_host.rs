@@ -37,6 +37,11 @@ impl Flyout {
         }
     }
 
+    /// Series used by the sparklines, shared with the companion window.
+    pub fn history(&self) -> &History {
+        &self.history
+    }
+
     pub fn is_open(&self) -> bool {
         self.hwnd.is_some()
     }

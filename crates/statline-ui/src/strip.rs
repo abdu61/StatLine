@@ -8,7 +8,7 @@ use statline_core::units::{UnitSystem, format_percent, format_rate_short};
 /// Text used to reserve a stable width, so a changing number cannot make the
 /// strip jump around. Network is the worst offender: "1.1 KB/s" and
 /// "12.4 MB/s" must occupy the same slot.
-const RATE_SAMPLE: &str = "\u{2193} 888 KB/s";
+const RATE_SAMPLE: &str = "\u{2193} 88.8 MB/s";
 
 /// One readout in the strip.
 #[derive(Debug, Clone, PartialEq)]

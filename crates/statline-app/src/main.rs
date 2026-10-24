@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cli;
+mod dashboard_host;
 mod flyout_host;
 mod profile;
 mod snapshots;
@@ -165,7 +166,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 }
             }
             menus::MENU_DASHBOARD => {
-                info!("dashboard requested (M6)");
+                strip_host::toggle_dashboard();
             }
             _ => {}
         }

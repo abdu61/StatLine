@@ -2,7 +2,7 @@
 
 use statline_core::model::Snapshot;
 use statline_core::units::{
-    UnitSystem, format_bytes, format_duration, format_percent, format_rate, format_rate_compact,
+    UnitSystem, format_bytes, format_duration, format_percent, format_rate, format_rate_short,
 };
 use statline_render::{Align, Color, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -125,8 +125,8 @@ pub fn model(snapshot: &Snapshot, history: &History) -> Model {
             label: "Network",
             value: format!(
                 "\u{2193} {}  \u{2191} {}",
-                format_rate_compact(network.rx_bytes_per_sec, UnitSystem::Binary),
-                format_rate_compact(network.tx_bytes_per_sec, UnitSystem::Binary)
+                format_rate_short(network.rx_bytes_per_sec, UnitSystem::Decimal),
+                format_rate_short(network.tx_bytes_per_sec, UnitSystem::Decimal)
             ),
             detail: match network.adapters.first() {
                 Some(adapter) => adapter.name.clone(),
