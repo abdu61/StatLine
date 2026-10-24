@@ -1,6 +1,6 @@
 //! The sampling engine: turns raw Win32 readings into a `Snapshot`.
 
-use statline_core::model::{CpuSample, MemorySample, Snapshot, SystemSample};
+use statline_core::model::{CpuSample, MemorySample, ProcessSample, Snapshot, SystemSample};
 use statline_win::metrics::net::InterfaceRef;
 use statline_win::metrics::{self, CpuTimes};
 use std::time::{Duration, Instant, SystemTime};
@@ -10,11 +10,13 @@ pub mod cpu;
 pub mod disk;
 pub mod gpu;
 pub mod network;
+pub mod process;
 pub mod thread;
 
 use disk::DiskState;
 use gpu::GpuState;
 use network::NetworkState;
+use process::ProcessState;
 
 /// Interface enumeration costs ~1.2 ms; the list changes rarely.
 const INTERFACE_REFRESH: Duration = Duration::from_secs(60);
@@ -32,6 +34,9 @@ pub struct Sampler {
     interfaces_at: Option<Instant>,
     disk: DiskState,
     gpu: GpuState,
+    process: ProcessState,
+    /// Set by the UI while a surface that shows processes is open.
+    process_visible: bool,
 }
 
 impl Default for Sampler {
@@ -51,7 +56,22 @@ impl Sampler {
             interfaces_at: None,
             disk: DiskState::new(),
             gpu: GpuState::new(),
+            process: ProcessState::new(),
+            process_visible: false,
         }
+    }
+
+    /// Enable or disable the process table.
+    ///
+    /// The query allocates in the kernel, so it runs only while the flyout or
+    /// the companion window is open. Disabling drops the delta baseline so a
+    /// later enable does not report CPU time averaged over the hidden gap.
+    pub fn set_process_table(&mut self, enabled: bool) {
+        if self.process_visible == enabled {
+            return;
+        }
+        self.process_visible = enabled;
+        self.process.reset();
     }
 
     /// Take one reading of everything v1 measures.
@@ -72,8 +92,16 @@ impl Sampler {
             network: Some(self.sample_network(now, elapsed)),
             battery: battery::sample(),
             system: sample_system(),
+            processes: self.sample_processes(now),
             ..Snapshot::default()
         }
+    }
+
+    fn sample_processes(&mut self, now: Instant) -> Option<ProcessSample> {
+        if !self.process_visible {
+            return None;
+        }
+        self.process.sample(now, metrics::logical_core_count())
     }
 
     fn sample_cpu(&mut self) -> Option<CpuSample> {

@@ -1,7 +1,7 @@
 //! Command-line modes: `--help`, `--version`, `--probe`, `--bench`, `--profile`.
 
 use statline_core::units::{
-    UnitSystem, format_bytes, format_frequency, format_percent, format_rate,
+    UnitSystem, format_bytes, format_frequency, format_percent, format_percent_precise, format_rate,
 };
 use statline_core::{APP_NAME, VERSION};
 use statline_metrics::Sampler;
@@ -44,6 +44,10 @@ pub fn print_version() {
 pub fn probe(count: u32, interval: Duration) {
     console::ensure();
     let mut sampler = Sampler::new();
+    // The probe is the diagnostic mode; include the table it would otherwise
+    // only collect while a process surface is visible.
+    sampler.set_process_table(true);
+    let mut last = None;
 
     console::write_line(&format!(
         "{} - {count} samples, {:.0} ms apart",
@@ -150,6 +154,30 @@ pub fn probe(count: u32, interval: Duration) {
             console::write_line("");
             std::thread::sleep(interval);
         }
+        last = Some(snapshot);
+    }
+
+    if let Some(processes) = last
+        .as_ref()
+        .and_then(|snapshot| snapshot.processes.as_ref())
+    {
+        console::write_line("");
+        console::write_line(&format!(
+            "top processes ({} total, CPU share of all cores)",
+            processes.total
+        ));
+        for entry in processes.top.iter().take(5) {
+            let cpu = entry
+                .cpu_percent
+                .map(format_percent_precise)
+                .unwrap_or_else(|| String::from("--"));
+            console::write_line(&format!(
+                "  {:<28} {:>5}  {}",
+                entry.name,
+                cpu,
+                format_bytes(entry.working_set_bytes, UnitSystem::Binary)
+            ));
+        }
     }
 }
 
@@ -163,10 +191,14 @@ pub fn bench(count: u32, interval: Duration) {
 
     let cpu_start = statline_win::metrics::process_cpu_time().unwrap_or_default();
     let mut durations = Vec::with_capacity(count as usize);
+    let mut cpu_samples = Vec::with_capacity(count as usize);
     for index in 0..count {
+        let before = statline_win::metrics::process_cpu_time().unwrap_or_default();
         let started = Instant::now();
         let _snapshot = sampler.sample();
         durations.push(started.elapsed());
+        let after = statline_win::metrics::process_cpu_time().unwrap_or_default();
+        cpu_samples.push(after.saturating_sub(before));
 
         if index + 1 < count {
             std::thread::sleep(interval);
@@ -177,6 +209,11 @@ pub fn bench(count: u32, interval: Duration) {
         .unwrap_or_default()
         .saturating_sub(cpu_start);
     let cpu_mean_ms = cpu_total.as_secs_f64() * 1000.0 / count.max(1) as f64;
+    cpu_samples.sort_unstable();
+    let cpu_sample_min = cpu_samples.first().copied().unwrap_or_default();
+    let cpu_sample_max = cpu_samples.last().copied().unwrap_or_default();
+    let cpu_sample_sum: Duration = cpu_samples.iter().sum();
+    let cpu_sample_mean = cpu_sample_sum.as_secs_f64() * 1000.0 / cpu_samples.len().max(1) as f64;
 
     durations.sort_unstable();
     let total: Duration = durations.iter().sum();
@@ -202,6 +239,12 @@ pub fn bench(count: u32, interval: Duration) {
     console::write_line(&format!("mean         {mean:.3} ms"));
     console::write_line(&format!("p95          {p95:.3} ms"));
     console::write_line(&format!("max          {max:.3} ms"));
+    console::write_line(&format!(
+        "cpu/sample   min {:.3}  mean {:.3}  max {:.3} ms",
+        cpu_sample_min.as_secs_f64() * 1000.0,
+        cpu_sample_mean,
+        cpu_sample_max.as_secs_f64() * 1000.0
+    ));
 
     if let Some(memory) = memory {
         console::write_line(&format!(

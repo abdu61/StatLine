@@ -68,6 +68,14 @@ pub fn run(iterations: u32) {
     time("volumes", iterations, || {
         black_box(metrics::disk::volumes());
     });
+    let mut process_buffer = Vec::new();
+    let mut process_rows = Vec::new();
+    time("process table (NtQuery)", iterations, || {
+        black_box(metrics::process::processes(
+            &mut process_buffer,
+            &mut process_rows,
+        ));
+    });
 
     let mut sampler = Sampler::new();
     let _ = sampler.sample();

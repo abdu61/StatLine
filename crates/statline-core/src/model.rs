@@ -17,6 +17,7 @@ pub struct Snapshot {
     pub battery: Option<BatterySample>,
     pub thermal: Option<ThermalSample>,
     pub system: Option<SystemSample>,
+    pub processes: Option<ProcessSample>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -144,6 +145,34 @@ pub struct SystemSample {
     pub processes: u32,
     pub threads: u32,
     pub handles: u32,
+}
+
+/// The per-app breakdown.
+///
+/// Only populated while a surface that shows processes is visible, so the
+/// process-table query never runs in the background.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ProcessSample {
+    /// Processes the kernel reported, before the top-N cut.
+    pub total: u32,
+    /// Highest-CPU processes, descending.
+    pub top: Vec<ProcessEntry>,
+}
+
+/// One row of the process table.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ProcessEntry {
+    pub pid: u32,
+    /// Executable name, e.g. `chrome.exe`.
+    pub name: String,
+    /// Share of total CPU capacity (sum of all cores), 0..=100.
+    ///
+    /// This is the Task Manager scale: one saturated core on an eight-core
+    /// machine reads 12.5 %, and the column sums to the CPU total. `None`
+    /// until a second sample provides a delta, so the UI can show "—" rather
+    /// than claim a busy process is idle.
+    pub cpu_percent: Option<f32>,
+    pub working_set_bytes: u64,
 }
 
 #[cfg(test)]

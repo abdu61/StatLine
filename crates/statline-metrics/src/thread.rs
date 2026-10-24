@@ -6,6 +6,7 @@
 use crate::Sampler;
 use arc_swap::ArcSwap;
 use statline_core::model::Snapshot;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -20,6 +21,7 @@ struct Control {
 pub struct SamplerThread {
     control: Arc<(Mutex<Control>, Condvar)>,
     snapshot: Arc<ArcSwap<Snapshot>>,
+    process_visible: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -35,18 +37,21 @@ impl SamplerThread {
             Condvar::new(),
         ));
         let snapshot = Arc::new(ArcSwap::from_pointee(Snapshot::default()));
+        let process_visible = Arc::new(AtomicBool::new(false));
 
         let worker_control = Arc::clone(&control);
         let worker_snapshot = Arc::clone(&snapshot);
+        let worker_process = Arc::clone(&process_visible);
 
         let handle = std::thread::Builder::new()
             .name(String::from("statline-sampler"))
-            .spawn(move || run(worker_control, worker_snapshot))
+            .spawn(move || run(worker_control, worker_snapshot, worker_process))
             .ok();
 
         Self {
             control,
             snapshot,
+            process_visible,
             handle,
         }
     }
@@ -54,6 +59,14 @@ impl SamplerThread {
     /// Latest published snapshot. Cheap: an atomic load plus refcount bump.
     pub fn snapshot(&self) -> Arc<Snapshot> {
         self.snapshot.load_full()
+    }
+
+    /// Include the process table in snapshots while a process view is visible.
+    ///
+    /// The next tick picks this up; there is no wake-up, so closing every
+    /// process surface simply lets the next tick omit the table.
+    pub fn set_process_table(&self, enabled: bool) {
+        self.process_visible.store(enabled, Ordering::Relaxed);
     }
 
     /// Change the cadence. Takes effect after the current tick.
@@ -95,11 +108,16 @@ impl Drop for SamplerThread {
     }
 }
 
-fn run(control: Arc<(Mutex<Control>, Condvar)>, snapshot: Arc<ArcSwap<Snapshot>>) {
+fn run(
+    control: Arc<(Mutex<Control>, Condvar)>,
+    snapshot: Arc<ArcSwap<Snapshot>>,
+    process_visible: Arc<AtomicBool>,
+) {
     let mut sampler = Sampler::new();
 
     loop {
         let started = Instant::now();
+        sampler.set_process_table(process_visible.load(Ordering::Relaxed));
         snapshot.store(Arc::new(sampler.sample()));
 
         let (lock, cvar) = &*control;
@@ -196,6 +214,42 @@ mod tests {
             paused_at,
             "sampling should resume"
         );
+        thread.stop();
+    }
+
+    #[test]
+    fn process_table_only_appears_on_request() {
+        let mut thread = SamplerThread::start(Duration::from_millis(120));
+        let _ = wait_for_sample(&thread);
+        assert!(
+            thread.snapshot().processes.is_none(),
+            "the process table must stay off until a process surface opens"
+        );
+
+        thread.set_process_table(true);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            if let Some(processes) = thread.snapshot().processes.clone() {
+                assert!(processes.total > 0);
+                assert!(!processes.top.is_empty());
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "process table never appeared after enabling"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        thread.set_process_table(false);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while thread.snapshot().processes.is_some() {
+            assert!(
+                Instant::now() < deadline,
+                "process table never stopped after disabling"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
         thread.stop();
     }
 }

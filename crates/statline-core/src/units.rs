@@ -60,6 +60,19 @@ pub fn format_percent(percent: f32) -> String {
     format!("{rounded}%")
 }
 
+/// `4.24` → `"4.2%"`, `23.4` → `"23%"`.
+///
+/// Process rows need the extra digit: the difference between an idle app and
+/// one using 0.4 % of the machine is exactly what the table is for.
+pub fn format_percent_precise(percent: f32) -> String {
+    let clamped = percent.clamp(0.0, 100.0);
+    if clamped < 10.0 {
+        format!("{clamped:.1}%")
+    } else {
+        format!("{clamped:.0}%")
+    }
+}
+
 /// `62.4` → `"62 °C"`.
 pub fn format_temperature(celsius: f32) -> String {
     format!("{:.0} °C", celsius)
@@ -187,6 +200,15 @@ mod tests {
         assert_eq!(format_percent(23.4), "23%");
         assert_eq!(format_percent(99.6), "100%");
         assert_eq!(format_percent(150.0), "100%");
+    }
+
+    #[test]
+    fn precise_percentages_keep_a_digit_below_ten() {
+        assert_eq!(format_percent_precise(0.4), "0.4%");
+        assert_eq!(format_percent_precise(4.24), "4.2%");
+        assert_eq!(format_percent_precise(9.96), "10.0%");
+        assert_eq!(format_percent_precise(23.4), "23%");
+        assert_eq!(format_percent_precise(150.0), "100%");
     }
 
     #[test]
