@@ -116,6 +116,15 @@ pub fn keep_on_top(hwnd: HWND) {
     }
 }
 
+/// Destroy the strip window (used when Explorer restarts).
+pub fn destroy(hwnd: HWND) {
+    // SAFETY: the handle is ours; DestroyWindow is idempotent for dead handles
+    // in the sense that it simply fails.
+    unsafe {
+        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
+    }
+}
+
 /// Show or hide the strip without activating it.
 pub fn set_visible(hwnd: HWND, visible: bool) {
     // SAFETY: the handle is ours; SW_SHOWNOACTIVATE keeps focus where it was.

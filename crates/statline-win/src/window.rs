@@ -6,13 +6,14 @@
 
 use crate::to_wide;
 use std::ffi::OsStr;
+use std::sync::OnceLock;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MSG, RegisterClassW,
-    TranslateMessage, WINDOW_EX_STYLE, WNDCLASSW, WNDPROC, WS_OVERLAPPED,
+    RegisterWindowMessageW, TranslateMessage, WINDOW_EX_STYLE, WNDCLASSW, WNDPROC, WS_OVERLAPPED,
 };
-use windows::core::{PCWSTR, Result};
+use windows::core::{PCWSTR, Result, w};
 
 /// A hidden top-level window used as the app's event sink.
 pub struct MessageWindow {
@@ -98,4 +99,17 @@ impl MessageWindow {
 pub fn default_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // SAFETY: forwarding the exact arguments received by the window procedure.
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+static TASKBAR_CREATED: OnceLock<u32> = OnceLock::new();
+
+/// The broadcast message Explorer sends after (re)starting.
+///
+/// Cached because the id is stable for the process lifetime and this is compared
+/// against every dispatched message.
+pub fn taskbar_created_message() -> u32 {
+    *TASKBAR_CREATED.get_or_init(|| {
+        // SAFETY: registering a message name; no pointers leave the call.
+        unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) }
+    })
 }

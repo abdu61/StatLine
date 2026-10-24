@@ -1,14 +1,20 @@
 //! Hosts the taskbar strip window and keeps it in sync with the sampler.
+//!
+//! Everything here runs on the UI thread. The host is created once, boxed, and
+//! published through a process-wide pointer that the strip's window procedure
+//! reads on every timer tick and mouse message.
 
 use statline_core::model::Snapshot;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
 use statline_ui::{render, strip};
-use statline_win::taskbar;
-use statline_win::{HWND, LPARAM, LRESULT, WPARAM, strip_window};
+use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar, window};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::time::Duration;
 use windows::Win32::Foundation::RECT;
+use windows::Win32::UI::Input::KeyboardAndMouse::{TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent};
+use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, PostMessageW, WM_COMMAND};
+use windows::core::w;
 
 /// Pointer to the single host instance, read by the window procedure.
 ///
@@ -17,6 +23,9 @@ use windows::Win32::Foundation::RECT;
 static HOST: AtomicPtr<Host> = AtomicPtr::new(std::ptr::null_mut());
 
 const TIMER_ID: usize = 1;
+
+/// `WM_MOUSELEAVE` (winuser.h); not generated in this binding.
+const WM_MOUSELEAVE: u32 = 0x02A3;
 
 pub struct Host {
     renderer: Renderer,
@@ -28,6 +37,9 @@ pub struct Host {
     height: f32,
     logged_first_frame: bool,
     visible: bool,
+    hovered: Option<usize>,
+    segment_rects: Vec<(f32, f32)>,
+    tracking_leave: bool,
 }
 
 impl Host {
@@ -44,19 +56,7 @@ impl Host {
 
         let renderer = Renderer::new()?;
         let sampler = SamplerThread::start(Duration::from_millis(1000));
-
-        let rect = RECT {
-            left: 0,
-            top: 0,
-            right: 1,
-            bottom: height as i32,
-        };
-        let hwnd = strip_window::create_strip_window(
-            strip_window::STRIP_CLASS,
-            "Statline",
-            Some(strip_proc),
-            rect,
-        )?;
+        let hwnd = create_window(height)?;
 
         let mut host = Box::new(Self {
             renderer,
@@ -68,6 +68,9 @@ impl Host {
             height,
             logged_first_frame: false,
             visible: true,
+            hovered: None,
+            segment_rects: Vec::new(),
+            tracking_leave: false,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -117,14 +120,16 @@ impl Host {
         }
 
         if let Some(surface) = self.surface.as_mut() {
-            render::render(
+            let metrics = render::render(
                 surface,
                 &mut self.renderer.text,
                 &self.palette,
                 &segments,
+                self.hovered,
                 self.scale,
                 self.height,
             );
+            self.segment_rects = metrics.segments;
         }
 
         let padding = (4.0 * self.scale) as i32;
@@ -158,6 +163,39 @@ impl Host {
         }
     }
 
+    /// Destroy and recreate the strip after Explorer restarts.
+    fn recreate(&mut self) {
+        log::info!("taskbar restarted; recreating strip");
+        strip_window::destroy(self.hwnd);
+        match create_window(self.height) {
+            Ok(hwnd) => {
+                self.hwnd = hwnd;
+                self.surface = None;
+                self.logged_first_frame = false;
+                self.visible = true;
+                self.hovered = None;
+                self.segment_rects.clear();
+                self.tick();
+            }
+            Err(error) => log::error!("could not recreate strip: {error}"),
+        }
+    }
+
+    fn set_hover(&mut self, x: f32) {
+        let hovered = render::hit_test(&self.segment_rects, x);
+        if hovered != self.hovered {
+            self.hovered = hovered;
+            self.tick();
+        }
+    }
+
+    fn clear_hover(&mut self) {
+        if self.hovered.is_some() {
+            self.hovered = None;
+            self.tick();
+        }
+    }
+
     fn set_visible(&mut self, visible: bool) {
         if self.visible == visible {
             return;
@@ -174,6 +212,32 @@ impl Drop for Host {
     }
 }
 
+fn create_window(height: f32) -> windows::core::Result<HWND> {
+    let rect = RECT {
+        left: 0,
+        top: 0,
+        right: 1,
+        bottom: height as i32,
+    };
+    strip_window::create_strip_window(
+        strip_window::STRIP_CLASS,
+        "Statline",
+        Some(strip_proc),
+        rect,
+    )
+}
+
+fn host() -> Option<&'static mut Host> {
+    let pointer = HOST.load(Ordering::Acquire);
+    if pointer.is_null() {
+        None
+    } else {
+        // SAFETY: the pointer is set once from a boxed host and cleared in its
+        // `Drop`; every call here runs on the UI thread that owns it.
+        Some(unsafe { &mut *pointer })
+    }
+}
+
 /// Window procedure for the strip.
 pub unsafe extern "system" fn strip_proc(
     hwnd: HWND,
@@ -182,9 +246,16 @@ pub unsafe extern "system" fn strip_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     use windows::Win32::UI::WindowsAndMessaging::{
-        DefWindowProcW, KillTimer, SetTimer, WM_CREATE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP,
-        WM_TIMER,
+        DefWindowProcW, KillTimer, SetTimer, WM_CREATE, WM_DESTROY, WM_LBUTTONUP, WM_MOUSEMOVE,
+        WM_RBUTTONUP, WM_TIMER,
     };
+
+    if msg == window::taskbar_created_message() {
+        if let Some(host) = host() {
+            host.recreate();
+        }
+        return LRESULT(0);
+    }
 
     match msg {
         WM_CREATE => {
@@ -195,24 +266,60 @@ pub unsafe extern "system" fn strip_proc(
             LRESULT(0)
         }
         WM_TIMER => {
-            let pointer = HOST.load(Ordering::Acquire);
-            if !pointer.is_null() {
-                // SAFETY: the pointer is stable for the host's lifetime and this
-                // code runs on the UI thread that owns it.
-                unsafe {
-                    (*pointer).tick();
+            if let Some(host) = host() {
+                host.tick();
+            }
+            LRESULT(0)
+        }
+        WM_MOUSEMOVE => {
+            let x = (lparam.0 & 0xFFFF) as i16 as f32;
+            if let Some(host) = host() {
+                if !host.tracking_leave {
+                    host.tracking_leave = true;
+                    let mut track = TRACKMOUSEEVENT {
+                        cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
+                        dwFlags: TME_LEAVE,
+                        hwndTrack: hwnd,
+                        dwHoverTime: 0,
+                    };
+                    // SAFETY: valid descriptor; asks for one WM_MOUSELEAVE.
+                    unsafe {
+                        let _ = TrackMouseEvent(&mut track);
+                    }
                 }
+                host.set_hover(x);
+            }
+            LRESULT(0)
+        }
+        WM_MOUSELEAVE => {
+            if let Some(host) = host() {
+                host.tracking_leave = false;
+                host.clear_hover();
             }
             LRESULT(0)
         }
         WM_LBUTTONUP => {
-            // The flyout lands in M5; until then a click is a no-op that we log
-            // so the hit path is visible during development.
-            log::debug!("strip clicked");
+            // The flyout lands in M5; log the hit so the path is observable.
+            let x = (lparam.0 & 0xFFFF) as i16 as f32;
+            let segment = host().and_then(|host| render::hit_test(&host.segment_rects, x));
+            log::debug!("strip clicked, segment={segment:?}");
             LRESULT(0)
         }
         WM_RBUTTONUP => {
-            log::debug!("strip right-clicked");
+            if let Err(error) = menus::show_tray_menu(hwnd) {
+                log::warn!("strip context menu failed: {error}");
+            }
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            // The menu was created for this window; forward the action to the
+            // app window that owns the command handlers.
+            // SAFETY: plain window lookup and a posted message.
+            unsafe {
+                if let Ok(app) = FindWindowW(w!("StatlineMessageWindow"), None) {
+                    let _ = PostMessageW(Some(app), WM_COMMAND, wparam, LPARAM(0));
+                }
+            }
             LRESULT(0)
         }
         WM_DESTROY => {
