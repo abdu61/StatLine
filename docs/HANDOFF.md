@@ -1,0 +1,140 @@
+# Statline — handoff
+
+Native Windows 11 system monitor that lives in the taskbar. Rust + Win32 + Direct2D.
+Repo: `c:\Users\abdu1\Desktop\Windows Perf Monitor`. MIT. Local commits only, never push.
+
+Read `AGENTS.md`, then `docs/STATUS.md`, then this file. Do not bulk-read the docs tree.
+
+## Build & verify (run before every commit)
+
+```powershell
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo build --release
+```
+
+Kill a running instance first (`Get-Process statline | Stop-Process -Force`) or the
+linker cannot replace the exe.
+
+## Run modes
+
+```powershell
+.\target\release\statline.exe                    # strip + tray (default)
+.\target\release\statline.exe --tray-only        # no strip
+.\target\release\statline.exe --probe            # live values, 5 samples
+.\target\release\statline.exe --bench 60         # sampling cost + memory
+.\target\release\statline.exe --profile 200      # per-provider tight-loop cost
+.\target\release\statline.exe --render-snapshots .\snapshots-out
+.\target\release\statline.exe --install-startup | --remove-startup | --startup-status
+```
+
+Log: `%LOCALAPPDATA%\Statline\logs\statline.log` (1 MB, 3 rotations).
+Single instance is enforced by a named mutex; a second launch logs and exits.
+
+## Visual QA — important
+
+**Screen capture cannot see this project on this machine.** `CopyFromScreen` and
+`BitBlt` omit both the taskbar and layered windows here. Do not conclude "invisible"
+from a screenshot.
+
+- Review the design with `--render-snapshots <dir>` and read the PNGs (they render the
+  real drawing code, composited over a taskbar colour).
+- Verify live windows logically: `FindWindow("StatlineStripWindow")`,
+  `FindWindow("StatlineFlyoutWindow")`, `FindWindow("StatlineCompanionWindow")`,
+  `IsWindowVisible`, `GetWindowRect`, `GetWindowLongPtr(GWL_EXSTYLE)`.
+- Post synthetic input to test interaction: `PostMessage(hwnd, 0x0202 /*LBUTTONUP*/, 0,
+  MAKELPARAM(x, y))`. Clicking the strip must create the flyout; verify by FindWindow
+  and the log.
+
+## Layout
+
+```
+crates/statline-core     model, units/formatting, ring buffer        (pure, no I/O)
+crates/statline-config   settings schema + atomic persistence        (not yet wired)
+crates/statline-win      ALL unsafe Win32: window, tray, menus, taskbar, strip window,
+                         single instance, autostart, logger, metrics wrappers
+crates/statline-metrics  providers + sampler thread (ArcSwap publish)
+crates/statline-render   D2D/DWrite surface, colour, PNG writer, tokens
+crates/statline-ui       strip model+render, flyout model+render, dashboard render
+crates/statline-app      bin: main, cli, profile, strip_host, flyout_host, dashboard_host
+docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
+```
+
+## State (all committed, 93 tests green, clippy clean)
+
+- **M0–M2 done**: workspace, docs, tray shell; metrics (CPU total/per-core/MHz, memory,
+  PDH disk, per-adapter network, GPU util+VRAM, battery); software Direct2D renderer
+  with headless PNG snapshots.
+- **M3 done**: strip renders in the taskbar beside the tray at 237x42 (125 %), segments
+  CPU/MEM/GPU/DISK + two-line NET, per-segment hover, right-click menu, hides for
+  fullscreen and a hidden taskbar, recreates on `TaskbarCreated`.
+- **M4 done**: single instance, autostart commands, log rotation, panic hook, tray menu
+  with Pause/Resume (parks the sampler on its condvar), Show/Hide strip, Dashboard, Exit.
+- **M5 partial**: flyout opens on strip click and closes on focus loss/Esc; renders as a
+  layered panel with interpolation-smoothed area charts.
+- **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
+  resizable, Windows 11 dark frame + rounded corners), painting a two-column card grid.
+
+Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tray-only
+10.6 MB WS / 1.8 MB private; strip live 30.2 MB / 14.2 MB / 310 handles, flat over 60 s.
+
+## Next work, in priority order
+
+1. **Parent the strip into `Shell_TrayWnd` (ADR tier 1).** This was abandoned when ULW
+   appeared broken, but the real cause was a null `BLENDFUNCTION`. Now that ULW works,
+   retest `SetParent(hwnd, taskbar)` + `WS_CHILD`; if `present_layered` still returns
+   false, revert to topmost. Parenting fixes both remaining strip bugs: the Start menu
+   covering it, and fragile click handling. Remember child windows are positioned in
+   parent-client coordinates (`docs/spec/taskbar-integration.md`).
+2. **Process provider + per-app breakdown.** `NtQuerySystemInformation(SystemProcessInformation)`
+   with CPU-time deltas and working sets, sampled at 2 s only while a surface showing
+   processes is visible. Then: click a segment → flyout opens focused on that module with
+   its top processes; same table in the companion window. This is the feature the user
+   asked for explicitly ("press CPU, shows CPU usage of apps").
+3. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
+   units, which modules show, autostart toggle, safe mode. Live-apply through the host.
+4. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
+   `IOCTL_STORAGE_QUERY_PROPERTY`, battery temperature/health, ACPI thermal zone via PDH.
+   Each degrades to hidden, never fakes a value. CPU package temp/fans are out of scope
+   (no user-mode API; legal audit in the plan's §10).
+5. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
+   CI (fmt/clippy/test/deny/build), README with snapshot images, MIT + third-party notices,
+   local `v0.1.0` tag.
+6. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
+   `WM_DPICHANGED`, Mica/acrylic on the companion (needs a non-layered window + DWM
+   backdrop; today it paints an opaque background).
+
+## Gotchas that cost hours — do not relearn these
+
+- **`UPDATELAYEREDWINDOWINFO.pblend` must not be null** with `ULW_ALPHA`. A null pointer
+  makes `UpdateLayeredWindowIndirect` fail with `ERROR_GEN_FAILURE (0x8007001F)`, which
+  reads like a broken display driver. Pass `BLENDFUNCTION { AC_SRC_OVER, 0, 255,
+  AC_SRC_ALPHA }`.
+- **Never store a pointer to a value you then move.** The strip host is boxed exactly
+  because the window procedure reads it through a static pointer.
+- **GDI destruction must follow Direct2D teardown.** `GdiSurface` drops after the D2D
+  fields on purpose; reversing that corrupts the heap later, far from the cause.
+- **`GetLastError` must be cleared before `CreateMutexW`**, otherwise a stale error reads
+  as "another instance is running". Use a plain mutex name (no `Local\` prefix).
+- **Moving a layered window every tick swallows clicks** — mouse-down lands on one frame
+  and mouse-up on the next. Only `MoveWindow` when the rect actually changes.
+- **`Edit`-style PowerShell string surgery corrupts source files.** An array-flattening bug
+  once replaced every `s` with `t`. Use the file tools; if using PowerShell, do single
+  `.Replace()` calls and write with `UTF8Encoding($false)`. Never round-trip a file with
+  `Get-Content`/`Set-Content` on non-ASCII content.
+- **MSIX/Store**: there is no supported third-party taskbar-widget API. Microsoft's only
+  channel is a Widgets Board provider (Windows App SDK + MSIX), which renders in the
+  Widgets flyout, not the taskbar. The overlay design stands.
+
+## Conventions
+
+- `unsafe` only in `statline-win` and the D2D calls in `statline-render`; every block gets
+  a `// SAFETY:` comment naming the invariant.
+- No `unwrap`/`expect`/`panic!` outside tests and documented invariants. Providers return
+  `Option` and the UI hides missing rows.
+- Conventional commits, small and frequent, local only. Update `docs/STATUS.md` and the
+  milestone file in `docs/status/` in the same commit as the work.
+- Perf budget is a merge gate: `docs/ops/perf-budget.md` (cpu mean < 1.5 ms/sample;
+  working set < 35 MB with the D2D/DWrite delta documented).
