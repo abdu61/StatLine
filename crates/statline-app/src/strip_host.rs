@@ -26,15 +26,20 @@ pub struct Host {
     palette: Palette,
     scale: f32,
     height: f32,
-    last_signature: Option<String>,
     logged_first_frame: bool,
+    visible: bool,
 }
 
 impl Host {
     /// Start sampling and create the strip window. Must be called on the UI thread.
-    pub fn start(palette: Palette) -> windows::core::Result<Self> {
+    ///
+    /// The host is boxed so its address is stable: the window procedure reads it
+    /// through `HOST`, and a moved stack value would leave a dangling pointer
+    /// there (that bug crashed the process on the first timer tick).
+    pub fn start(palette: Palette) -> windows::core::Result<Box<Self>> {
         let geometry = taskbar::primary().ok_or_else(windows::core::Error::from_thread)?;
         let scale = geometry.dpi as f32 / 96.0;
+        // Leave a small margin so the strip does not touch the taskbar edges.
         let height = ((geometry.height() as f32) - 8.0 * scale).max(16.0);
 
         let renderer = Renderer::new()?;
@@ -53,7 +58,7 @@ impl Host {
             rect,
         )?;
 
-        let mut host = Self {
+        let mut host = Box::new(Self {
             renderer,
             sampler,
             surface: None,
@@ -61,35 +66,40 @@ impl Host {
             palette,
             scale,
             height,
-            last_signature: None,
             logged_first_frame: false,
-        };
-        HOST.store(&mut host as *mut Host, Ordering::Release);
+            visible: true,
+        });
+        HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
         Ok(host)
     }
 
-    /// Recompute the readout, reposition and repaint when something changed.
+    /// Recompute the readout, reposition and repaint.
     pub fn tick(&mut self) {
         let Some(geometry) = taskbar::primary() else {
+            self.set_visible(false);
             return;
         };
-        if taskbar::is_hidden(geometry.taskbar) {
-            log::warn!("taskbar is hidden; skipping strip update");
+
+        // Hide for anything that owns the screen: fullscreen games, video,
+        // presentation mode, or an auto-hidden taskbar.
+        let should_hide = taskbar::is_hidden(geometry.taskbar) || taskbar::fullscreen_active();
+        self.set_visible(!should_hide);
+        if should_hide {
             return;
         }
 
         let snapshot: std::sync::Arc<Snapshot> = self.sampler.snapshot();
-        // The sampler publishes its first frame a moment after start; drawing
-        // an empty snapshot would size the strip to a single pixel.
+        // The sampler publishes its first frame a moment after start; drawing an
+        // empty snapshot would size the strip to a single pixel.
         if snapshot.taken_at.is_none() {
             return;
         }
+
         let segments = strip::segments(&snapshot);
         let measured = render::measure(&mut self.renderer.text, &segments, self.scale);
         let width = measured.width.ceil().max(1.0);
 
-        let signature = format!("{width}|{segments:?}");
         let size_changed = self
             .surface
             .as_ref()
@@ -131,14 +141,12 @@ impl Host {
                 bottom: screen_top + self.height as i32,
             },
         );
-
         strip_window::keep_on_top(self.hwnd);
 
         if let Some(surface) = self.surface.as_ref() {
             // A null destination in UPDATELAYEREDWINDOWINFO makes Windows use
-            // the window's own position, which is what a child window needs.
+            // the window's own position.
             let presented = surface.present_layered(self.hwnd, 0, 0);
-
             if !self.logged_first_frame {
                 self.logged_first_frame = true;
                 log::info!(
@@ -148,10 +156,15 @@ impl Host {
                 );
             }
         }
+    }
 
-        if self.last_signature.as_deref() != Some(signature.as_str()) {
-            self.last_signature = Some(signature);
+    fn set_visible(&mut self, visible: bool) {
+        if self.visible == visible {
+            return;
         }
+        self.visible = visible;
+        log::info!("strip visibility -> {visible}");
+        strip_window::set_visible(self.hwnd, visible);
     }
 }
 
@@ -169,7 +182,8 @@ pub unsafe extern "system" fn strip_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     use windows::Win32::UI::WindowsAndMessaging::{
-        DefWindowProcW, KillTimer, SetTimer, WM_CREATE, WM_DESTROY, WM_TIMER,
+        DefWindowProcW, KillTimer, SetTimer, WM_CREATE, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP,
+        WM_TIMER,
     };
 
     match msg {
@@ -183,12 +197,22 @@ pub unsafe extern "system" fn strip_proc(
         WM_TIMER => {
             let pointer = HOST.load(Ordering::Acquire);
             if !pointer.is_null() {
-                // SAFETY: the pointer is set once on the UI thread and cleared
-                // in `Drop`; this code also runs on the UI thread.
+                // SAFETY: the pointer is stable for the host's lifetime and this
+                // code runs on the UI thread that owns it.
                 unsafe {
                     (*pointer).tick();
                 }
             }
+            LRESULT(0)
+        }
+        WM_LBUTTONUP => {
+            // The flyout lands in M5; until then a click is a no-op that we log
+            // so the hit path is visible during development.
+            log::debug!("strip clicked");
+            LRESULT(0)
+        }
+        WM_RBUTTONUP => {
+            log::debug!("strip right-clicked");
             LRESULT(0)
         }
         WM_DESTROY => {

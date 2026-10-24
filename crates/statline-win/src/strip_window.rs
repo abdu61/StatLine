@@ -11,9 +11,9 @@ use std::ffi::OsStr;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, GetWindowRect, HWND_TOPMOST, MoveWindow, RegisterClassW, SWP_NOACTIVATE,
-    SWP_SHOWWINDOW, SetWindowPos, WINDOW_EX_STYLE, WNDCLASSW, WNDPROC, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+    CreateWindowExW, GetWindowRect, HWND_TOPMOST, MoveWindow, RegisterClassW, SW_HIDE,
+    SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_SHOWWINDOW, SetWindowPos, ShowWindow, WINDOW_EX_STYLE,
+    WNDCLASSW, WNDPROC, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use windows::core::{PCWSTR, Result};
 
@@ -113,6 +113,14 @@ pub fn keep_on_top(hwnd: HWND) {
                 | windows::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
                 | SWP_NOACTIVATE,
         );
+    }
+}
+
+/// Show or hide the strip without activating it.
+pub fn set_visible(hwnd: HWND, visible: bool) {
+    // SAFETY: the handle is ours; SW_SHOWNOACTIVATE keeps focus where it was.
+    unsafe {
+        let _ = ShowWindow(hwnd, if visible { SW_SHOWNOACTIVATE } else { SW_HIDE });
     }
 }
 

@@ -74,13 +74,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         error!("failed to add tray icon: {err}");
         return Err(err.into());
     }
-
     info!("tray icon ready");
 
-    // The strip is behind a flag until presentation is finished: see
-    // docs/STATUS.md. The tray path is always safe.
+    // The strip is the product; `--tray-only` is the escape hatch when a shell
+    // build will not cooperate.
     let mut _strip = None;
-    if args.iter().any(|a| a == "--strip") {
+    if !args.iter().any(|a| a == "--tray-only") {
         match strip_host::Host::start(strip_host::default_palette(true)) {
             Ok(host) => {
                 info!("taskbar strip attached");

@@ -16,10 +16,10 @@ use windows::Win32::Graphics::Direct2D::Common::{
 use windows::Win32::Graphics::Direct2D::{
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_FEATURE_LEVEL_DEFAULT, D2D1_RENDER_TARGET_PROPERTIES,
     D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_ROUNDED_RECT,
-    D2D1CreateFactory, ID2D1Brush, ID2D1Factory, ID2D1RenderTarget,
-    ID2D1SolidColorBrush,
+    D2D1CreateFactory, ID2D1Brush, ID2D1Factory, ID2D1RenderTarget, ID2D1SolidColorBrush,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
+use windows::Win32::Graphics::Gdi::{AC_SRC_ALPHA, AC_SRC_OVER, BLENDFUNCTION};
 use windows::Win32::Graphics::Gdi::{
     BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS,
     DeleteDC, DeleteObject, GetDC, HBITMAP, HDC, HGDIOBJ, ReleaseDC, SelectObject,
@@ -35,9 +35,9 @@ pub struct Surface {
     height: u32,
     factory: ID2D1Factory,
     render: ID2D1RenderTarget,
-    dc: HDC,
-    bitmap: HBITMAP,
-    previous: HGDIOBJ,
+    /// Declared after the D2D fields on purpose: Rust drops fields in order, so
+    /// the render target is released before the DC and bitmap it was bound to.
+    gdi: GdiSurface,
     bits: *mut u8,
     stride: usize,
     brush: ID2D1SolidColorBrush,
@@ -141,9 +141,11 @@ impl Surface {
             height,
             factory,
             render,
-            dc,
-            bitmap,
-            previous,
+            gdi: GdiSurface {
+                dc,
+                bitmap,
+                previous,
+            },
             bits: bits.cast(),
             stride,
             brush,
@@ -250,15 +252,22 @@ impl Surface {
             cy: self.height as i32,
         };
 
+        let blend = BLENDFUNCTION {
+            BlendOp: AC_SRC_OVER as u8,
+            BlendFlags: 0,
+            SourceConstantAlpha: 255,
+            AlphaFormat: AC_SRC_ALPHA as u8,
+        };
+
         let info = UPDATELAYEREDWINDOWINFO {
             cbSize: std::mem::size_of::<UPDATELAYEREDWINDOWINFO>() as u32,
             hdcDst: HDC::default(),
             pptDst: std::ptr::null(),
             psize: &size,
-            hdcSrc: self.dc,
+            hdcSrc: self.gdi.dc,
             pptSrc: &source,
             crKey: windows::Win32::Foundation::COLORREF(0),
-            pblend: std::ptr::null(),
+            pblend: &blend,
             dwFlags: ULW_ALPHA,
             prcDirty: std::ptr::null(),
         };
@@ -324,9 +333,20 @@ impl Surface {
     }
 }
 
-impl Drop for Surface {
+/// GDI resources owned by a surface.
+///
+/// Kept in its own type so its `Drop` runs *after* the Direct2D fields: the
+/// render target is bound to this DC, and deleting the DC first corrupts the
+/// heap when D2D tears the binding down.
+struct GdiSurface {
+    dc: HDC,
+    bitmap: HBITMAP,
+    previous: HGDIOBJ,
+}
+
+impl Drop for GdiSurface {
     fn drop(&mut self) {
-        // SAFETY: restore the original GDI object, then release what we created.
+        // SAFETY: restore the previous GDI object, then release what we created.
         unsafe {
             SelectObject(self.dc, self.previous);
             let _ = DeleteObject(self.bitmap.into());

@@ -25,6 +25,7 @@ pub fn print_help() {
         "  --probe               Print a few samples and exit",
         "  --bench [samples]     Measure sampling cost (default 60)",
         "  --profile [iters]     Time each provider in isolation (default 20)",
+        "  --tray-only           Do not attach the taskbar strip",
         "",
         "With no options, Statline starts in the notification area.",
     ];

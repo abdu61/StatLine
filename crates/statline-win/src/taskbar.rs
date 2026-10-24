@@ -2,6 +2,9 @@
 
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
+use windows::Win32::UI::Shell::{
+    QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN, SHQueryUserNotificationState,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowExW, FindWindowW, GetWindowRect, IsWindowVisible,
 };
@@ -75,13 +78,25 @@ pub fn is_hidden(taskbar: HWND) -> bool {
     unsafe { !IsWindowVisible(taskbar).as_bool() }
 }
 
+/// True when a fullscreen app, video or presentation owns the screen.
+///
+/// `SHQueryUserNotificationState` is the documented, cheap way to ask; Windows
+/// itself uses it to suppress notifications during games and videos.
+pub fn fullscreen_active() -> bool {
+    // SAFETY: no arguments, no pointers.
+    match unsafe { SHQueryUserNotificationState() } {
+        Ok(state) => {
+            state == QUNS_BUSY
+                || state == QUNS_RUNNING_D3D_FULL_SCREEN
+                || state == QUNS_PRESENTATION_MODE
+        }
+        Err(_) => false,
+    }
+}
+
 /// Parent a window to the taskbar so it stacks with shell content.
 pub fn adopt(parent: HWND, child: HWND) -> Result<()> {
     // SAFETY: both handles are owned by this process or the shell; `SetParent`
     // only changes the parent link and does not take ownership.
-    let result = unsafe { windows::Win32::UI::WindowsAndMessaging::SetParent(child, Some(parent)) };
-    match result {
-        Ok(_) => Ok(()),
-        Err(error) => Err(error),
-    }
+    unsafe { windows::Win32::UI::WindowsAndMessaging::SetParent(child, Some(parent)) }.map(|_| ())
 }
