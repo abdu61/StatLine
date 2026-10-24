@@ -24,7 +24,8 @@ process table sampling on
   restart via the app message window. Topmost popup remains as an automatic fallback.
 - **Flyout**: opens on strip click, toggles closed on a second click, closes on Esc or
   focus loss, renders smoothed area charts, and lists the top five processes with CPU
-  share and working set.
+  share and working set. Clicking a segment focuses that card (accent bar); MEM sorts
+  the process table by working set.
 - **Companion**: framed resizable Windows 11 window with a two-column card grid and an
   eight-row, two-column process table.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
@@ -39,13 +40,11 @@ process table sampling on
 
 1. **Settings UI** (`statline-config` is written but unwired): theme, interval,
    placement, units, modules, autostart, safe mode; live-apply.
-2. **Segment focus**: clicking CPU/MEM/GPU opens the flyout focused on that module
-   (highlight the card, sort the process table by CPU or memory accordingly).
-3. **Driver-free sensors (M7)**: GPU temp/fan/power, drive temps, battery health,
+2. **Driver-free sensors (M7)**: GPU temp/fan/power, drive temps, battery health,
    ACPI thermal zone. Degrade to hidden; never fake a value.
-4. **Packaging (M9)**: MSIX, portable zip, CI, README with snapshots, notices,
+3. **Packaging (M9)**: MSIX, portable zip, CI, README with snapshots, notices,
    local `v0.1.0` tag.
-5. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
+4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
    `WM_DPICHANGED`, Mica on the companion.
 
 ## Measured

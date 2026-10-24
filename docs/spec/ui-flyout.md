@@ -37,6 +37,8 @@ surface: no settings, no navigation, everything scannable in one screen.
   effect, so it works on a layered window).
 - Opens anchored: `x = clamp(segment_center − width/2, screen.left + 8, screen.right − width − 8)`,
   `y = strip.top − height − 8`; if it would leave the monitor, open below.
+- The clicked strip segment focuses its card: accent label plus a 2 dip accent bar, and
+  the process table sorts by working set when Memory is focused (CPU order otherwise).
 - Closes on: focus loss, Esc, click outside, strip click again, display change.
 - Scrolls with the mouse wheel when content exceeds the max height; no scrollbar chrome
   until hover.

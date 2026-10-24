@@ -19,6 +19,8 @@ pub struct Flyout {
     surface: Option<Surface>,
     history: History,
     model: Model,
+    /// Module the panel was opened from; drives the highlight and sort order.
+    focus: Option<flyout::Focus>,
     scale: f32,
     palette: Palette,
     last_sample: Option<std::time::SystemTime>,
@@ -31,6 +33,7 @@ impl Flyout {
             surface: None,
             history: History::default(),
             model: Model::default(),
+            focus: None,
             scale,
             palette,
             last_sample: None,
@@ -65,9 +68,16 @@ impl Flyout {
     }
 
     /// Open the panel above `anchor` (the strip's rect), or refresh it.
-    pub fn open(&mut self, renderer: &mut Renderer, snapshot: &Snapshot, anchor: RECT) {
+    pub fn open(
+        &mut self,
+        renderer: &mut Renderer,
+        snapshot: &Snapshot,
+        anchor: RECT,
+        focus: Option<flyout::Focus>,
+    ) {
+        self.focus = focus;
         self.record(snapshot);
-        self.model = flyout::model(snapshot, &self.history);
+        self.model = flyout::model_focused(snapshot, &self.history, focus);
 
         let width = flyout::width(self.scale);
         let height = flyout::height(&self.model, self.scale);
@@ -83,7 +93,7 @@ impl Flyout {
                 Ok(hwnd) => {
                     self.hwnd = Some(hwnd);
                     FLYOUT.store(self as *mut Flyout, Ordering::Release);
-                    log::info!("flyout window created");
+                    log::info!("flyout window created (focus {focus:?})");
                 }
                 Err(error) => {
                     log::error!("could not create flyout: {error}");
@@ -162,7 +172,7 @@ impl Flyout {
     /// Model refresh used by the panel's own timer.
     pub fn refresh(&mut self, renderer: &mut Renderer, snapshot: &Snapshot) {
         self.record(snapshot);
-        self.model = flyout::model(snapshot, &self.history);
+        self.model = flyout::model_focused(snapshot, &self.history, self.focus);
         self.paint(renderer);
     }
 }

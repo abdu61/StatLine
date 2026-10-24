@@ -9,7 +9,7 @@ use crate::flyout_host::Flyout;
 use statline_core::model::Snapshot;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
-use statline_ui::{render, strip};
+use statline_ui::{flyout, render, strip};
 use statline_win::menus::MenuState;
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, menus, strip_window, taskbar};
 use std::sync::atomic::{AtomicPtr, Ordering};
@@ -369,6 +369,19 @@ pub fn recreate() {
     }
 }
 
+/// Map a strip segment label to the flyout card it focuses.
+fn focus_for_label(label: &str) -> Option<flyout::Focus> {
+    match label {
+        "CPU" => Some(flyout::Focus::Cpu),
+        "MEM" => Some(flyout::Focus::Memory),
+        "GPU" => Some(flyout::Focus::Gpu),
+        "DISK" => Some(flyout::Focus::Disk),
+        // The network segment is unlabelled: the arrows say the direction.
+        "" => Some(flyout::Focus::Network),
+        _ => None,
+    }
+}
+
 fn create_window(height: f32) -> windows::core::Result<(HWND, bool)> {
     let rect = RECT {
         left: 0,
@@ -476,8 +489,13 @@ pub unsafe extern "system" fn strip_proc(
                 } else {
                     let anchor = strip_window::window_rect(hwnd);
                     let snapshot = host.sampler.snapshot();
-                    let _segment = render::hit_test(&host.segment_rects, x);
-                    host.flyout.open(&mut host.renderer, &snapshot, anchor);
+                    // Which segment was clicked decides what the panel focuses.
+                    let segments = strip::segments(&snapshot);
+                    let focus = render::hit_test(&host.segment_rects, x)
+                        .and_then(|index| segments.get(index))
+                        .and_then(|segment| focus_for_label(segment.label));
+                    host.flyout
+                        .open(&mut host.renderer, &snapshot, anchor, focus);
                 }
             }
             LRESULT(0)

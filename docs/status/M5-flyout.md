@@ -12,6 +12,7 @@ One glance gives the whole picture, without opening a window.
 - [x] Cards: CPU (sparkline + total), memory, GPU, disk, network, battery
 - [x] Top-process list (5 rows) with live CPU/RAM, `—` until a CPU baseline exists
 - [x] Open/close rules: focus loss, Esc, click-outside, strip click again
+- [x] Segment click focuses that card (accent bar); MEM sorts processes by working set
 - [x] Only samples processes while visible (`set_process_table` gate)
 - [ ] Per-core mini bars on the CPU card
 - [ ] System card (uptime, threads, handles, ACPI "System" temperature)

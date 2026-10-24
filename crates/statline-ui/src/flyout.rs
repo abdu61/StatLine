@@ -1,6 +1,6 @@
 //! The flyout panel: a compact summary that opens above the strip.
 
-use statline_core::model::Snapshot;
+use statline_core::model::{ProcessEntry, Snapshot};
 use statline_core::units::{
     UnitSystem, format_bytes, format_duration, format_percent, format_percent_precise, format_rate,
     format_rate_short,
@@ -13,6 +13,29 @@ pub struct History {
     pub cpu: Vec<f32>,
     pub memory: Vec<f32>,
     pub gpu: Vec<f32>,
+}
+
+/// The module a strip segment belongs to, used to focus the matching card.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Focus {
+    Cpu,
+    Memory,
+    Gpu,
+    Disk,
+    Network,
+}
+
+impl Focus {
+    /// Label used by the corresponding card, which is how the renderer finds it.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Cpu => "CPU",
+            Self::Memory => "Memory",
+            Self::Gpu => "GPU",
+            Self::Disk => "Disk",
+            Self::Network => "Network",
+        }
+    }
 }
 
 /// One card in the panel.
@@ -40,6 +63,8 @@ pub struct Model {
     pub rows: Vec<Row>,
     /// Busiest processes, already sorted; empty hides the section.
     pub processes: Vec<ProcessRow>,
+    /// Module the panel was opened from, highlighted and used to sort processes.
+    pub focus: Option<Focus>,
 }
 
 /// Process rows the flyout shows (the companion shows more).
@@ -56,6 +81,14 @@ fn series(values: &[f32], latest: f32) -> Vec<f32> {
 
 /// Build the panel contents from a snapshot plus the recorded history.
 pub fn model(snapshot: &Snapshot, history: &History) -> Model {
+    model_focused(snapshot, history, None)
+}
+
+/// Build the panel with one module focused.
+///
+/// Focusing memory sorts the process table by working set; every other module
+/// keeps the sampler's CPU order.
+pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus>) -> Model {
     let mut rows = Vec::new();
 
     let header = match snapshot.system.as_ref() {
@@ -171,9 +204,18 @@ pub fn model(snapshot: &Snapshot, history: &History) -> Model {
         .processes
         .as_ref()
         .map(|sample| {
-            sample
-                .top
-                .iter()
+            let mut entries: Vec<&ProcessEntry> = sample.top.iter().collect();
+            if focus == Some(Focus::Memory) {
+                entries.sort_by(|a, b| {
+                    b.working_set_bytes.cmp(&a.working_set_bytes).then_with(|| {
+                        b.cpu_percent
+                            .unwrap_or(0.0)
+                            .total_cmp(&a.cpu_percent.unwrap_or(0.0))
+                    })
+                });
+            }
+            entries
+                .into_iter()
                 .map(|entry| ProcessRow {
                     name: entry.name.clone(),
                     cpu: entry
@@ -190,6 +232,7 @@ pub fn model(snapshot: &Snapshot, history: &History) -> Model {
         header,
         rows,
         processes,
+        focus,
     }
 }
 
@@ -316,13 +359,28 @@ pub fn render(
 
     for row in &model.rows {
         let row_height = 52.0 * scale;
+        let focused = model.focus.is_some_and(|focus| focus.label() == row.label);
+
+        if focused {
+            surface.fill_rect(
+                padding - space::XS * scale,
+                y,
+                2.0 * scale,
+                14.0 * scale,
+                palette.accent,
+            );
+        }
 
         let _ = text.draw(
             surface,
             row.label,
             (padding, y, 120.0 * scale, 14.0 * scale),
             label_style(scale),
-            palette.text_muted,
+            if focused {
+                palette.accent
+            } else {
+                palette.text_muted
+            },
         );
         let _ = text.draw(
             surface,
@@ -378,9 +436,13 @@ pub fn render(
         );
         y += 1.0 + space::XS * scale;
 
+        let heading = match model.focus {
+            Some(Focus::Memory) => "TOP PROCESSES \u{00b7} MEMORY",
+            _ => "TOP PROCESSES",
+        };
         let _ = text.draw(
             surface,
-            "TOP PROCESSES",
+            heading,
             (padding, y, width - padding * 2.0, 12.0 * scale),
             TextStyle::new(8.0 * scale, true, Align::Left),
             palette.text_muted,
@@ -522,6 +584,36 @@ mod tests {
 
         let model = model(&snapshot, &History::default());
         assert_eq!(model.processes[0].cpu, "\u{2014}");
+    }
+
+    #[test]
+    fn memory_focus_sorts_processes_by_working_set() {
+        let mut snapshot = snapshot();
+        snapshot.processes = Some(ProcessSample {
+            total: 2,
+            top: vec![
+                ProcessEntry {
+                    pid: 1,
+                    name: String::from("cpu.exe"),
+                    cpu_percent: Some(50.0),
+                    working_set_bytes: 10,
+                },
+                ProcessEntry {
+                    pid: 2,
+                    name: String::from("memory.exe"),
+                    cpu_percent: Some(1.0),
+                    working_set_bytes: 1_000,
+                },
+            ],
+        });
+
+        let busiest = model_focused(&snapshot, &History::default(), None);
+        assert_eq!(busiest.processes[0].name, "cpu.exe");
+        assert_eq!(busiest.focus, None);
+
+        let largest = model_focused(&snapshot, &History::default(), Some(Focus::Memory));
+        assert_eq!(largest.processes[0].name, "memory.exe");
+        assert_eq!(largest.focus, Some(Focus::Memory));
     }
 
     #[test]

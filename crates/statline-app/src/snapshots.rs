@@ -205,6 +205,15 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let path = dir.join("flyout-dark-125.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
+
+        // Focused on memory, as after clicking the MEM segment.
+        let model = flyout::model_focused(&snapshot, &history, Some(flyout::Focus::Memory));
+        let height = flyout::height(&model, scale).ceil() as u32;
+        let mut surface = renderer.surface(width, height)?;
+        flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
+        let path = dir.join("flyout-dark-125-memory.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
     }
     // Companion window at 100 %.
     {

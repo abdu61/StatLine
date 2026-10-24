@@ -110,16 +110,14 @@ the 2 s cadence and only while a process surface is visible.
 
 1. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
    units, which modules show, autostart toggle, safe mode. Live-apply through the host.
-2. **Segment focus**: clicking CPU/MEM/GPU should open the flyout focused on that module
-   (highlight the card; sort the process table by CPU or memory to match).
-3. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
+2. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
    `IOCTL_STORAGE_QUERY_PROPERTY`, battery temperature/health, ACPI thermal zone via PDH.
    Each degrades to hidden, never fakes a value. CPU package temp/fans are out of scope
    (no user-mode API; legal audit in the plan's §10).
-4. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
+3. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
    CI (fmt/clippy/test/deny/build), README with snapshot images, MIT + third-party notices,
    local `v0.1.0` tag.
-5. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
+4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
    `WM_DPICHANGED`, Mica/acrylic on the companion (needs a non-layered window + DWM
    backdrop; today it paints an opaque background).
 
