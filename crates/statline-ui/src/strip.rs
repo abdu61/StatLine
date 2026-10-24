@@ -138,7 +138,7 @@ mod tests {
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].label, "");
         assert_eq!(segments[0].value, "\u{2193} 1.2 MB/s");
-        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 82 KB/s"));
+        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 84 KB/s"));
         assert_eq!(segments[0].width_sample, RATE_SAMPLE);
     }
 

@@ -150,19 +150,21 @@ mod tests {
 
     #[test]
     fn height_grows_with_rows() {
-        let one = Model {
-            header: String::new(),
-            rows: vec![Row {
-                label: "CPU",
-                value: String::from("1%"),
-                detail: String::new(),
-                series: Vec::new(),
-            }],
+        let row = Row {
+            label: "CPU",
+            value: String::from("1%"),
+            detail: String::new(),
+            series: Vec::new(),
         };
+        // Two columns: rows 1 and 2 share a line, so growth starts at the third.
         let two = Model {
             header: String::new(),
-            rows: vec![one.rows[0].clone(), one.rows[0].clone()],
+            rows: vec![row.clone(), row.clone()],
         };
-        assert!(height(&two, 1.0) > height(&one, 1.0));
+        let three = Model {
+            header: String::new(),
+            rows: vec![row.clone(), row.clone(), row],
+        };
+        assert!(height(&three, 1.0) > height(&two, 1.0));
     }
 }
