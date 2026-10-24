@@ -1,17 +1,59 @@
-//! Minimal file logger.
+//! File logger with size-based rotation, plus a panic hook that records where
+//! the process died.
 //!
-//! Deliberately small: one file, UTC timestamps, `log` facade so the rest of
-//! the codebase stays backend-agnostic. Rotation arrives with M4.
+//! Deliberately small: one file, UTC timestamps, `log` facade so the rest of the
+//! codebase stays backend-agnostic.
 
 use log::{LevelFilter, Log, Metadata, Record};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::Path;
-use std::sync::Mutex;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Rotate once the active file passes this size.
+const MAX_BYTES: u64 = 1024 * 1024;
+/// Keep this many rotated files (`.1`, `.2`, ...).
+const KEEP_FILES: u32 = 3;
 
 struct FileLogger {
     file: Mutex<File>,
+    path: PathBuf,
+}
+
+impl FileLogger {
+    fn rotate_if_needed(&self, file: &mut File) {
+        let too_big = file
+            .metadata()
+            .map(|metadata| metadata.len() >= MAX_BYTES)
+            .unwrap_or(false);
+        if !too_big {
+            return;
+        }
+
+        // Drop the oldest, shift the rest, then reopen a fresh active file.
+        let _ = std::fs::remove_file(rotated_path(&self.path, KEEP_FILES));
+        for index in (1..KEEP_FILES).rev() {
+            let from = rotated_path(&self.path, index);
+            let to = rotated_path(&self.path, index + 1);
+            let _ = std::fs::rename(from, to);
+        }
+        if std::fs::rename(&self.path, rotated_path(&self.path, 1)).is_ok() {
+            if let Ok(fresh) = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.path)
+            {
+                *file = fresh;
+            }
+        }
+    }
+}
+
+fn rotated_path(path: &Path, index: u32) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(".{index}"));
+    PathBuf::from(name)
 }
 
 impl Log for FileLogger {
@@ -31,6 +73,7 @@ impl Log for FileLogger {
             record.args()
         );
         if let Ok(mut file) = self.file.lock() {
+            self.rotate_if_needed(&mut file);
             let _ = file.write_all(line.as_bytes());
             let _ = file.flush();
         }
@@ -43,24 +86,43 @@ impl Log for FileLogger {
     }
 }
 
+static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
+
 /// Install the file logger. Safe to call twice; the second call is a no-op.
 pub fn init(log_dir: &Path, level: LevelFilter) -> std::io::Result<()> {
     std::fs::create_dir_all(log_dir)?;
-    let file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_dir.join("statline.log"))?;
+    let path = log_dir.join("statline.log");
+    let file = OpenOptions::new().create(true).append(true).open(&path)?;
+    let _ = LOG_PATH.set(path.clone());
 
     let logger = FileLogger {
         file: Mutex::new(file),
+        path,
     };
-    // SAFETY: `set_boxed_logger` may only be called once per process. We ignore
-    // the error if a logger is already installed, which keeps this idempotent.
-    match log::set_boxed_logger(Box::new(logger)) {
-        Ok(()) => log::set_max_level(level),
-        Err(_) => log::set_max_level(level),
-    }
+    // `set_boxed_logger` may only be called once per process; ignoring the error
+    // keeps this idempotent for tests and the CLI modes.
+    let _ = log::set_boxed_logger(Box::new(logger));
+    log::set_max_level(level);
     Ok(())
+}
+
+/// Record panics before the process aborts.
+///
+/// Release builds use `panic = "abort"`, so the hook runs and then the runtime
+/// aborts; there is no unwinding to catch.
+pub fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let location = info
+            .location()
+            .map(|location| format!("{}:{}", location.file(), location.line()))
+            .unwrap_or_else(|| String::from("unknown location"));
+        log::error!("panic at {location}: {info}");
+    }));
+}
+
+/// Path of the active log file, for the About panel and diagnostics.
+pub fn log_path() -> Option<PathBuf> {
+    LOG_PATH.get().cloned()
 }
 
 /// Render a `SystemTime` as `YYYY-MM-DD HH:MM:SS.mmm` in UTC.
@@ -110,5 +172,18 @@ mod tests {
     #[test]
     fn formats_epoch() {
         assert_eq!(format_timestamp(UNIX_EPOCH), "1970-01-01 00:00:00.000Z");
+    }
+
+    #[test]
+    fn rotated_paths_are_numbered() {
+        let base = Path::new("C:/logs/statline.log");
+        assert_eq!(
+            rotated_path(base, 1),
+            PathBuf::from("C:/logs/statline.log.1")
+        );
+        assert_eq!(
+            rotated_path(base, 3),
+            PathBuf::from("C:/logs/statline.log.3")
+        );
     }
 }

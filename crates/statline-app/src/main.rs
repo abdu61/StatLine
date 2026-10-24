@@ -61,13 +61,45 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if args.iter().any(|a| a == "--install-startup") {
+        match statline_win::autostart::set_enabled(true) {
+            Ok(()) => cli::print_line("startup entry installed"),
+            Err(error) => cli::print_line(&format!("could not install startup entry: {error}")),
+        }
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--remove-startup") {
+        match statline_win::autostart::set_enabled(false) {
+            Ok(()) => cli::print_line("startup entry removed"),
+            Err(error) => cli::print_line(&format!("could not remove startup entry: {error}")),
+        }
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--startup-status") {
+        cli::print_line(if statline_win::autostart::is_enabled() {
+            "startup: enabled"
+        } else {
+            "startup: disabled"
+        });
+        return Ok(());
+    }
+
     dpi::enable_per_monitor_v2();
 
     let log_dir = paths::log_dir();
     if let Err(err) = logger::init(&log_dir, LevelFilter::Info) {
         eprintln!("could not open log file in {}: {err}", log_dir.display());
     }
+    logger::install_panic_hook();
     info!("{APP_NAME} {VERSION} starting");
+
+    // A second instance must not stack trays or strips.
+    let Some(_instance) =
+        statline_win::single_instance::InstanceGuard::acquire("Statline.SingleInstance")
+    else {
+        info!("another instance is already running; exiting");
+        return Ok(());
+    };
 
     let window = MessageWindow::create(WINDOW_CLASS, APP_NAME, Some(wndproc))?;
     if let Err(err) = tray::add(window.hwnd(), TRAY_ICON_ID, APP_NAME) {

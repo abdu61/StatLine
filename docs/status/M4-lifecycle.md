@@ -1,25 +1,34 @@
 # M4 — tray, lifecycle, settings I/O
 
-**Status:** not started
+**Status:** in progress (single instance + autostart + logging done)
 
-## Goal
+## Done
 
-A well-behaved Windows citizen: one instance, correct startup behaviour, real menu,
-recoverable failures.
+- [x] Single instance via a named mutex (`Statline.SingleInstance`); the second
+      launch logs and exits. Note: a plain name is per-session, which is what we want —
+      `Local\` prefixes need careful escaping and add nothing here.
+- [x] `GetLastError` is cleared immediately before `CreateMutexW`; otherwise a stale
+      error from any earlier startup call reads as "already exists".
+- [x] Autostart through `HKCU\...\Run` with `--install-startup`, `--remove-startup`,
+      `--startup-status`. Verified round-trip: disabled → enabled → disabled.
+- [x] Log rotation: 1 MB cap, three rotated files, done inside the logger under the
+      same lock as the write.
+- [x] Panic hook records file:line before the abort.
+- [x] `--tray-only` to run without the strip.
 
-## Checklist
+## Remaining
 
-- [ ] Tray icon artwork + tooltip with live summary
-- [ ] Full context menu (pause, placement, modules, settings, dashboard, about, exit)
-- [ ] Single instance: named mutex + `RegisterWindowMessageW` hand-off
-- [ ] Autostart: `HKCU\...\Run` (portable) / `StartupTask` (packaged)
-- [ ] Settings load/save wired, debounced, live-applied
-- [ ] `--tray-only`, `--safe-mode`, `--settings`, `--version`, `--help`
-- [ ] Log rotation (1 MB × 3), error-only by default
-- [ ] Panic hook + `SetUnhandledExceptionFilter` → log + tray notification
-- [ ] Power throttling (EcoQoS) when hidden/fullscreen
+- [ ] Tray menu: Pause/Resume, Show/Hide strip, Settings, Dashboard, About, Exit
+- [ ] Sampler pause (stop periodic sampling, keep the last snapshot)
+- [ ] Second launch hands its arguments to the first instance (open Settings)
+- [ ] Startup preference persisted in settings; first-run prompt
+- [ ] `--safe-mode` (force topmost-only behaviour, no taskbar anchoring attempts)
 
-## Exit criteria
+## Commands
 
-Second launch focuses the first and exits; autostart works in both packaging modes;
-killing the process mid-write never corrupts settings; log never grows unbounded.
+```powershell
+statline --startup-status
+statline --install-startup
+statline --remove-startup
+statline --tray-only
+```

@@ -230,3 +230,9 @@ pub fn bench(count: u32, interval: Duration) {
         "result: OVER BUDGET"
     });
 }
+
+/// Print one line from a non-UI command (startup, diagnostics).
+pub fn print_line(text: &str) {
+    console::ensure();
+    console::write_line(text);
+}
