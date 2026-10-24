@@ -6,9 +6,10 @@ use statline_core::model::Snapshot;
 use statline_core::units::{UnitSystem, format_percent, format_rate_short};
 
 /// Text used to reserve a stable width, so a changing number cannot make the
-/// strip jump around. Network is the worst offender: "1.1 KB/s" and
-/// "12.4 MB/s" must occupy the same slot.
-const RATE_SAMPLE: &str = "\u{2193} 88.8 MB/s";
+/// strip jump around. Network is the worst offender: "1.1 KiB/s" and
+/// "12.4 MiB/s" must occupy the same slot.
+const RATE_SAMPLE_BINARY: &str = "\u{2193} 88.8 MiB/s";
+const RATE_SAMPLE_DECIMAL: &str = "\u{2193} 88.8 MB/s";
 
 /// One readout in the strip.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +39,14 @@ impl Segment {
 }
 
 /// Build the strip contents from a snapshot, skipping unavailable modules.
+///
+/// Binary units are the default; the settings window can switch to decimal.
 pub fn segments(snapshot: &Snapshot) -> Vec<Segment> {
+    segments_with(snapshot, UnitSystem::Binary)
+}
+
+/// Build the strip contents with explicit byte units.
+pub fn segments_with(snapshot: &Snapshot, units: UnitSystem) -> Vec<Segment> {
     let mut segments = Vec::new();
 
     if let Some(cpu) = snapshot.cpu.as_ref() {
@@ -77,14 +85,17 @@ pub fn segments(snapshot: &Snapshot) -> Vec<Segment> {
             label: "",
             value: format!(
                 "\u{2193} {}",
-                format_rate_short(network.rx_bytes_per_sec, UnitSystem::Decimal)
+                format_rate_short(network.rx_bytes_per_sec, units)
             ),
             extra: Some(format!(
                 "\u{2191} {}",
-                format_rate_short(network.tx_bytes_per_sec, UnitSystem::Decimal)
+                format_rate_short(network.tx_bytes_per_sec, units)
             )),
             percent: None,
-            width_sample: RATE_SAMPLE,
+            width_sample: match units {
+                UnitSystem::Binary => RATE_SAMPLE_BINARY,
+                UnitSystem::Decimal => RATE_SAMPLE_DECIMAL,
+            },
         });
     }
 
@@ -137,9 +148,25 @@ mod tests {
         let segments = segments(&snapshot);
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].label, "");
+        assert_eq!(segments[0].value, "\u{2193} 1.2 MiB/s");
+        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 82 KiB/s"));
+        assert_eq!(segments[0].width_sample, RATE_SAMPLE_BINARY);
+    }
+
+    #[test]
+    fn decimal_units_change_the_network_labels() {
+        let snapshot = Snapshot {
+            network: Some(NetworkSample {
+                rx_bytes_per_sec: 1_240_000.0,
+                tx_bytes_per_sec: 84_000.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let segments = segments_with(&snapshot, UnitSystem::Decimal);
         assert_eq!(segments[0].value, "\u{2193} 1.2 MB/s");
         assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 84 KB/s"));
-        assert_eq!(segments[0].width_sample, RATE_SAMPLE);
+        assert_eq!(segments[0].width_sample, RATE_SAMPLE_DECIMAL);
     }
 
     #[test]

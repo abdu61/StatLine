@@ -1,6 +1,7 @@
 //! Hosts the companion window: a normal framed Windows app.
 
 use statline_core::model::Snapshot;
+use statline_core::units::UnitSystem;
 use statline_render::{Palette, Renderer, Surface};
 use statline_ui::dashboard;
 use statline_ui::flyout::{self, Model};
@@ -22,6 +23,7 @@ pub struct Dashboard {
     hwnd: Option<HWND>,
     surface: Option<Surface>,
     model: Model,
+    units: UnitSystem,
     scale: f32,
     palette: Palette,
 }
@@ -32,6 +34,7 @@ impl Dashboard {
             hwnd: None,
             surface: None,
             model: Model::default(),
+            units: UnitSystem::Binary,
             scale,
             palette,
         }
@@ -44,6 +47,11 @@ impl Dashboard {
     /// Recolour the companion; the next tick repaints with the new palette.
     pub fn set_palette(&mut self, palette: Palette) {
         self.palette = palette;
+    }
+
+    /// Change the byte units used by the cards.
+    pub fn set_units(&mut self, units: UnitSystem) {
+        self.units = units;
     }
 
     pub fn toggle(
@@ -60,7 +68,7 @@ impl Dashboard {
     }
 
     fn open(&mut self, renderer: &mut Renderer, snapshot: &Snapshot, history: &flyout::History) {
-        self.model = flyout::model(snapshot, history);
+        self.model = flyout::model_focused(snapshot, history, None, self.units);
 
         let width = (WINDOW_WIDTH as f32 * self.scale) as i32;
         let height = (WINDOW_HEIGHT as f32 * self.scale) as i32;
@@ -91,7 +99,7 @@ impl Dashboard {
         let Some(hwnd) = self.hwnd else {
             return;
         };
-        self.model = flyout::model(snapshot, history);
+        self.model = flyout::model_focused(snapshot, history, None, self.units);
         self.render_surface(_renderer, hwnd);
         // SAFETY: our window; a null rect invalidates the whole client area.
         unsafe {

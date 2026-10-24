@@ -53,6 +53,8 @@ pub struct General {
     pub run_at_startup: bool,
     /// Which side of the taskbar the strip sits on.
     pub strip_placement: StripPlacement,
+    /// Byte units: 1024-based (KiB) or 1000-based (kB).
+    pub units: Units,
 }
 
 impl Default for General {
@@ -61,6 +63,33 @@ impl Default for General {
             update_interval_ms: 1000,
             run_at_startup: false,
             strip_placement: StripPlacement::Right,
+            units: Units::Binary,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Units {
+    /// 1024-based: KiB, MiB, GiB.
+    #[default]
+    Binary,
+    /// 1000-based: kB, MB, GB.
+    Decimal,
+}
+
+impl Units {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Binary => Self::Decimal,
+            Self::Decimal => Self::Binary,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Binary => "Binary (KiB)",
+            Self::Decimal => "Decimal (kB)",
         }
     }
 }
@@ -222,12 +251,14 @@ mod tests {
         let mut settings = Settings::default();
         settings.general.update_interval_ms = 2000;
         settings.general.strip_placement = StripPlacement::Left;
+        settings.general.units = Units::Decimal;
         settings.appearance.theme = Theme::Light;
         settings.save(&path).expect("save");
 
         let loaded = Settings::load_or_default(&path).expect("load");
         assert_eq!(loaded.general.update_interval_ms, 2000);
         assert_eq!(loaded.general.strip_placement, StripPlacement::Left);
+        assert_eq!(loaded.general.units, Units::Decimal);
         assert_eq!(loaded.appearance.theme, Theme::Light);
     }
 
@@ -271,5 +302,13 @@ mod tests {
         assert_eq!(theme, Theme::System);
         assert!(!Theme::Light.resolve_dark(true));
         assert!(Theme::System.resolve_dark(true));
+    }
+
+    #[test]
+    fn units_default_to_binary_and_toggle() {
+        assert_eq!(Units::default(), Units::Binary);
+        assert_eq!(Units::Binary.next(), Units::Decimal);
+        assert_eq!(Units::Decimal.next(), Units::Binary);
+        assert_ne!(Units::Binary.label(), Units::Decimal.label());
     }
 }

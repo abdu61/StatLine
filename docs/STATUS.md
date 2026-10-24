@@ -29,8 +29,9 @@ detail sampling on
 - **Companion**: framed resizable Windows 11 window with a two-column card grid and an
   eight-row, two-column process table.
 - **Settings**: a framed window from the tray menu (or the strip menu) with theme,
-  sampler interval, strip placement and start-with-Windows. Changes apply live and are
-  saved atomically to `%APPDATA%\Statline\settings.json`; unknown keys are ignored.
+  sampler interval, byte units, strip placement and start-with-Windows. Changes apply
+  live and are saved atomically to `%APPDATA%\Statline\settings.json`; unknown keys are
+  ignored.
 - **Packaging**: portable zip script (exe, README, changelog, licence texts) and an
   MSIX manifest with `runFullTrust` + a user-toggleable startup task. Both build locally;
   CI verifies fmt/clippy/test/deny/build and produces tag artifacts.

@@ -10,7 +10,8 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
   "general": {
     "update_interval_ms": 1000,   // 500 | 1000 | 2000 | 5000
     "run_at_startup": false,      // per-user Run key for portable builds
-    "strip_placement": "right"    // right | left
+    "strip_placement": "right",   // right | left
+    "units": "binary"             // binary (KiB) | decimal (kB)
   },
 
   "appearance": {
@@ -35,7 +36,7 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
 
 ## Planned (not in schema v1 yet)
 
-`modules` (enable/order/options), `behaviour.units`, `behaviour.hide_in_fullscreen`,
+`modules` (enable/order/options), `behaviour.hide_in_fullscreen`,
 `appearance.density`, `window.dashboard` bounds, and the read-only `telemetry` block.
 Adding any of them is a schema change with a migration path.
 
@@ -47,8 +48,10 @@ Tray icon or strip right-click → **Settings…**. Rows cycle on click:
 |---|---|
 | Theme | System → Dark → Light |
 | Update interval | 500 → 1000 → 2000 → 5000 ms |
+| Units | Binary (KiB) ↔ Decimal (kB) |
 | Strip placement | Right ↔ Left (left anchors past Start, clamped at the tray) |
 | Start with Windows | On ↔ Off (writes `HKCU\...\Run`) |
 
-Changes apply live: the strip palette, sampler cadence and anchor update on the next
-tick, and an open flyout/companion repaints with the new palette.
+Changes apply live: the strip palette, sampler cadence, byte units and anchor update on
+the next tick, and an open flyout/companion repaints with the new palette and units.
+Binary is the default (KiB/MiB); decimal switches every surface to kB/MB.

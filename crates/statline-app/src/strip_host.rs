@@ -6,8 +6,9 @@
 
 use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
-use statline_config::{Settings, StripPlacement};
+use statline_config::{Settings, StripPlacement, Units};
 use statline_core::model::Snapshot;
+use statline_core::units::UnitSystem;
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
 use statline_ui::{flyout, render, strip};
@@ -55,6 +56,8 @@ pub struct Host {
     details_visible: bool,
     /// Which side of the taskbar the strip is anchored to.
     placement: taskbar::Placement,
+    /// Byte units used by the strip readouts.
+    units: UnitSystem,
 }
 
 impl Host {
@@ -94,6 +97,7 @@ impl Host {
             parented,
             details_visible: false,
             placement: taskbar::Placement::Right,
+            units: UnitSystem::Binary,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -134,7 +138,7 @@ impl Host {
             return;
         }
 
-        let segments = strip::segments(&snapshot);
+        let segments = strip::segments_with(&snapshot, self.units);
         let measured = render::measure(&mut self.renderer.text, &segments, self.scale);
         let width = measured.width.ceil().max(1.0);
 
@@ -381,6 +385,12 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
         StripPlacement::Right => taskbar::Placement::Right,
         StripPlacement::Left => taskbar::Placement::Left,
     };
+    host.units = match settings.general.units {
+        Units::Binary => UnitSystem::Binary,
+        Units::Decimal => UnitSystem::Decimal,
+    };
+    host.flyout.set_units(host.units);
+    host.dashboard.set_units(host.units);
     host.sampler.set_interval(Duration::from_millis(
         settings.general.update_interval_ms as u64,
     ));
@@ -518,7 +528,7 @@ pub unsafe extern "system" fn strip_proc(
                     let anchor = strip_window::window_rect(hwnd);
                     let snapshot = host.sampler.snapshot();
                     // Which segment was clicked decides what the panel focuses.
-                    let segments = strip::segments(&snapshot);
+                    let segments = strip::segments_with(&snapshot, host.units);
                     let focus = render::hit_test(&host.segment_rects, x)
                         .and_then(|index| segments.get(index))
                         .and_then(|segment| focus_for_label(segment.label));

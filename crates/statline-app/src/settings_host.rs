@@ -117,6 +117,10 @@ fn build_model(settings: &Settings) -> settings::Model {
                 value: format!("{} ms", settings.general.update_interval_ms),
             },
             settings::Row {
+                label: "Units",
+                value: String::from(settings.general.units.label()),
+            },
+            settings::Row {
                 label: "Strip placement",
                 value: String::from(settings.general.strip_placement.label()),
             },
@@ -158,10 +162,11 @@ impl SettingsWindow {
                 self.settings.general.update_interval_ms =
                     next_interval(self.settings.general.update_interval_ms)
             }
-            2 => {
+            2 => self.settings.general.units = self.settings.general.units.next(),
+            3 => {
                 self.settings.general.strip_placement = self.settings.general.strip_placement.next()
             }
-            3 => {
+            4 => {
                 let enabled = !self.settings.general.run_at_startup;
                 match autostart::set_enabled(enabled) {
                     Ok(()) => self.settings.general.run_at_startup = enabled,

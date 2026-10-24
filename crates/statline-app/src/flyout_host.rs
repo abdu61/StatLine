@@ -1,6 +1,7 @@
 //! The flyout window: opens above the strip, closes on focus loss or Esc.
 
 use statline_core::model::Snapshot;
+use statline_core::units::UnitSystem;
 use statline_render::{Palette, Renderer, Surface};
 use statline_ui::flyout::{self, History, Model};
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, strip_window};
@@ -21,6 +22,7 @@ pub struct Flyout {
     model: Model,
     /// Module the panel was opened from; drives the highlight and sort order.
     focus: Option<flyout::Focus>,
+    units: UnitSystem,
     scale: f32,
     palette: Palette,
     last_sample: Option<std::time::SystemTime>,
@@ -34,6 +36,7 @@ impl Flyout {
             history: History::default(),
             model: Model::default(),
             focus: None,
+            units: UnitSystem::Binary,
             scale,
             palette,
             last_sample: None,
@@ -48,6 +51,11 @@ impl Flyout {
     /// Recolour the panel; the next tick repaints with the new palette.
     pub fn set_palette(&mut self, palette: Palette) {
         self.palette = palette;
+    }
+
+    /// Change the byte units; the next refresh rebuilds the strings.
+    pub fn set_units(&mut self, units: UnitSystem) {
+        self.units = units;
     }
 
     pub fn is_open(&self) -> bool {
@@ -82,7 +90,7 @@ impl Flyout {
     ) {
         self.focus = focus;
         self.record(snapshot);
-        self.model = flyout::model_focused(snapshot, &self.history, focus);
+        self.model = flyout::model_focused(snapshot, &self.history, focus, self.units);
 
         let width = flyout::width(self.scale);
         let height = flyout::height(&self.model, self.scale);
@@ -177,7 +185,7 @@ impl Flyout {
     /// Model refresh used by the panel's own timer.
     pub fn refresh(&mut self, renderer: &mut Renderer, snapshot: &Snapshot) {
         self.record(snapshot);
-        self.model = flyout::model_focused(snapshot, &self.history, self.focus);
+        self.model = flyout::model_focused(snapshot, &self.history, self.focus, self.units);
         self.paint(renderer);
     }
 }

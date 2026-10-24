@@ -215,7 +215,12 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         written.push(path);
 
         // Focused on memory, as after clicking the MEM segment.
-        let model = flyout::model_focused(&snapshot, &history, Some(flyout::Focus::Memory));
+        let model = flyout::model_focused(
+            &snapshot,
+            &history,
+            Some(flyout::Focus::Memory),
+            statline_core::units::UnitSystem::Binary,
+        );
         let height = flyout::height(&model, scale).ceil() as u32;
         let mut surface = renderer.surface(width, height)?;
         flyout::render(&mut surface, &mut renderer.text, &palette, &model, scale);
@@ -260,6 +265,10 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                 settings_ui::Row {
                     label: "Update interval",
                     value: String::from("1000 ms"),
+                },
+                settings_ui::Row {
+                    label: "Units",
+                    value: String::from("Binary (KiB)"),
                 },
                 settings_ui::Row {
                     label: "Strip placement",

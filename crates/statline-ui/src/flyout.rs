@@ -81,14 +81,19 @@ fn series(values: &[f32], latest: f32) -> Vec<f32> {
 
 /// Build the panel contents from a snapshot plus the recorded history.
 pub fn model(snapshot: &Snapshot, history: &History) -> Model {
-    model_focused(snapshot, history, None)
+    model_focused(snapshot, history, None, UnitSystem::Binary)
 }
 
-/// Build the panel with one module focused.
+/// Build the panel with one module focused and explicit byte units.
 ///
 /// Focusing memory sorts the process table by working set; every other module
 /// keeps the sampler's CPU order.
-pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus>) -> Model {
+pub fn model_focused(
+    snapshot: &Snapshot,
+    history: &History,
+    focus: Option<Focus>,
+    units: UnitSystem,
+) -> Model {
     let mut rows = Vec::new();
 
     let header = match snapshot.system.as_ref() {
@@ -119,9 +124,9 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
             value: format_percent(memory.percent()),
             detail: format!(
                 "{} of {} · commit {}",
-                format_bytes(memory.used_bytes, UnitSystem::Binary),
-                format_bytes(memory.total_bytes, UnitSystem::Binary),
-                format_bytes(memory.commit_bytes, UnitSystem::Binary)
+                format_bytes(memory.used_bytes, units),
+                format_bytes(memory.total_bytes, units),
+                format_bytes(memory.commit_bytes, units)
             ),
             series: series(&history.memory, memory.percent()),
         });
@@ -131,8 +136,8 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
         let detail = if gpu.vram_total_bytes > 0 {
             format!(
                 "VRAM {} of {}",
-                format_bytes(gpu.vram_used_bytes, UnitSystem::Binary),
-                format_bytes(gpu.vram_total_bytes, UnitSystem::Binary)
+                format_bytes(gpu.vram_used_bytes, units),
+                format_bytes(gpu.vram_total_bytes, units)
             )
         } else {
             String::from("VRAM unavailable")
@@ -154,16 +159,16 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
                     .unwrap_or_default();
                 format!(
                     "{} free of {} \u{00b7} read {} write {}{temperature}",
-                    format_bytes(volume.free_bytes, UnitSystem::Binary),
-                    format_bytes(volume.total_bytes, UnitSystem::Binary),
-                    format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
-                    format_rate(disk.write_bytes_per_sec, UnitSystem::Binary)
+                    format_bytes(volume.free_bytes, units),
+                    format_bytes(volume.total_bytes, units),
+                    format_rate(disk.read_bytes_per_sec, units),
+                    format_rate(disk.write_bytes_per_sec, units)
                 )
             }
             None => format!(
                 "read {} write {}",
-                format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
-                format_rate(disk.write_bytes_per_sec, UnitSystem::Binary)
+                format_rate(disk.read_bytes_per_sec, units),
+                format_rate(disk.write_bytes_per_sec, units)
             ),
         };
         rows.push(Row {
@@ -179,8 +184,8 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
             label: "Network",
             value: format!(
                 "\u{2193} {}  \u{2191} {}",
-                format_rate_short(network.rx_bytes_per_sec, UnitSystem::Decimal),
-                format_rate_short(network.tx_bytes_per_sec, UnitSystem::Decimal)
+                format_rate_short(network.rx_bytes_per_sec, units),
+                format_rate_short(network.tx_bytes_per_sec, units)
             ),
             detail: match network.adapters.first() {
                 Some(adapter) => adapter.name.clone(),
@@ -253,7 +258,7 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
                         .cpu_percent
                         .map(format_percent_precise)
                         .unwrap_or_else(|| String::from("\u{2014}")),
-                    memory: format_bytes(entry.working_set_bytes, UnitSystem::Binary),
+                    memory: format_bytes(entry.working_set_bytes, units),
                 })
                 .collect()
         })
@@ -640,11 +645,16 @@ mod tests {
             ],
         });
 
-        let busiest = model_focused(&snapshot, &History::default(), None);
+        let busiest = model_focused(&snapshot, &History::default(), None, UnitSystem::Binary);
         assert_eq!(busiest.processes[0].name, "cpu.exe");
         assert_eq!(busiest.focus, None);
 
-        let largest = model_focused(&snapshot, &History::default(), Some(Focus::Memory));
+        let largest = model_focused(
+            &snapshot,
+            &History::default(),
+            Some(Focus::Memory),
+            UnitSystem::Binary,
+        );
         assert_eq!(largest.processes[0].name, "memory.exe");
         assert_eq!(largest.focus, Some(Focus::Memory));
     }

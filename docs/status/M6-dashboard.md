@@ -11,14 +11,14 @@ The place to configure and to explore, in one window.
 - [x] Window shell: DWM rounded corners, native resize, dark frame
 - [x] Overview: live cards
 - [x] Overview: top-process table (8 rows, two columns, CPU + working set)
-- [x] Settings window: theme, interval, strip placement, autostart; changes live-apply
-      and persist atomically
+- [x] Settings window: theme, interval, units, strip placement, autostart; changes
+      live-apply and persist atomically
 - [ ] Window shell: custom title area, remembered bounds
 - [ ] Left navigation: Overview / Modules / Appearance / Behaviour / About
 - [ ] Overview: 5-minute chart with hover readout, sortable process table
 - [ ] Modules: enable, reorder (drag), per-module meter/threshold/colour
 - [ ] Appearance: accent, density, labels, opacity
-- [ ] Behaviour: units, secondary monitors, fullscreen, safe mode
+- [ ] Behaviour: secondary monitors, fullscreen, safe mode
 - [ ] About: versions, active tier, folders, copy diagnostics, reset, licences
 - [ ] Keyboard navigation + focus rings; Esc closes
 - [ ] Live preview of strip changes while editing

@@ -101,8 +101,9 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
   zero when both are closed.
 - **Settings**: framed window from the tray/strip menu. Theme (system/light/dark),
-  interval, strip placement and autostart, applied live and saved atomically to
-  `%APPDATA%\Statline\settings.json`. The Run key is treated as the truth for startup.
+  interval, byte units (binary/decimal), strip placement and autostart, applied live and
+  saved atomically to `%APPDATA%\Statline\settings.json`. The Run key is treated as the
+  truth for startup.
 - **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
   `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
   battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
