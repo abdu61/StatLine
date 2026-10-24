@@ -1,45 +1,64 @@
 # Status
 
-**Milestone:** M1 complete — metrics engine · **Updated:** 2026-10-24
+**Milestone:** M1 complete · M2 renderer complete · M3 strip in progress · **Updated:** 2026-10-24
 
 ## Now
 
-- [x] `Snapshot` model, units/formatting, ring buffer
-- [x] CPU total/per-core/MHz, memory/commit/cache, disk, network
-- [x] GPU utilization + VRAM (PDH `GPU Engine` + `GPU Process Memory`, DXGI budget)
-- [x] Battery percent/AC/rate; desktops correctly report `None`
-- [x] Sampler thread: condvar-paced, `ArcSwap` publish, live interval change, clean stop
-- [x] `--probe`, `--bench` (CPU-time gate), `--profile` (per-provider cost)
-- [x] 68 tests green, clippy clean
-- [ ] M2: Direct2D software surface, design tokens, widget kit, headless snapshots
+- [x] M0: workspace, tray shell, docs index, capture tooling
+- [x] M1: CPU, memory, disk, network, GPU, battery, sampler thread
+- [x] M2: Direct2D software surface, palette/type tokens, text engine,
+      dependency-free PNG writer, `--render-snapshots` smoke test (verified visually)
+- [x] Strip model + renderer (`statline-ui`) with measured layout
+- [x] Strip window creation, cross-process `SetParent`, positioning math,
+      1 s timer, `ArcSwap` snapshot read, `UpdateLayeredWindowIndirect` present
+- [ ] **Strip pixels are not yet visible in the taskbar** (see below)
+- [ ] M3 remainder: visibility rules (fullscreen/auto-hide), fallback tiers, hover
+- [ ] M4–M9
 
-## Next (in order)
+## Immediate next step (start here)
 
-1. M2: `statline-render` — D2D/DWrite/WIC factories, DIB surface, palette + type scale.
-2. M2: widget kit (text, meter, sparkline, card, button, toggle) + `--render-snapshots`.
-3. M3: taskbar strip window lifecycle, placement, fallbacks, live capture QA.
-4. M4: tray menu, single instance, autostart, crash handling.
+The strip window attaches (`taskbar strip attached` in the log) and the renderer
+produces correct pixels in isolation, but nothing appears over the taskbar. Investigate
+in this order:
 
-## Blockers / decisions needed
+1. Confirm the surface has content at present time: log `surface.pixels_rgba()` alpha
+   sum once, right before `present_layered`. If zero, `render()`/`TextEngine` is not
+   drawing into the bound DIB.
+2. Check `UpdateLayeredWindowIndirect` return value. It is currently ignored. With a
+   **child** window, `pptDst` semantics differ from top-level windows: try
+   `pptDst = null` (window position, current code) **and** explicit screen coordinates,
+   and try presenting a plain `WS_EX_LAYERED` top-level window first (no `SetParent`)
+   to isolate parenting from presentation.
+3. If a child layered window still refuses, switch presentation to DirectComposition
+   (DComp visual on the child HWND) — the path TrafficMonitor uses on Win11 — while
+   keeping the same D2D drawing code.
+4. Verify z-order: after `SetParent`, call `SetWindowPos(hwnd, HWND_TOP, ...)` within
+   the taskbar to ensure the strip is above the XAML island.
 
-- None.
+Relevant files: `crates/statline-render/src/surface.rs` (`present_layered`),
+`crates/statline-win/src/strip_window.rs`, `crates/statline-app/src/strip_host.rs`.
 
-## Measured facts (this machine)
+## Known cleanup
 
-Ryzen 7 4700U (8C/8T), 7.4 GiB RAM, Radeon iGPU · Windows 11 25H2 build 26220.9568 ·
-1536x864 logical @125 % · taskbar bottom, left-aligned, 48 logical px · `MSTaskSwWClass`
-absent (XAML taskbar) · `PrintWindow` captures the taskbar, `CopyFromScreen` does not.
+- `statline-render` warnings: unused `TextStyle` import in `tokens.rs`, unused `target`
+  field in `Surface`, unused `WS_EX_*` imports in `strip_host.rs`, one unsafe call
+  needing an explicit block in `strip_proc`. All are mechanical.
+- `Surface::present_layered` takes `(x, y)` but ignores them now; decide the contract
+  (window-position vs explicit destination) as part of the fix above.
 
-Sampling cost (release, 60 samples @ 1 s): **cpu mean 0.78 ms/sample = 0.078 % of one
-core**, WS 14.3 MB, private 6.2 MB. Tight-loop full sample ~0.56 ms.
+## Measured facts
 
-Provider costs (release, tight loop): `GetIfTable2` 1.16-1.4 ms (cached 60 s),
-`GetIfEntry2` x7 ~0.27-0.33 ms, GPU PDH+DXGI ~0.65 ms (cached 3 s), PDH disk ~50 us,
-battery ~12 us, volumes ~76 us (cached 30 s).
+Ryzen 7 4700U, 7.4 GiB, Radeon iGPU · Windows 11 25H2 build 26220.9568 · 1536x864
+logical @125 % (taskbar 48 logical / 60 physical px) · taskbar left-aligned, tray at
+right · `MSTaskSwWClass` absent (XAML taskbar) · `CopyFromScreen` misses the taskbar,
+`PrintWindow` captures it.
+
+Sampling (release): cpu mean 0.78 ms/sample at 1 Hz = 0.078 % of one core, WS 14.3 MB.
+App with strip + renderer attached: WS 17.2 MB.
 
 ## Log
 
-- 2026-10-24 — M0 committed: workspace, tray shell, docs index, capture tooling.
-- 2026-10-24 — M1 slice 1: core model/units/ring, CPU+memory providers, probe/bench.
-- 2026-10-24 — M1 slice 2: disk (PDH) + network providers, interface/volume caching.
-- 2026-10-24 — M1 slice 3: GPU (PDH + DXGI), battery, sampler thread; CPU-time bench gate.
+- 2026-10-24 — M0: scaffold, tray, docs, tooling.
+- 2026-10-24 — M1: all providers + sampler thread (3 commits).
+- 2026-10-24 — M2: renderer foundation, tokens, text, PNG snapshots (verified).
+- 2026-10-24 — M3 partial: strip window lifecycle wired; pixels not visible yet.

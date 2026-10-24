@@ -104,7 +104,10 @@ dependencies = [
  "statline-config",
  "statline-core",
  "statline-metrics",
+ "statline-render",
+ "statline-ui",
  "statline-win",
+ "windows",
 ]
 
 [[package]]
@@ -134,7 +137,10 @@ dependencies = [
 name = "statline-render"
 version = "0.1.0"
 dependencies = [
+ "log",
  "statline-core",
+ "thiserror",
+ "windows",
 ]
 
 [[package]]
@@ -142,6 +148,8 @@ name = "statline-ui"
 version = "0.1.0"
 dependencies = [
  "statline-core",
+ "statline-render",
+ "windows",
 ]
 
 [[package]]

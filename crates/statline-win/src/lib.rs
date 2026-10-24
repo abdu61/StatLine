@@ -11,6 +11,8 @@ pub mod menus;
 pub mod metrics;
 pub mod paths;
 pub mod shell;
+pub mod strip_window;
+pub mod taskbar;
 pub mod tray;
 pub mod window;
 

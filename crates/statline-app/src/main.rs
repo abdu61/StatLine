@@ -3,6 +3,7 @@
 
 mod cli;
 mod profile;
+mod strip_host;
 
 use log::{LevelFilter, error, info};
 use statline_core::{APP_NAME, VERSION};
@@ -75,6 +76,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     info!("tray icon ready");
+
+    let host = strip_host::Host::start(strip_host::default_palette(true));
+    match &host {
+        Ok(_) => info!("taskbar strip attached"),
+        Err(err) => error!("taskbar strip unavailable: {err}"),
+    }
+    let _host = host.ok();
+
     let exit_code = MessageWindow::run_message_loop()?;
     info!("{APP_NAME} exiting with {exit_code}");
     Ok(())

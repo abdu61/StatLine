@@ -8,3 +8,5 @@ description = "Views and layout for Statline"
 
 [dependencies]
 statline-core.workspace = true
+statline-render.workspace = true
+windows.workspace = true
