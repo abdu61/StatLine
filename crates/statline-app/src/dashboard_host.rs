@@ -6,9 +6,7 @@ use statline_ui::dashboard;
 use statline_ui::flyout::{self, Model};
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, window};
 use windows::Win32::Foundation::RECT;
-use windows::Win32::Graphics::Gdi::{
-    BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT,
-};
+use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT};
 use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, GetClientRect, WM_CLOSE, WM_PAINT, WM_SIZE,
 };
@@ -124,7 +122,6 @@ impl Dashboard {
                 scale,
             );
         }
-
     }
 
     pub fn close(&mut self) {
@@ -204,5 +201,3 @@ unsafe extern "system" fn companion_proc(
         }
     }
 }
-
-

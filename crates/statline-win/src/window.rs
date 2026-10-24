@@ -179,7 +179,7 @@ pub fn create_frame_window(
 }
 
 fn apply_frame_style(hwnd: HWND) {
-    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWINDOWATTRIBUTE};
+    use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
 
     // DWMWA_USE_IMMERSIVE_DARK_MODE = 20, DWMWA_WINDOW_CORNER_PREFERENCE = 33.
     let dark: i32 = 1;
