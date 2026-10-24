@@ -13,7 +13,7 @@ pub struct StripMetrics {
 }
 
 fn label_style(scale: f32) -> TextStyle {
-    TextStyle::new(9.0 * scale, true, Align::Left)
+    TextStyle::new(8.5 * scale, true, Align::Left)
 }
 
 fn value_style(scale: f32) -> TextStyle {

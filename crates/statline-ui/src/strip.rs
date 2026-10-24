@@ -3,7 +3,7 @@
 //! Pure data so it can be tested without a window, D2D or a live system.
 
 use statline_core::model::Snapshot;
-use statline_core::units::{UnitSystem, format_percent, format_rate};
+use statline_core::units::{UnitSystem, format_percent, format_rate_compact};
 
 /// One readout in the strip.
 #[derive(Debug, Clone, PartialEq)]
@@ -57,9 +57,9 @@ pub fn segments(snapshot: &Snapshot) -> Vec<Segment> {
         segments.push(Segment {
             label: "NET",
             value: format!(
-                "{} {}",
-                format_rate(network.rx_bytes_per_sec, UnitSystem::Binary),
-                format_rate(network.tx_bytes_per_sec, UnitSystem::Binary)
+                "\u{2193} {} \u{2191} {}",
+                format_rate_compact(network.rx_bytes_per_sec, UnitSystem::Binary),
+                format_rate_compact(network.tx_bytes_per_sec, UnitSystem::Binary)
             ),
             percent: None,
         });

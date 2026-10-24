@@ -26,6 +26,7 @@ pub fn print_help() {
         "  --bench [samples]     Measure sampling cost (default 60)",
         "  --profile [iters]     Time each provider in isolation (default 20)",
         "  --tray-only           Do not attach the taskbar strip",
+        "  --render-snapshots D  Write PNGs of every surface to directory D",
         "",
         "With no options, Statline starts in the notification area.",
     ];

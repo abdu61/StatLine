@@ -1,0 +1,141 @@
+//! Headless rendering of every surface to PNG.
+//!
+//! `--render-snapshots <dir>` exists because the strip is a layered window: on
+//! some display drivers screen capture cannot see it. Rendering the same drawing
+//! code into a bitmap is the only reliable way to review the design here.
+
+use statline_core::model::{
+    CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample, Snapshot, VolumeSample,
+};
+use statline_render::{Color, Palette, Renderer};
+use statline_ui::{render, strip};
+use std::path::Path;
+
+/// A plausible, fixed snapshot so output is reproducible between runs.
+fn synthetic() -> Snapshot {
+    Snapshot {
+        taken_at: Some(std::time::SystemTime::now()),
+        cpu: Some(CpuSample {
+            total_percent: 23.0,
+            per_core_percent: vec![12.0, 44.0, 8.0, 31.0, 5.0, 61.0, 17.0, 9.0],
+            mhz: Some(2400),
+        }),
+        memory: Some(MemorySample {
+            used_bytes: 9_800_000_000,
+            total_bytes: 17_180_000_000,
+            commit_bytes: 11_200_000_000,
+            commit_limit_bytes: 20_000_000_000,
+            cached_bytes: 3_100_000_000,
+        }),
+        gpu: Some(GpuSample {
+            utilization_percent: 8.0,
+            vram_used_bytes: 1_100_000_000,
+            vram_total_bytes: 6_000_000_000,
+            ..Default::default()
+        }),
+        disk: Some(DiskSample {
+            read_bytes_per_sec: 12_400_000.0,
+            write_bytes_per_sec: 3_100_000.0,
+            busy_percent: 4.0,
+            volumes: vec![VolumeSample {
+                mount: String::from("C:"),
+                label: String::from("System"),
+                free_bytes: 412_000_000_000,
+                total_bytes: 931_000_000_000,
+                temperature_c: None,
+            }],
+        }),
+        network: Some(NetworkSample {
+            rx_bytes_per_sec: 1_240_000.0,
+            tx_bytes_per_sec: 84_000.0,
+            ..Default::default()
+        }),
+        ..Snapshot::default()
+    }
+}
+
+/// Render the strip for every theme and scale into `dir`.
+pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(dir)?;
+    let mut renderer = Renderer::new()?;
+    let snapshot = synthetic();
+    let segments = strip::segments(&snapshot);
+
+    let mut written = Vec::new();
+
+    for (theme_name, dark) in [("dark", true), ("light", false)] {
+        let palette = Palette::for_theme(dark, Color::rgb(0x4C, 0xC2, 0xFF));
+        // The taskbar colour the strip is composited over for review.
+        let background = if dark {
+            Color::rgb(0x1F, 0x1F, 0x1F)
+        } else {
+            Color::rgb(0xF3, 0xF3, 0xF3)
+        };
+
+        for (scale_name, scale) in [("100", 1.0_f32), ("125", 1.25), ("150", 1.5), ("200", 2.0)] {
+            let height = (48.0 * scale - 8.0 * scale).max(16.0);
+            let measured = render::measure(&mut renderer.text, &segments, scale);
+            let width = measured.width.ceil().max(1.0);
+
+            // Normal state.
+            {
+                let mut surface = renderer.surface(width as u32, height as u32)?;
+                render::render(
+                    &mut surface,
+                    &mut renderer.text,
+                    &palette,
+                    &segments,
+                    None,
+                    scale,
+                    height,
+                );
+                let path = dir.join(format!("strip-{theme_name}-{scale_name}.png"));
+                surface.save_png_over(&path, background)?;
+                written.push(path);
+            }
+
+            // Hover on the first segment, to review the plate.
+            {
+                let mut surface = renderer.surface(width as u32, height as u32)?;
+                render::render(
+                    &mut surface,
+                    &mut renderer.text,
+                    &palette,
+                    &segments,
+                    Some(0),
+                    scale,
+                    height,
+                );
+                let path = dir.join(format!("strip-{theme_name}-{scale_name}-hover.png"));
+                surface.save_png_over(&path, background)?;
+                written.push(path);
+            }
+        }
+    }
+
+    // Also render tall, so edges and radii are easy to inspect.
+    {
+        let palette = Palette::dark(Color::rgb(0x4C, 0xC2, 0xFF));
+        let scale = 2.0_f32;
+        let measured = render::measure(&mut renderer.text, &segments, scale);
+        let width = measured.width.ceil().max(1.0);
+        let mut surface = renderer.surface(width as u32, 80)?;
+        render::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &segments,
+            Some(2),
+            scale,
+            80.0,
+        );
+        let path = dir.join("strip-dark-200-tall.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+    }
+
+    for path in written {
+        println!("{}", path.display());
+    }
+    Ok(())
+}

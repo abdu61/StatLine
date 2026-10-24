@@ -327,6 +327,31 @@ impl Surface {
         )
     }
 
+    /// Write the surface to a PNG composited over an opaque background.
+    ///
+    /// Snapshots of a layered surface are mostly transparent, so reviewing them
+    /// on their own shows nothing useful; this blends them the way the taskbar
+    /// would.
+    pub fn save_png_over(&self, path: &Path, background: Color) -> std::io::Result<()> {
+        let pixels = self.pixels_rgba();
+        let mut composited = vec![0u8; pixels.len()];
+        for (index, pixel) in pixels.chunks(4).enumerate() {
+            let alpha = pixel[3] as u32;
+            let blend = |over: u8, under: u8| {
+                ((over as u32 * alpha + under as u32 * (255 - alpha)) / 255) as u8
+            };
+            let base = index * 4;
+            composited[base] = blend(pixel[0], background.r);
+            composited[base + 1] = blend(pixel[1], background.g);
+            composited[base + 2] = blend(pixel[2], background.b);
+            composited[base + 3] = 255;
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, png::encode_rgba(self.width, self.height, &composited))
+    }
+
     /// Keep the factory alive with the surfaces it created.
     pub fn factory(&self) -> &ID2D1Factory {
         &self.factory

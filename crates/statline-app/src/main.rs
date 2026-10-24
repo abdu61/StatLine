@@ -3,6 +3,7 @@
 
 mod cli;
 mod profile;
+mod snapshots;
 mod strip_host;
 
 use log::{LevelFilter, error, info};
@@ -38,6 +39,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if args.iter().any(|a| a == "--probe") {
         cli::probe(5, Duration::from_millis(DEFAULT_INTERVAL_MS));
+        return Ok(());
+    }
+    if let Some(index) = args.iter().position(|a| a == "--render-snapshots") {
+        let dir = args
+            .get(index + 1)
+            .cloned()
+            .unwrap_or_else(|| String::from("snapshots-out"));
+        snapshots::run(std::path::Path::new(&dir))?;
         return Ok(());
     }
     if let Some(index) = args.iter().position(|a| a == "--profile") {
