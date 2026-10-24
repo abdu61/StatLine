@@ -1,0 +1,10 @@
+[package]
+name = "statline-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Direct2D rendering and widget kit for Statline"
+
+[dependencies]
+statline-core.workspace = true

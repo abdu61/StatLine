@@ -1,0 +1,14 @@
+# Taste — Command Code user preferences
+- Prefers deep research and an explicit feasibility verdict before any code is written on a new project; wants a written plan reviewed and confirmed before implementation starts. Confidence: 0.85
+- Wants clarifying questions asked during the planning phase (including what the user must install/do manually), then expects the agent to run unattended to completion. Confidence: 0.8
+- Wants incremental git commits as work progresses — `git init` plus local commits are fine, but do **not** push. Confidence: 0.9
+- Expects long projects to be broken into explicit milestones, each ending in a verifiable result and a commit. Confidence: 0.75
+- Prefers documentation split into multiple small, indexed files (master index, short status file, architecture, ADRs, per-milestone status) instead of one large status document. Confidence: 0.85
+- Wants the repo to carry explicit written instructions for the agent itself (e.g. `AGENTS.md`) codifying best coding practices and the working protocol. Confidence: 0.8
+- Likes decisions and scope to be captured in small ADRs / spec docs that constrain future work. Confidence: 0.65
+- Prioritizes minimal resource footprint (CPU cycles, memory, power draw) and expects that constraint to drive architecture and language choice. Confidence: 0.85
+- Prefers the latest/fastest suitable language and stack, chosen through research and justified, rather than defaults. Confidence: 0.75
+- Values robustness and polish: good UI/UX, graceful degradation/fallbacks, and little setup for end users, because projects may be open-sourced on GitHub or published to the Microsoft Store. Confidence: 0.85
+- Cares about best coding practices as an explicit requirement, not an implicit expectation. Confidence: 0.7
+- Windows 11 is the primary target platform for Windows desktop work. Confidence: 0.6
+- Use Independent Sub agent for a review after each Mid to Major Task (for an extra verification, since code quality is important)

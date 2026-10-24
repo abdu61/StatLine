@@ -1,0 +1,23 @@
+# Rust
+/target
+**/*.rs.bk
+*.pdb
+
+# Build & packaging output
+/dist
+/artifacts
+*.msix
+*.msixbundle
+*.appx
+*.cer
+*.pfx
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# Local snapshots produced by `--render-snapshots`
+/snapshots-out

@@ -1,0 +1,10 @@
+[package]
+name = "statline-metrics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "System metric providers and sampling engine for Statline"
+
+[dependencies]
+statline-core.workspace = true

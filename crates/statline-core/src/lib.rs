@@ -1,0 +1,24 @@
+//! Shared identity, model types and formatting helpers.
+//!
+//! This crate is pure logic: no Win32, no I/O, no globals. That keeps it
+//! trivially unit-testable and safe to depend on from every other crate.
+
+/// Product name. Used in window titles, tray tooltips and log headers.
+pub const APP_NAME: &str = "Statline";
+
+/// Stable identifier for mutexes, message names and package identity.
+pub const APP_ID: &str = "Statline";
+
+/// Semantic version of the running binary.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identity_is_set() {
+        assert_eq!(APP_NAME, "Statline");
+        assert!(!VERSION.is_empty());
+    }
+}

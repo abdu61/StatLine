@@ -1,0 +1,13 @@
+[package]
+name = "statline-win"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Safe Win32 wrappers for Statline"
+
+[dependencies]
+statline-core.workspace = true
+windows.workspace = true
+log.workspace = true
+thiserror.workspace = true

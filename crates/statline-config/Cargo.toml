@@ -1,0 +1,12 @@
+[package]
+name = "statline-config"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Settings schema, persistence and migration for Statline"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
