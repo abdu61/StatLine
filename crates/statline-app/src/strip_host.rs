@@ -58,6 +58,8 @@ pub struct Host {
     placement: taskbar::Placement,
     /// Byte units used by the strip readouts.
     units: UnitSystem,
+    /// Strip module visibility.
+    modules: strip::VisibleModules,
 }
 
 impl Host {
@@ -98,6 +100,7 @@ impl Host {
             details_visible: false,
             placement: taskbar::Placement::Right,
             units: UnitSystem::Binary,
+            modules: strip::VisibleModules::default(),
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -138,7 +141,7 @@ impl Host {
             return;
         }
 
-        let segments = strip::segments_with(&snapshot, self.units);
+        let segments = strip::segments_with(&snapshot, self.units, self.modules);
         let measured = render::measure(&mut self.renderer.text, &segments, self.scale);
         let width = measured.width.ceil().max(1.0);
 
@@ -410,6 +413,13 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
         Units::Binary => UnitSystem::Binary,
         Units::Decimal => UnitSystem::Decimal,
     };
+    host.modules = strip::VisibleModules {
+        cpu: settings.modules.cpu,
+        memory: settings.modules.memory,
+        gpu: settings.modules.gpu,
+        disk: settings.modules.disk,
+        network: settings.modules.network,
+    };
     host.flyout.set_units(host.units);
     host.flyout.set_mica(settings.appearance.mica);
     host.dashboard.set_units(host.units);
@@ -551,7 +561,7 @@ pub unsafe extern "system" fn strip_proc(
                     let anchor = strip_window::window_rect(hwnd);
                     let snapshot = host.sampler.snapshot();
                     // Which segment was clicked decides what the panel focuses.
-                    let segments = strip::segments_with(&snapshot, host.units);
+                    let segments = strip::segments_with(&snapshot, host.units, host.modules);
                     let focus = render::hit_test(&host.segment_rects, x)
                         .and_then(|index| segments.get(index))
                         .and_then(|segment| focus_for_label(segment.label));

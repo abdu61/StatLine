@@ -36,9 +36,10 @@ detail sampling on
   1/5/15-minute averages and processes; memory cache and top memory apps; per-volume
   and per-adapter rows. Optional Mica DWM backdrop on the framed windows.
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
-  with theme, accent presets, sampler interval, byte units, Mica, strip placement and
-  start-with-Windows. Mica shows a GPU/battery caution. Changes apply live and are saved
-  atomically to `%APPDATA%\Statline\settings.json`; unknown keys are ignored.
+  with theme, accent presets, sampler interval, byte units, Mica, strip placement,
+  start-with-Windows and per-module strip visibility. Mica shows a GPU/battery caution.
+  Changes apply live and are saved atomically to `%APPDATA%\Statline\settings.json`;
+  unknown keys are ignored.
 - **Packaging**: portable zip script (exe, README, changelog, licence texts) and an
   MSIX manifest with `runFullTrust` + a user-toggleable startup task. Both build locally;
   CI verifies fmt/clippy/test/deny/build and produces tag artifacts.
@@ -58,8 +59,8 @@ detail sampling on
 
 ## Next, in order
 
-1. **Settings, remaining**: module enable/order, density/accent (accent done), safe mode,
-   remembered window bounds.
+1. **Settings, remaining**: module reorder, density, safe mode, remembered window
+   bounds.
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power; current builds show
    utilization and VRAM only. This machine is an AMD APU, so an AMD discrete GPU is
    needed to verify the ADL path; NVML can be exercised on any NVIDIA machine.

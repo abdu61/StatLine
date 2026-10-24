@@ -18,6 +18,10 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
     "theme": "system",            // system | light | dark
     "accent": "system",           // system | blue | green | purple | orange | teal | pink
     "mica": false                 // DWM Mica backdrop on framed windows
+  },
+
+  "modules": {
+    "cpu": true, "memory": true, "gpu": true, "disk": true, "network": true
   }
 }
 ```
@@ -38,9 +42,9 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
 
 ## Planned (not in schema v1 yet)
 
-`modules` (enable/order/options), `behaviour.hide_in_fullscreen`,
-`appearance.density`, `window.dashboard` bounds, and the read-only `telemetry` block.
-Adding any of them is a schema change with a migration path.
+`modules` ordering and per-module meter/threshold/colour overrides,
+`behaviour.hide_in_fullscreen`, `appearance.density`, `window.dashboard` bounds, and the
+read-only `telemetry` block. Adding any of them is a schema change with a migration path.
 
 ## Where it is edited
 
@@ -55,6 +59,7 @@ Tray icon or strip right-click → **Settings…**. Rows cycle on click:
 | Mica window effect | On ↔ Off (`DWMWA_SYSTEMBACKDROP_TYPE` on the framed windows) |
 | Strip placement | Right ↔ Left (left anchors past Start, clamped at the tray) |
 | Start with Windows | On ↔ Off (writes `HKCU\...\Run`) |
+| Strip CPU / memory / GPU / disk / network | On ↔ Off (the flyout and companion stay complete) |
 
 Changes apply live: the strip palette, sampler cadence, byte units and anchor update on
 the next tick, and an open flyout/companion repaints with the new palette and units.

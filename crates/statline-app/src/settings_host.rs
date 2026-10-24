@@ -106,6 +106,10 @@ fn open() -> windows::core::Result<()> {
     Ok(())
 }
 
+fn on_off(value: bool) -> String {
+    String::from(if value { "On" } else { "Off" })
+}
+
 fn build_model(settings: &Settings) -> settings::Model {
     settings::Model {
         rows: vec![
@@ -144,6 +148,26 @@ fn build_model(settings: &Settings) -> settings::Model {
                 } else {
                     "Off"
                 }),
+            },
+            settings::Row {
+                label: "Strip CPU",
+                value: on_off(settings.modules.cpu),
+            },
+            settings::Row {
+                label: "Strip memory",
+                value: on_off(settings.modules.memory),
+            },
+            settings::Row {
+                label: "Strip GPU",
+                value: on_off(settings.modules.gpu),
+            },
+            settings::Row {
+                label: "Strip disk",
+                value: on_off(settings.modules.disk),
+            },
+            settings::Row {
+                label: "Strip network",
+                value: on_off(settings.modules.network),
             },
         ],
         warning: if settings.appearance.mica {
@@ -198,6 +222,11 @@ impl SettingsWindow {
                     }
                 }
             }
+            7 => self.settings.modules.cpu = !self.settings.modules.cpu,
+            8 => self.settings.modules.memory = !self.settings.modules.memory,
+            9 => self.settings.modules.gpu = !self.settings.modules.gpu,
+            10 => self.settings.modules.disk = !self.settings.modules.disk,
+            11 => self.settings.modules.network = !self.settings.modules.network,
             _ => return false,
         }
         true

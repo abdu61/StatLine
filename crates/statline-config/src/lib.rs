@@ -42,6 +42,30 @@ pub struct Settings {
     pub schema_version: u32,
     pub general: General,
     pub appearance: Appearance,
+    pub modules: Modules,
+}
+
+/// Modules shown in the taskbar strip. The flyout and companion stay complete.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Modules {
+    pub cpu: bool,
+    pub memory: bool,
+    pub gpu: bool,
+    pub disk: bool,
+    pub network: bool,
+}
+
+impl Default for Modules {
+    fn default() -> Self {
+        Self {
+            cpu: true,
+            memory: true,
+            gpu: true,
+            disk: true,
+            network: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -354,6 +378,22 @@ mod tests {
         assert_eq!(Units::Binary.next(), Units::Decimal);
         assert_eq!(Units::Decimal.next(), Units::Binary);
         assert_ne!(Units::Binary.label(), Units::Decimal.label());
+    }
+
+    #[test]
+    fn modules_default_to_visible_and_round_trip() {
+        assert_eq!(Modules::default(), Modules::default());
+        let dir = std::env::temp_dir().join("statline-config-test-modules");
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = dir.join("settings.json");
+        let mut settings = Settings::default();
+        settings.modules.gpu = false;
+        settings.modules.network = false;
+        settings.save(&path).expect("save");
+        let loaded = Settings::load_or_default(&path).expect("load");
+        assert!(!loaded.modules.gpu);
+        assert!(!loaded.modules.network);
+        assert!(loaded.modules.cpu);
     }
 
     #[test]

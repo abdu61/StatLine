@@ -380,6 +380,26 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     label: "Start with Windows",
                     value: String::from("Off"),
                 },
+                settings_ui::Row {
+                    label: "Strip CPU",
+                    value: String::from("On"),
+                },
+                settings_ui::Row {
+                    label: "Strip memory",
+                    value: String::from("On"),
+                },
+                settings_ui::Row {
+                    label: "Strip GPU",
+                    value: String::from("On"),
+                },
+                settings_ui::Row {
+                    label: "Strip disk",
+                    value: String::from("On"),
+                },
+                settings_ui::Row {
+                    label: "Strip network",
+                    value: String::from("On"),
+                },
             ],
             warning: None,
             footer: String::from("Click a row to change \u{00b7} Esc closes"),

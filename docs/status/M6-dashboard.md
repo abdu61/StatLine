@@ -19,7 +19,7 @@ The place to configure and to explore, in one window.
       live-apply and persist atomically
 - [ ] Window shell: custom title area, remembered bounds
 - [ ] Overview: 5-minute chart with hover readout, sortable process table
-- [ ] Modules: enable, reorder (drag), per-module meter/threshold/colour
+- [ ] Modules: reorder (drag), per-module meter/threshold/colour (strip visibility done)
 - [ ] Appearance: density, labels, opacity
 - [ ] Behaviour: secondary monitors, fullscreen, safe mode
 - [x] About: version, privacy posture, folders, licence, sensor scope

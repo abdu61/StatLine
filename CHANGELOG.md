@@ -8,6 +8,8 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Per-module strip visibility in Settings (CPU, memory, GPU, disk, network); the flyout
+  and companion stay complete.
 - About page in the companion: version, privacy posture, settings/log folders, licence
   and the sensor scope.
 - CPU 1/5/15-minute smoothed averages (real elapsed time, not fixed ticks), shown on the

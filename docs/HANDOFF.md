@@ -108,9 +108,9 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   zero when both are closed.
 - **Settings**: framed window from the tray/strip menu or the companion nav. Theme
   (system/light/dark), accent presets (system/blue/green/purple/orange/teal/pink),
-  interval, byte units, Mica, strip placement and autostart, applied live and saved
-  atomically to `%APPDATA%\Statline\settings.json`. Turning Mica on shows a GPU/battery
-  caution. The Run key is treated as the truth for startup.
+  interval, byte units, Mica, strip placement, autostart and per-module strip visibility,
+  applied live and saved atomically to `%APPDATA%\Statline\settings.json`. Turning Mica
+  on shows a GPU/battery caution. The Run key is treated as the truth for startup.
 - **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
   `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
   battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
@@ -129,7 +129,7 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
 
 ## Next work, in priority order
 
-1. **Settings, remaining**: module enable/order, density, safe mode, remembered window
+1. **Settings, remaining**: module reorder, density, safe mode, remembered window
    bounds.
 2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power. The current build
    shows utilization and VRAM only. This machine is an AMD APU, so ADL needs an AMD

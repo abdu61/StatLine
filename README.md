@@ -26,8 +26,9 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
   ![Companion window](docs/images/dashboard.jpg)
 
 - **Settings**: theme (system/light/dark), seven accent presets, sampler interval, byte
-  units, strip placement, start-with-Windows and an optional Mica window effect (with a
-  GPU/battery caution). Changes apply live and are written atomically.
+  units, strip placement, start-with-Windows, per-module strip visibility and an optional
+  Mica window effect (with a GPU/battery caution). Changes apply live and are written
+  atomically.
 
   ![Settings](docs/images/settings.jpg)
 
