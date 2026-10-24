@@ -118,6 +118,27 @@ pub fn format_rate_compact(bytes_per_sec: f64, units: UnitSystem) -> String {
     }
 }
 
+/// Short rate for the strip: "1.1 KB/s", "82 KB/s", "12.4 MB/s".
+///
+/// One decimal below 10 keeps small values readable without widening the
+/// segment much; above that the integer is plenty.
+pub fn format_rate_short(bytes_per_sec: f64, units: UnitSystem) -> String {
+    if !bytes_per_sec.is_finite() || bytes_per_sec <= 0.0 {
+        return String::from("0 B/s");
+    }
+
+    let base = units.base();
+    let suffixes = units.suffixes();
+    let mut scaled = bytes_per_sec;
+    let mut index = 0;
+    while scaled >= base && index + 1 < suffixes.len() {
+        scaled /= base;
+        index += 1;
+    }
+
+    let decimals = if index > 0 && scaled < 10.0 { 1 } else { 0 };
+    format!("{scaled:.decimals$} {}/s", suffixes[index])
+}
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -13,22 +13,33 @@ pub struct StripMetrics {
 }
 
 fn label_style(scale: f32) -> TextStyle {
-    TextStyle::new(8.5 * scale, true, Align::Left)
+    TextStyle::new(7.5 * scale, true, Align::Left)
 }
 
 fn value_style(scale: f32) -> TextStyle {
-    TextStyle::new(12.0 * scale, true, Align::Left)
+    TextStyle::new(11.0 * scale, true, Align::Left)
+}
+
+fn stacked_style(scale: f32) -> TextStyle {
+    TextStyle::new(8.5 * scale, true, Align::Left)
 }
 
 fn segment_widths(text: &mut TextEngine, segments: &[Segment], scale: f32) -> Vec<f32> {
-    let padding = space::S * scale;
-    let min_width = 40.0 * scale;
+    let padding = space::XS * scale;
+    let min_width = 32.0 * scale;
+
     segments
         .iter()
         .map(|segment| {
-            let label = text.measure(segment.label, label_style(scale));
-            let value = text.measure(&segment.value, value_style(scale));
-            (label.max(value) + padding * 2.0).max(min_width)
+            let mut widest = text.measure(segment.label, label_style(scale));
+            if !segment.width_sample.is_empty() {
+                widest = widest.max(text.measure(segment.width_sample, stacked_style(scale)));
+            }
+            widest = widest.max(text.measure(&segment.value, value_style(scale)));
+            if let Some(extra) = segment.extra.as_ref() {
+                widest = widest.max(text.measure(extra, stacked_style(scale)));
+            }
+            (widest + padding * 2.0).max(min_width)
         })
         .collect()
 }
@@ -61,7 +72,7 @@ pub fn render(
     scale: f32,
     height: f32,
 ) -> StripMetrics {
-    let padding = space::S * scale;
+    let padding = space::XS * scale;
     let gap = space::XXS * scale;
     let widths = segment_widths(text, segments, scale);
 
@@ -76,26 +87,19 @@ pub fn render(
 
     surface.begin(palette.strip_background);
 
-    let label_height = 11.0 * scale;
-    let value_height = 15.0 * scale;
-    let meter_height = (2.0 * scale).max(1.0);
-    let label_top = (height * 0.14).max(1.0);
-    let value_top = label_top + label_height;
-    let meter_top = height - meter_height - (2.0 * scale);
-
+    let meter_height = (1.5 * scale).max(1.0);
     let mut rects = Vec::with_capacity(segments.len());
     let mut x = 0.0;
+
     for (index, (segment, segment_width)) in segments.iter().zip(widths.iter().copied()).enumerate()
     {
-        // Hover reads as a soft plate behind the whole segment, the way taskbar
-        // buttons highlight, but smaller and without animation.
         if hovered == Some(index) {
             surface.fill_round_rect(
                 x,
-                (height * 0.1).max(0.0),
+                height * 0.08,
                 segment_width,
-                height - (height * 0.2).max(0.0),
-                space::XS * scale,
+                height * 0.84,
+                6.0 * scale,
                 palette.hover,
             );
         }
@@ -103,40 +107,66 @@ pub fn render(
         let left = x + padding;
         let content = segment_width - padding * 2.0;
 
-        let _ = text.draw(
-            surface,
-            segment.label,
-            (left, label_top, content, label_height),
-            label_style(scale),
-            palette.text_muted,
-        );
-        let _ = text.draw(
-            surface,
-            &segment.value,
-            (left, value_top, content, value_height),
-            value_style(scale),
-            palette.text_primary,
-        );
-
-        if let Some(percent) = segment.percent {
-            let filled = (content * (percent.clamp(0.0, 100.0) / 100.0)).max(0.0);
-            surface.fill_round_rect(
-                left,
-                meter_top,
-                content,
-                meter_height,
-                meter_height / 2.0,
-                palette.meter_track,
+        if let Some(extra) = segment.extra.as_ref() {
+            // Stacked segment: two values, no label, no meter.
+            let style = stacked_style(scale);
+            let line_height = height * 0.34;
+            let _ = text.draw(
+                surface,
+                &segment.value,
+                (left, height * 0.14, content, line_height),
+                style,
+                palette.text_primary,
             );
-            if filled > 0.5 {
+            let _ = text.draw(
+                surface,
+                extra,
+                (left, height * 0.52, content, line_height),
+                style,
+                palette.text_primary,
+            );
+        } else {
+            let label_height = height * 0.30;
+            let value_height = height * 0.40;
+            let label_top = height * 0.08;
+            let value_top = height * 0.34;
+            let meter_top = height - meter_height - height * 0.08;
+
+            let _ = text.draw(
+                surface,
+                segment.label,
+                (left, label_top, content, label_height),
+                label_style(scale),
+                palette.text_muted,
+            );
+            let _ = text.draw(
+                surface,
+                &segment.value,
+                (left, value_top, content, value_height),
+                value_style(scale),
+                palette.text_primary,
+            );
+
+            if let Some(percent) = segment.percent {
+                let filled = (content * (percent.clamp(0.0, 100.0) / 100.0)).max(0.0);
                 surface.fill_round_rect(
                     left,
                     meter_top,
-                    filled,
+                    content,
                     meter_height,
                     meter_height / 2.0,
-                    palette.accent,
+                    palette.meter_track,
                 );
+                if filled > 0.5 {
+                    surface.fill_round_rect(
+                        left,
+                        meter_top,
+                        filled,
+                        meter_height,
+                        meter_height / 2.0,
+                        palette.accent,
+                    );
+                }
             }
         }
 

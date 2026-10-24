@@ -45,6 +45,7 @@ pub struct Host {
     segment_rects: Vec<(f32, f32)>,
     tracking_leave: bool,
     flyout: Flyout,
+    last_rect: Option<RECT>,
 }
 
 impl Host {
@@ -57,7 +58,7 @@ impl Host {
         let geometry = taskbar::primary().ok_or_else(windows::core::Error::from_thread)?;
         let scale = geometry.dpi as f32 / 96.0;
         // Leave a small margin so the strip does not touch the taskbar edges.
-        let height = ((geometry.height() as f32) - 8.0 * scale).max(16.0);
+        let height = ((geometry.height() as f32) - 14.0 * scale).max(14.0);
 
         let renderer = Renderer::new()?;
         let sampler = SamplerThread::start(Duration::from_millis(1000));
@@ -79,6 +80,7 @@ impl Host {
             segment_rects: Vec::new(),
             tracking_leave: false,
             flyout: Flyout::new(palette, scale),
+            last_rect: None,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -151,16 +153,28 @@ impl Host {
         let screen_top =
             geometry.rect.top + ((geometry.height() as f32 - self.height) / 2.0) as i32;
 
-        strip_window::move_window(
-            self.hwnd,
-            RECT {
-                left: screen_left,
-                top: screen_top,
-                right: screen_left + width as i32,
-                bottom: screen_top + self.height as i32,
-            },
-        );
-        strip_window::keep_on_top(self.hwnd);
+        let rect = RECT {
+            left: screen_left,
+            top: screen_top,
+            right: screen_left + width as i32,
+            bottom: screen_top + self.height as i32,
+        };
+        // Moving the window on every tick made it twitch and swallowed clicks:
+        // the mouse-down landed on one frame and the button-up on the next.
+        let moved = self
+            .last_rect
+            .map(|previous| {
+                previous.left != rect.left
+                    || previous.top != rect.top
+                    || previous.right != rect.right
+                    || previous.bottom != rect.bottom
+            })
+            .unwrap_or(true);
+        if moved {
+            self.last_rect = Some(rect);
+            strip_window::move_window(self.hwnd, rect);
+            strip_window::keep_on_top(self.hwnd);
+        }
 
         if let Some(surface) = self.surface.as_ref() {
             // A null destination in UPDATELAYEREDWINDOWINFO makes Windows use
