@@ -327,6 +327,46 @@ impl Surface {
         )
     }
 
+    /// Blit the surface into a window DC, scaled to `dest` size.
+    ///
+    /// Used by the companion window, which is an ordinary framed window rather
+    /// than a layered one: its content is opaque, so `StretchDIBits` is enough.
+    pub fn blit_to(&self, hdc: HDC, dest_width: i32, dest_height: i32) {
+        if dest_width <= 0 || dest_height <= 0 {
+            return;
+        }
+        let info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: self.width as i32,
+                biHeight: -(self.height as i32),
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        // SAFETY: the DIB is `stride * height` bytes and outlives the call; the
+        // header describes exactly that layout.
+        unsafe {
+            windows::Win32::Graphics::Gdi::StretchDIBits(
+                hdc,
+                0,
+                0,
+                dest_width,
+                dest_height,
+                0,
+                0,
+                self.width as i32,
+                self.height as i32,
+                Some(self.bits.cast()),
+                &info,
+                DIB_RGB_COLORS,
+                windows::Win32::Graphics::Gdi::SRCCOPY,
+            );
+        }
+    }
     /// Write the surface to a PNG composited over an opaque background.
     ///
     /// Snapshots of a layered surface are mostly transparent, so reviewing them

@@ -113,3 +113,91 @@ pub fn taskbar_created_message() -> u32 {
         unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) }
     })
 }
+
+/// Create an ordinary framed window: caption, system menu, minimise and close.
+///
+/// The companion app is a normal Windows app, so it gets a normal frame. The
+/// Windows 11 treatment is applied explicitly: immersive dark mode when the
+/// system theme is dark, and rounded corners.
+pub fn create_frame_window(
+    class_name: &str,
+    title: &str,
+    wndproc: WNDPROC,
+    width: i32,
+    height: i32,
+) -> Result<HWND> {
+    let class_wide = to_wide(OsStr::new(class_name));
+    let instance = unsafe { GetModuleHandleW(None)? };
+
+    let hbr_background = unsafe {
+        windows::Win32::Graphics::Gdi::CreateSolidBrush(windows::Win32::Foundation::COLORREF(
+            0x0020_2020,
+        ))
+    };
+
+    let class = WNDCLASSW {
+        lpfnWndProc: wndproc,
+        hInstance: instance.into(),
+        lpszClassName: PCWSTR(class_wide.as_ptr()),
+        hbrBackground: hbr_background,
+        ..Default::default()
+    };
+    unsafe {
+        let _ = RegisterClassW(&class);
+    }
+
+    let title_wide = to_wide(OsStr::new(title));
+    // SAFETY: strings outlive the call; a normal overlapped window with a
+    // caption and a system menu.
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WINDOW_EX_STYLE(0),
+            PCWSTR(class_wide.as_ptr()),
+            PCWSTR(title_wide.as_ptr()),
+            windows::Win32::UI::WindowsAndMessaging::WS_OVERLAPPEDWINDOW,
+            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            width,
+            height,
+            None,
+            None,
+            Some(instance.into()),
+            None,
+        )
+    }?;
+
+    apply_frame_style(hwnd);
+
+    // SAFETY: our window; show it normally.
+    unsafe {
+        let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(
+            hwnd,
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+        );
+    }
+    Ok(hwnd)
+}
+
+fn apply_frame_style(hwnd: HWND) {
+    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWINDOWATTRIBUTE};
+
+    // DWMWA_USE_IMMERSIVE_DARK_MODE = 20, DWMWA_WINDOW_CORNER_PREFERENCE = 33.
+    let dark: i32 = 1;
+    let round: u32 = 2; // DWMWCP_ROUND
+    // SAFETY: attribute writes only; unsupported attributes fail harmlessly on
+    // older builds, which is why the results are ignored.
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWINDOWATTRIBUTE(20),
+            (&dark as *const i32).cast(),
+            std::mem::size_of::<i32>() as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWINDOWATTRIBUTE(33),
+            (&round as *const u32).cast(),
+            std::mem::size_of::<u32>() as u32,
+        );
+    }
+}

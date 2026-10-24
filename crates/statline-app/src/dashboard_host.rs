@@ -1,13 +1,23 @@
-//! Hosts the companion (dashboard) window.
+//! Hosts the companion window: a normal framed Windows app.
 
 use statline_core::model::Snapshot;
 use statline_render::{Palette, Renderer, Surface};
 use statline_ui::dashboard;
 use statline_ui::flyout::{self, Model};
-use statline_win::{HWND, LPARAM, LRESULT, WPARAM, strip_window};
+use statline_win::{HWND, LPARAM, LRESULT, WPARAM, window};
 use windows::Win32::Foundation::RECT;
+use windows::Win32::Graphics::Gdi::{
+    BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    DefWindowProcW, GetClientRect, WM_CLOSE, WM_PAINT, WM_SIZE,
+};
 
-const CLASS: &str = "StatlineDashboardWindow";
+const CLASS: &str = "StatlineCompanionWindow";
+
+/// Logical size of the window, in DIPs.
+const WINDOW_WIDTH: i32 = 760;
+const WINDOW_HEIGHT: i32 = 560;
 
 pub struct Dashboard {
     hwnd: Option<HWND>,
@@ -47,59 +57,47 @@ impl Dashboard {
 
     fn open(&mut self, renderer: &mut Renderer, snapshot: &Snapshot, history: &flyout::History) {
         self.model = flyout::model(snapshot, history);
-        let width = dashboard::width(self.scale);
-        let height = dashboard::height(&self.model, self.scale);
 
-        // Centre on the primary monitor, above the taskbar.
-        let screen_w = unsafe {
-            windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
-                windows::Win32::UI::WindowsAndMessaging::SM_CXSCREEN,
-            )
-        };
-        let screen_h = unsafe {
-            windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
-                windows::Win32::UI::WindowsAndMessaging::SM_CYSCREEN,
-            )
-        };
-        let left = ((screen_w as f32 - width) / 2.0).max(0.0) as i32;
-        let top = ((screen_h as f32 - height) / 2.0).max(0.0) as i32;
-
-        let rect = RECT {
-            left,
-            top,
-            right: left + width as i32,
-            bottom: top + height as i32,
-        };
-
-        match strip_window::create_popup_window(CLASS, "Statline", Some(dashboard_proc), rect) {
+        let width = (WINDOW_WIDTH as f32 * self.scale) as i32;
+        let height = (WINDOW_HEIGHT as f32 * self.scale) as i32;
+        match window::create_frame_window(CLASS, "Statline", Some(companion_proc), width, height) {
             Ok(hwnd) => {
                 self.hwnd = Some(hwnd);
-                self.paint(renderer);
-                log::info!("dashboard opened {}x{}", width as i32, height as i32);
+                COMPANION.store(self as *mut Dashboard, std::sync::atomic::Ordering::Release);
+                self.render_surface(renderer, hwnd);
+                log::info!("companion opened {width}x{height}");
             }
-            Err(error) => log::error!("could not open dashboard: {error}"),
+            Err(error) => log::error!("could not open companion: {error}"),
         }
     }
 
     pub fn refresh(
         &mut self,
-        renderer: &mut Renderer,
+        _renderer: &mut Renderer,
         snapshot: &Snapshot,
         history: &flyout::History,
     ) {
-        if !self.is_open() {
-            return;
-        }
-        self.model = flyout::model(snapshot, history);
-        self.paint(renderer);
-    }
-
-    fn paint(&mut self, renderer: &mut Renderer) {
         let Some(hwnd) = self.hwnd else {
             return;
         };
-        let width = dashboard::width(self.scale).ceil() as u32;
-        let height = dashboard::height(&self.model, self.scale).ceil() as u32;
+        self.model = flyout::model(snapshot, history);
+        self.render_surface(_renderer, hwnd);
+        // SAFETY: our window; a null rect invalidates the whole client area.
+        unsafe {
+            let _ = InvalidateRect(Some(hwnd), None, false);
+        }
+    }
+
+    /// Render into the client area of `hwnd`.
+    fn render_surface(&mut self, renderer: &mut Renderer, hwnd: HWND) {
+        let mut client = RECT::default();
+        // SAFETY: valid out-parameter for a live window.
+        unsafe {
+            let _ = GetClientRect(hwnd, &mut client);
+        }
+        let width = (client.right - client.left).max(1) as u32;
+        let height = (client.bottom - client.top).max(1) as u32;
+
         let needs_surface = self
             .surface
             .as_ref()
@@ -109,67 +107,102 @@ impl Dashboard {
             match renderer.surface(width, height) {
                 Ok(surface) => self.surface = Some(surface),
                 Err(error) => {
-                    log::error!("could not allocate dashboard surface: {error}");
+                    log::error!("could not allocate companion surface: {error}");
                     return;
                 }
             }
         }
+
         if let Some(surface) = self.surface.as_mut() {
+            // Fill the whole client area, then draw the panel on top of it.
+            let scale = (width as f32 / WINDOW_WIDTH as f32).max(0.75);
             dashboard::render(
                 surface,
                 &mut renderer.text,
                 &self.palette,
                 &self.model,
-                self.scale,
+                scale,
             );
         }
-        if let Some(surface) = self.surface.as_ref() {
-            surface.present_layered(hwnd, 0, 0);
-        }
+
     }
 
     pub fn close(&mut self) {
         if let Some(hwnd) = self.hwnd.take() {
-            strip_window::destroy(hwnd);
-            log::info!("dashboard closed");
+            // SAFETY: our window; DestroyWindow triggers WM_DESTROY on this thread.
+            unsafe {
+                let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
+            }
+            log::info!("companion closed");
         }
         self.surface = None;
     }
 }
 
-unsafe extern "system" fn dashboard_proc(
+static COMPANION: std::sync::atomic::AtomicPtr<Dashboard> =
+    std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+unsafe extern "system" fn companion_proc(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
-    lparam: LPARAM,
+    _lparam: LPARAM,
 ) -> LRESULT {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        DefWindowProcW, WM_DESTROY, WM_KEYDOWN, WM_PAINT,
-    };
-
     match msg {
-        WM_KEYDOWN => {
-            if wparam.0 == 0x1B {
-                // SAFETY: the window belongs to us; destroying it is the close path.
-                unsafe {
-                    let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
-                }
+        WM_SIZE => {
+            // The surface is rebuilt on the next paint from the new client size.
+            // SAFETY: our window.
+            unsafe {
+                let _ = InvalidateRect(Some(hwnd), None, false);
             }
             LRESULT(0)
         }
         WM_PAINT => {
-            // SAFETY: standard begin/end paint pair on a layered window.
-            unsafe {
-                let mut ps = windows::Win32::Graphics::Gdi::PAINTSTRUCT::default();
-                let _ = windows::Win32::Graphics::Gdi::BeginPaint(hwnd, &mut ps);
-                let _ = windows::Win32::Graphics::Gdi::EndPaint(hwnd, &ps);
+            let pointer = COMPANION.load(std::sync::atomic::Ordering::Acquire);
+            if pointer.is_null() {
+                // SAFETY: still must validate the paint region.
+                unsafe {
+                    let mut ps = PAINTSTRUCT::default();
+                    let hdc = BeginPaint(hwnd, &mut ps);
+                    let _ = EndPaint(hwnd, &ps);
+                    let _ = hdc;
+                }
+            } else {
+                // The surface needs the renderer, which lives with the strip
+                // host; the host repaints on the next tick. Validate here so
+                // Windows does not spin on WM_PAINT.
+                // SAFETY: begin/end pair.
+                unsafe {
+                    let mut ps = PAINTSTRUCT::default();
+                    let hdc = BeginPaint(hwnd, &mut ps);
+                    let dashboard = &*pointer;
+                    if let Some(surface) = dashboard.surface.as_ref() {
+                        let mut client = RECT::default();
+                        let _ = GetClientRect(hwnd, &mut client);
+                        surface.blit_to(hdc, client.right, client.bottom);
+                    }
+                    let _ = EndPaint(hwnd, &ps);
+                    let _ = hdc;
+                }
             }
             LRESULT(0)
         }
-        WM_DESTROY => LRESULT(0),
+        WM_CLOSE => {
+            // SAFETY: our window.
+            unsafe {
+                let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
+            }
+            LRESULT(0)
+        }
+        windows::Win32::UI::WindowsAndMessaging::WM_DESTROY => {
+            COMPANION.store(std::ptr::null_mut(), std::sync::atomic::Ordering::Release);
+            LRESULT(0)
+        }
         _ => {
             // SAFETY: forwarding the exact arguments received by the procedure.
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            unsafe { DefWindowProcW(hwnd, msg, wparam, _lparam) }
         }
     }
 }
+
+
