@@ -8,3 +8,5 @@ description = "System metric providers and sampling engine for Statline"
 
 [dependencies]
 statline-core.workspace = true
+statline-win.workspace = true
+log.workspace = true

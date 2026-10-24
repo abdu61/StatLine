@@ -1,6 +1,8 @@
 // Console in debug builds (for `--probe`, `--bench`), no console in release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cli;
+
 use log::{LevelFilter, error, info};
 use statline_core::{APP_NAME, VERSION};
 use statline_win::window::MessageWindow;
@@ -8,9 +10,11 @@ use statline_win::{
     HWND, LPARAM, LRESULT, WPARAM, command_id, destroy_window, dpi, is_destroy, logger, menus,
     paths, quit_message_loop, shell, tray, window,
 };
+use std::time::Duration;
 
 const WINDOW_CLASS: &str = "StatlineMessageWindow";
 const TRAY_ICON_ID: u32 = 1;
+const DEFAULT_INTERVAL_MS: u64 = 1000;
 
 fn main() {
     if let Err(err) = run() {
@@ -21,19 +25,25 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.iter().any(|a| a == "--version" || a == "-V") {
-        println!("{APP_NAME} {VERSION}");
+
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        cli::print_help();
         return Ok(());
     }
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("{APP_NAME} {VERSION}");
-        println!();
-        println!("Usage: statline [options]");
-        println!();
-        println!("  --help, -h       Show this help");
-        println!("  --version, -V    Show the version");
-        println!();
-        println!("With no options, Statline starts in the notification area.");
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        cli::print_version();
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--probe") {
+        cli::probe(5, Duration::from_millis(DEFAULT_INTERVAL_MS));
+        return Ok(());
+    }
+    if let Some(index) = args.iter().position(|a| a == "--bench") {
+        let count = args
+            .get(index + 1)
+            .and_then(|value| value.parse::<u32>().ok())
+            .unwrap_or(60);
+        cli::bench(count, Duration::from_millis(DEFAULT_INTERVAL_MS));
         return Ok(());
     }
 

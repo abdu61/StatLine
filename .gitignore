@@ -12,10 +12,11 @@
 *.cer
 *.pfx
 
-# IDE / OS
+# IDE / OS / tooling metadata
 .vs/
 .vscode/
 .idea/
+.commandcode/
 Thumbs.db
 desktop.ini
 

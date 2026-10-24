@@ -4,9 +4,11 @@
 //! to contain `unsafe`. Every block carries a `// SAFETY:` justification, and
 //! the public API is safe: callers never see raw pointers.
 
+pub mod console;
 pub mod dpi;
 pub mod logger;
 pub mod menus;
+pub mod metrics;
 pub mod paths;
 pub mod shell;
 pub mod tray;

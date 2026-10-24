@@ -13,5 +13,6 @@ path = "src/main.rs"
 [dependencies]
 statline-core.workspace = true
 statline-config.workspace = true
+statline-metrics.workspace = true
 statline-win.workspace = true
 log.workspace = true

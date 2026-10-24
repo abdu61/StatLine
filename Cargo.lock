@@ -88,6 +88,7 @@ dependencies = [
  "log",
  "statline-config",
  "statline-core",
+ "statline-metrics",
  "statline-win",
 ]
 
@@ -108,7 +109,9 @@ version = "0.1.0"
 name = "statline-metrics"
 version = "0.1.0"
 dependencies = [
+ "log",
  "statline-core",
+ "statline-win",
 ]
 
 [[package]]
