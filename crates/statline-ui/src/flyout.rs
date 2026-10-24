@@ -3,7 +3,7 @@
 use statline_core::model::{ProcessEntry, Snapshot};
 use statline_core::units::{
     UnitSystem, format_bytes, format_duration, format_percent, format_percent_precise, format_rate,
-    format_rate_short,
+    format_rate_short, format_temperature,
 };
 use statline_render::{Align, Color, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -147,13 +147,19 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
 
     if let Some(disk) = snapshot.disk.as_ref() {
         let detail = match disk.volumes.first() {
-            Some(volume) => format!(
-                "{} free of {} · read {} write {}",
-                format_bytes(volume.free_bytes, UnitSystem::Binary),
-                format_bytes(volume.total_bytes, UnitSystem::Binary),
-                format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
-                format_rate(disk.write_bytes_per_sec, UnitSystem::Binary)
-            ),
+            Some(volume) => {
+                let temperature = volume
+                    .temperature_c
+                    .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
+                    .unwrap_or_default();
+                format!(
+                    "{} free of {} \u{00b7} read {} write {}{temperature}",
+                    format_bytes(volume.free_bytes, UnitSystem::Binary),
+                    format_bytes(volume.total_bytes, UnitSystem::Binary),
+                    format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
+                    format_rate(disk.write_bytes_per_sec, UnitSystem::Binary)
+                )
+            }
             None => format!(
                 "read {} write {}",
                 format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
@@ -185,17 +191,42 @@ pub fn model_focused(snapshot: &Snapshot, history: &History, focus: Option<Focus
     }
 
     if let Some(battery) = snapshot.battery.as_ref() {
+        let mut detail = match battery.seconds_left {
+            Some(seconds) => format!(
+                "{} remaining{}",
+                format_duration(seconds as u64),
+                if battery.on_ac { " (charging)" } else { "" }
+            ),
+            None => String::from(if battery.on_ac { "on AC" } else { "on battery" }),
+        };
+        if let Some(health) = battery.health_percent() {
+            detail.push_str(&format!(" \u{00b7} {} health", format_percent(health)));
+        }
+        if let Some(celsius) = battery.temperature_c {
+            detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
+        }
         rows.push(Row {
             label: "Battery",
             value: format_percent(battery.percent),
-            detail: match battery.seconds_left {
-                Some(seconds) => format!(
-                    "{} remaining{}",
-                    format_duration(seconds as u64),
-                    if battery.on_ac { " (charging)" } else { "" }
-                ),
-                None => String::from(if battery.on_ac { "on AC" } else { "on battery" }),
-            },
+            detail,
+            series: Vec::new(),
+        });
+    }
+
+    if let Some(thermal) = snapshot.thermal.as_ref() {
+        let detail = match snapshot.system.as_ref() {
+            Some(system) => format!(
+                "Up {} \u{00b7} {} threads \u{00b7} {} handles",
+                format_duration(system.uptime_secs),
+                system.threads,
+                system.handles
+            ),
+            None => String::from("ACPI thermal zone"),
+        };
+        rows.push(Row {
+            label: "System",
+            value: format_temperature(thermal.system_c),
+            detail,
             series: Vec::new(),
         });
     }
@@ -497,7 +528,9 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use statline_core::model::{CpuSample, MemorySample, ProcessEntry, ProcessSample};
+    use statline_core::model::{
+        BatterySample, CpuSample, MemorySample, ProcessEntry, ProcessSample,
+    };
 
     fn snapshot() -> Snapshot {
         Snapshot {
@@ -614,6 +647,58 @@ mod tests {
         let largest = model_focused(&snapshot, &History::default(), Some(Focus::Memory));
         assert_eq!(largest.processes[0].name, "memory.exe");
         assert_eq!(largest.focus, Some(Focus::Memory));
+    }
+
+    #[test]
+    fn thermal_zone_adds_a_system_row() {
+        let mut snapshot = snapshot();
+        snapshot.thermal = Some(statline_core::model::ThermalSample { system_c: 54.0 });
+        snapshot.system = Some(statline_core::model::SystemSample {
+            uptime_secs: 3_600,
+            processes: 240,
+            threads: 3_000,
+            handles: 90_000,
+        });
+
+        let model = model(&snapshot, &History::default());
+        let system = model
+            .rows
+            .iter()
+            .find(|row| row.label == "System")
+            .expect("system row");
+        assert_eq!(system.value, "54 °C");
+        assert!(system.detail.contains("1h"), "detail: {}", system.detail);
+    }
+
+    #[test]
+    fn battery_health_and_temperature_are_shown() {
+        let mut snapshot = snapshot();
+        snapshot.battery = Some(BatterySample {
+            percent: 98.0,
+            on_ac: true,
+            designed_mwh: Some(50_000),
+            full_mwh: Some(46_000),
+            temperature_c: Some(31.0),
+            ..Default::default()
+        });
+
+        let model = model(&snapshot, &History::default());
+        let battery = model
+            .rows
+            .iter()
+            .find(|row| row.label == "Battery")
+            .expect("battery row");
+        assert_eq!(battery.value, "98%");
+        assert!(
+            battery.detail.contains("92% health"),
+            "detail: {}",
+            battery.detail
+        );
+        assert!(
+            battery.detail.contains("31 °C"),
+            "detail: {}",
+            battery.detail
+        );
     }
 
     #[test]

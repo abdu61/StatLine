@@ -78,7 +78,7 @@ crates/statline-app      bin: main, cli, profile, strip_host, flyout_host, dashb
 docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 ```
 
-## State (all committed, 110 tests green, clippy clean)
+## State (all committed, 133 tests green, clippy clean)
 
 - **M0–M2 done**: workspace, docs, tray shell; metrics (CPU total/per-core/MHz, memory,
   PDH disk, per-adapter network, GPU util+VRAM, battery); software Direct2D renderer
@@ -103,20 +103,25 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **Settings**: framed window from the tray/strip menu. Theme (system/light/dark),
   interval, strip placement and autostart, applied live and saved atomically to
   `%APPDATA%\Statline\settings.json`. The Run key is treated as the truth for startup.
+- **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
+  `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
+  battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
+  the process table's visibility gate and hide when unavailable. GPU vendor
+  temperature/fan/power (NVML/ADL) is still pending.
 
-Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tray-only
-10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles, flat over
-90 s. Process table: **~4.75 ms per query** (~250 processes), i.e. ~0.24 % of one core at
-the 2 s cadence and only while a process surface is visible.
+Measured (release): 0.46 ms CPU per sample in a tight loop with detail providers off;
+tray-only 10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles,
+flat over 90 s. Process table: **~4.75 ms per query** (~250 processes). With a detail
+surface open the average is ~2.3 ms/sample; sensors add 1.16 ms per 5 s (ACPI), 0.14 ms
+per 30 s (battery) and ~11 ms per 5 min (drive temps).
 
 ## Next work, in priority order
 
-1. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
-   `IOCTL_STORAGE_QUERY_PROPERTY`, battery temperature/health, ACPI thermal zone via PDH.
-   Each degrades to hidden, never fakes a value. CPU package temp/fans are out of scope
-   (no user-mode API; legal audit in the plan's §10).
-2. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
+1. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
    remembered window bounds, About pane.
+2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power. The current build
+   shows utilization and VRAM only. This machine is AMD integrated, so ADL needs an AMD
+   discrete GPU to verify; NVML can be exercised on any NVIDIA machine.
 3. **Packaging (M9)**: MSIX manifest (`runFullTrust` + `windows.startupTask`), portable zip,
    CI (fmt/clippy/test/deny/build), README with snapshot images, MIT + third-party notices,
    local `v0.1.0` tag.
@@ -146,6 +151,17 @@ the 2 s cadence and only while a process surface is visible.
   behind `Reserved1: [u8; 48]`. Define the documented `repr(C)` prefix locally and walk
   the `NextEntryOffset` chain with `read_unaligned`. The query costs **~4.8 ms** for
   ~250 processes: never run it unless a surface showing processes is open.
+- **The ACPI thermal counter is whole Kelvin.** `\Thermal Zone Information(*)\Temperature`
+  returned 350 here, which is 77 °C — not 35 °C. `deci-Kelvin` assumptions produce −238 °C.
+  Convert with `value − 273.15` and discard anything outside −20..125 °C.
+- **Device IOCTLs are not cheap.** Mapping a volume to a disk and reading its temperature
+  costs ~11 ms; cache it for minutes. Open the volume/disk with zero access and
+  `FILE_SHARE_READ|WRITE`. The battery device is the exception: it needs
+  `GENERIC_READ|GENERIC_WRITE`, and some firmware refuses `BatteryTemperature` with
+  `ERROR_INVALID_FUNCTION` — hide the value.
+- **Gate every expensive provider behind surface visibility.** Process table, ACPI zones,
+  battery health and drive temps share `set_detail_surfaces`; with only the strip visible
+  the tight-loop sample is 0.46 ms. Opening a detail surface costs ~2.3 ms/sample.
 - **GUI-subsystem CLI output can vanish.** The release binary has no console; `--probe`
   and friends attach to the parent console, and that output races process exit when the
   command is run in a loop. An empty `--startup-status` line is not "disabled": read

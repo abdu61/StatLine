@@ -13,7 +13,7 @@ only runs while one of those surfaces is open.
 ```
 strip hosted by Shell_TrayWnd (tier 1)
 strip 237x42 at (1348,1028) presented=true tier=child
-process table sampling on
+detail sampling on
 ```
 
 ## Working
@@ -34,17 +34,22 @@ process table sampling on
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
   deltas; Task Manager scale (share of all cores); `—` until a baseline exists; sampled
   at 2 s only while the flyout or companion is open (~4.75 ms per query).
-- **Sampling**: 0.78 ms per sample at 1 Hz (0.078 % of one core) without the process
-  table, WS ~30 MB, private ~14.5 MB, handles flat.
+- **Sensors**: ACPI "System" temperature via PDH (5 s), drive temperatures via
+  `IOCTL_STORAGE_QUERY_PROPERTY` (5 min cache, volume → disk mapping), battery health and
+  temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). Every source degrades to
+  hidden; they share the process table's surface-visibility gate.
+- **Sampling**: 0.46 ms per sample in a tight loop with detail providers off; WS ~30 MB,
+  private ~14.5 MB, handles flat.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic
   hook, `--tray-only`.
 
 ## Next, in order
 
-1. **Driver-free sensors (M7)**: GPU temp/fan/power, drive temps, battery health,
-   ACPI thermal zone. Degrade to hidden; never fake a value.
-2. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
+1. **Settings, remaining**: module enable/order, units, density/accent, safe mode,
    remembered window bounds, About pane.
+2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power; current builds show
+   utilization and VRAM only. This machine is AMD integrated, so an AMD discrete GPU is
+   needed to verify the ADL path.
 3. **Packaging (M9)**: MSIX, portable zip, CI, README with snapshots, notices,
    local `v0.1.0` tag.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
@@ -60,9 +65,12 @@ process table sampling on
 
 The process table query costs 4.75 ms for ~250 processes; at the 2 s cadence and only
 while a process surface is open that is ~0.24 % of one core, and zero when closed.
-Handles and private bytes are flat across companion open/close cycles.
+Handles and private bytes are flat across companion open/close cycles. Sensors are gated
+the same way: the idle tight-loop sample is 0.46 ms, and opening a detail surface raises
+the average to ~2.3 ms/sample (process table dominates).
 
 ## Log
 
 - M0 scaffold · M1 metrics · M2 renderer · M3 strip live, parented into the taskbar ·
-  M4 lifecycle · M5 flyout verified, top processes · M6 companion window + process table.
+  M4 lifecycle · M5 flyout verified, top processes · M6 companion window + process table ·
+  M7 drive/battery/ACPI sensors (GPU vendor sensors pending).

@@ -13,6 +13,8 @@ Append one line per measured run. Machine: see `environment.md`.
 | 2026-10-24 | M3b | strip live, parented child | 1000 ms | ~0.8 ms | 30.0 | 14.5 | 314 | tier 1: `WS_CHILD` of `Shell_TrayWnd` |
 | 2026-10-24 | M6b | process provider, one query | — | 4.75 ms/query | — | — | — | 250 processes; 2 s cadence only while a process surface is open |
 | 2026-10-24 | M6c | bench, process table off | 1000 ms | 0.78 ms/sample | 15.1 | 6.3 | — | per-sample CPU sum; total mean 1.04 ms (scheduler-quantized) |
+| 2026-10-24 | M7 | sensors, details off | 1000 ms | 0.46 ms/sample tight loop | 15.3 | 6.6 | — | bench total 1.74 ms is a quantized upper bound |
+| 2026-10-24 | M7 | sensors, details on | 2000 ms (process) / 5 s (thermal) | ~2.3 ms/sample average | — | — | — | 4.75 ms process / 1.16 ms thermal while a detail surface is open |
 
 ## 90-second soak (M3b, parented strip)
 

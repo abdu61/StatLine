@@ -1,7 +1,8 @@
 //! Command-line modes: `--help`, `--version`, `--probe`, `--bench`, `--profile`.
 
 use statline_core::units::{
-    UnitSystem, format_bytes, format_frequency, format_percent, format_percent_precise, format_rate,
+    UnitSystem, format_bytes, format_frequency, format_percent, format_percent_precise,
+    format_rate, format_temperature,
 };
 use statline_core::{APP_NAME, VERSION};
 use statline_metrics::Sampler;
@@ -44,9 +45,9 @@ pub fn print_version() {
 pub fn probe(count: u32, interval: Duration) {
     console::ensure();
     let mut sampler = Sampler::new();
-    // The probe is the diagnostic mode; include the table it would otherwise
-    // only collect while a process surface is visible.
-    sampler.set_process_table(true);
+    // The probe is the diagnostic mode; include the detail providers it would
+    // otherwise only collect while a detail surface is visible.
+    sampler.set_detail_surfaces(true);
     let mut last = None;
 
     console::write_line(&format!(
@@ -102,8 +103,12 @@ pub fn probe(count: u32, interval: Duration) {
                         )
                     })
                     .unwrap_or_default();
+                let temperature = volume
+                    .and_then(|volume| volume.temperature_c)
+                    .map(|celsius| format!("  {}", format_temperature(celsius)))
+                    .unwrap_or_default();
                 format!(
-                    "disk R {} W {}{used}",
+                    "disk R {} W {}{used}{temperature}",
                     format_rate(disk.read_bytes_per_sec, UnitSystem::Binary),
                     format_rate(disk.write_bytes_per_sec, UnitSystem::Binary)
                 )
@@ -126,6 +131,12 @@ pub fn probe(count: u32, interval: Duration) {
             .map(|system| format!("procs {}", system.processes))
             .unwrap_or_default();
 
+        let thermal_text = snapshot
+            .thermal
+            .as_ref()
+            .map(|thermal| format!("  thermal {}", format_temperature(thermal.system_c)))
+            .unwrap_or_default();
+
         let gpu_text = match snapshot.gpu.as_ref() {
             Some(gpu) => format!(
                 "gpu {}  vram {} / {}",
@@ -137,11 +148,21 @@ pub fn probe(count: u32, interval: Duration) {
         };
 
         let battery_text = match snapshot.battery.as_ref() {
-            Some(battery) => format!(
-                "  battery {} {}",
-                format_percent(battery.percent),
-                if battery.on_ac { "on AC" } else { "on battery" }
-            ),
+            Some(battery) => {
+                let health = battery
+                    .health_percent()
+                    .map(|percent| format!("  {percent:.0}% health"))
+                    .unwrap_or_default();
+                let temperature = battery
+                    .temperature_c
+                    .map(|celsius| format!("  {}", format_temperature(celsius)))
+                    .unwrap_or_default();
+                format!(
+                    "  battery {} {}{health}{temperature}",
+                    format_percent(battery.percent),
+                    if battery.on_ac { "on AC" } else { "on battery" }
+                )
+            }
             None => String::new(),
         };
 
@@ -149,7 +170,9 @@ pub fn probe(count: u32, interval: Duration) {
         console::write_line(&format!("      {memory_text}"));
         console::write_line(&format!("      {disk_text}"));
         console::write_line(&format!("      {gpu_text}"));
-        console::write_line(&format!("      {net_text}  {system_text}{battery_text}"));
+        console::write_line(&format!(
+            "      {net_text}  {system_text}{battery_text}{thermal_text}"
+        ));
         if index + 1 < count {
             console::write_line("");
             std::thread::sleep(interval);

@@ -229,7 +229,7 @@ pub fn render(
 
     let _ = text.draw(
         surface,
-        "Settings arrive with the next milestone \u{00b7} Esc closes this window",
+        "Settings live in the tray menu \u{00b7} Esc closes this window",
         (pad, height - pad * 0.9, width - pad * 2.0, 14.0 * scale),
         footer_style(scale),
         palette.text_muted.scaled_alpha(0.8),

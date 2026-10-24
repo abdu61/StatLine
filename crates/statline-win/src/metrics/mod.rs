@@ -13,6 +13,7 @@ pub mod memory;
 pub mod net;
 pub mod pdh;
 pub mod process;
+pub mod thermal;
 
 pub use cpu::{CpuTimes, current_mhz, logical_core_count, per_core_times, system_times};
 pub use memory::{

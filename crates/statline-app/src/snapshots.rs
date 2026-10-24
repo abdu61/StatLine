@@ -5,8 +5,8 @@
 //! code into a bitmap is the only reliable way to review the design here.
 
 use statline_core::model::{
-    CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample, ProcessEntry, ProcessSample,
-    Snapshot, SystemSample, VolumeSample,
+    BatterySample, CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample, ProcessEntry,
+    ProcessSample, Snapshot, SystemSample, ThermalSample, VolumeSample,
 };
 use statline_render::{Color, Palette, Renderer};
 use statline_ui::{render, strip};
@@ -43,7 +43,7 @@ fn synthetic() -> Snapshot {
                 label: String::from("System"),
                 free_bytes: 412_000_000_000,
                 total_bytes: 931_000_000_000,
-                temperature_c: None,
+                temperature_c: Some(41.0),
             }],
         }),
         network: Some(NetworkSample {
@@ -56,6 +56,15 @@ fn synthetic() -> Snapshot {
             processes: 248,
             threads: 3_412,
             handles: 112_908,
+        }),
+        thermal: Some(ThermalSample { system_c: 54.0 }),
+        battery: Some(BatterySample {
+            percent: 98.0,
+            on_ac: true,
+            designed_mwh: Some(50_000),
+            full_mwh: Some(46_000),
+            temperature_c: Some(31.0),
+            ..Default::default()
         }),
         processes: Some(ProcessSample {
             total: 248,
@@ -98,7 +107,6 @@ fn synthetic() -> Snapshot {
                 },
             ],
         }),
-        ..Snapshot::default()
     }
 }
 

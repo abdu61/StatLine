@@ -60,6 +60,17 @@ pub fn run(iterations: u32) {
     time("battery (GetSystemPowerStatus)", iterations, || {
         black_box(statline_win::metrics::battery::battery());
     });
+    time("battery details (IOCTL)", iterations, || {
+        black_box(statline_win::metrics::battery::details());
+    });
+    if let Some(thermal) = statline_win::metrics::thermal::ThermalCounters::open() {
+        time("thermal zone (PDH)", iterations, || {
+            black_box(thermal.sample());
+        });
+    }
+    time("disk temperatures (IOCTL)", iterations, || {
+        black_box(metrics::disk::volume_temperatures());
+    });
     if let Some(gpu) = statline_win::metrics::gpu::GpuCounters::open() {
         time("gpu sample (PDH + DXGI)", iterations, || {
             black_box(gpu.sample());

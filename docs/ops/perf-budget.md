@@ -48,7 +48,10 @@ private bytes past 25 MB.
 | Battery | ~12 us |
 | Volume enumeration | ~72–80 us |
 | Process table (`NtQuerySystemInformation`) | **~4.75 ms** (250 processes) |
-| Full `Sampler::sample` | ~0.47 ms (tight loop) |
+| ACPI thermal zone (PDH wildcard) | ~1.16 ms |
+| Drive temperatures (2 IOCTLs per volume) | **~11.2 ms** |
+| Battery details (SetupAPI + IOCTL) | ~0.14 ms |
+| Full `Sampler::sample` | ~0.46 ms (tight loop, detail providers off) |
 
 ## Design consequences baked in
 
@@ -60,6 +63,12 @@ private bytes past 25 MB.
 - The process table costs ~4.75 ms per query, so it runs at 2 s and **only while the
   flyout or companion is open**; with every process surface closed it costs zero. That
   is ~0.24 % of one core while a process view is visible, and none at idle.
+- Detail sensors share that visibility gate: ACPI zones (5 s, ~1.16 ms), battery health
+  (30 s, ~0.14 ms) and drive temperatures (5 min, ~11 ms) do not run while only the
+  strip is visible. This keeps the idle tight-loop sample at ~0.46 ms; opening the
+  flyout raises the average to ~2.3 ms/sample because of the process table.
+- Drive temperatures are cached for five minutes because the volume and disk IOCTLs
+  cost ~11 ms together; capacity alone stays on the 30 s refresh.
 
 ## Rules for contributors
 

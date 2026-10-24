@@ -51,8 +51,8 @@ pub struct Host {
     dashboard: Dashboard,
     /// `true` when the strip is a child of `Shell_TrayWnd` (ADR tier 1).
     parented: bool,
-    /// Last process-sampling request, so transitions are logged once.
-    process_visible: bool,
+    /// Last detail-surface request, so transitions are logged once.
+    details_visible: bool,
     /// Which side of the taskbar the strip is anchored to.
     placement: taskbar::Placement,
 }
@@ -92,7 +92,7 @@ impl Host {
             last_rect: None,
             dashboard: Dashboard::new(palette, scale),
             parented,
-            process_visible: false,
+            details_visible: false,
             placement: taskbar::Placement::Right,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
@@ -115,15 +115,16 @@ impl Host {
             return;
         }
 
-        // The process table only runs while a surface showing it is open.
-        let process_visible = self.flyout.is_open() || self.dashboard.is_open();
-        if process_visible != self.process_visible {
-            self.process_visible = process_visible;
+        // Detail sensors and the process table only run while a surface that
+        // shows them is open; the strip needs neither.
+        let details_visible = self.flyout.is_open() || self.dashboard.is_open();
+        if details_visible != self.details_visible {
+            self.details_visible = details_visible;
             log::info!(
-                "process table sampling {}",
-                if process_visible { "on" } else { "off" }
+                "detail sampling {}",
+                if details_visible { "on" } else { "off" }
             );
-            self.sampler.set_process_table(process_visible);
+            self.sampler.set_detail_surfaces(details_visible);
         }
 
         let snapshot: std::sync::Arc<Snapshot> = self.sampler.snapshot();

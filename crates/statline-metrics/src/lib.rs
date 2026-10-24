@@ -1,6 +1,8 @@
 //! The sampling engine: turns raw Win32 readings into a `Snapshot`.
 
-use statline_core::model::{CpuSample, MemorySample, ProcessSample, Snapshot, SystemSample};
+use statline_core::model::{
+    CpuSample, MemorySample, ProcessSample, Snapshot, SystemSample, ThermalSample,
+};
 use statline_win::metrics::net::InterfaceRef;
 use statline_win::metrics::{self, CpuTimes};
 use std::time::{Duration, Instant, SystemTime};
@@ -11,12 +13,15 @@ pub mod disk;
 pub mod gpu;
 pub mod network;
 pub mod process;
+pub mod thermal;
 pub mod thread;
 
+use battery::BatteryState;
 use disk::DiskState;
 use gpu::GpuState;
 use network::NetworkState;
 use process::ProcessState;
+use thermal::ThermalState;
 
 /// Interface enumeration costs ~1.2 ms; the list changes rarely.
 const INTERFACE_REFRESH: Duration = Duration::from_secs(60);
@@ -35,8 +40,10 @@ pub struct Sampler {
     disk: DiskState,
     gpu: GpuState,
     process: ProcessState,
-    /// Set by the UI while a surface that shows processes is open.
-    process_visible: bool,
+    thermal: ThermalState,
+    battery: BatteryState,
+    /// Set by the UI while a surface that shows processes or sensors is open.
+    details_visible: bool,
 }
 
 impl Default for Sampler {
@@ -57,21 +64,28 @@ impl Sampler {
             disk: DiskState::new(),
             gpu: GpuState::new(),
             process: ProcessState::new(),
-            process_visible: false,
+            thermal: ThermalState::new(),
+            battery: BatteryState::new(),
+            details_visible: false,
         }
     }
 
-    /// Enable or disable the process table.
+    /// Enable the expensive detail providers: process table, ACPI zones, drive
+    /// temperatures and battery health.
     ///
-    /// The query allocates in the kernel, so it runs only while the flyout or
-    /// the companion window is open. Disabling drops the delta baseline so a
-    /// later enable does not report CPU time averaged over the hidden gap.
-    pub fn set_process_table(&mut self, enabled: bool) {
-        if self.process_visible == enabled {
+    /// The strip only needs the cheap counters. The process query allocates in
+    /// the kernel and the sensor IOCTLs cost milliseconds, so they run only
+    /// while the flyout or the companion is open. Disabling drops the process
+    /// delta baseline so a later enable does not average over the hidden gap.
+    pub fn set_detail_surfaces(&mut self, visible: bool) {
+        if self.details_visible == visible {
             return;
         }
-        self.process_visible = enabled;
+        self.details_visible = visible;
         self.process.reset();
+        self.disk.set_details_visible(visible);
+        self.battery.set_details_visible(visible);
+        self.thermal.invalidate();
     }
 
     /// Take one reading of everything v1 measures.
@@ -88,17 +102,23 @@ impl Sampler {
             cpu: self.sample_cpu(),
             memory: sample_memory(),
             gpu: self.gpu.sample(now),
-            disk: self.disk.sample(now),
+            disk: self.disk.sample(now, self.details_visible),
             network: Some(self.sample_network(now, elapsed)),
-            battery: battery::sample(),
+            battery: self.battery.sample(now, self.details_visible),
+            thermal: if self.details_visible {
+                self.thermal
+                    .sample(now)
+                    .map(|system_c| ThermalSample { system_c })
+            } else {
+                None
+            },
             system: sample_system(),
             processes: self.sample_processes(now),
-            ..Snapshot::default()
         }
     }
 
     fn sample_processes(&mut self, now: Instant) -> Option<ProcessSample> {
-        if !self.process_visible {
+        if !self.details_visible {
             return None;
         }
         self.process.sample(now, metrics::logical_core_count())

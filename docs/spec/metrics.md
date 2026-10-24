@@ -10,7 +10,7 @@ here is user-mode and requires no elevation.
 | CPU, memory, network, disk I/O | every tick (default 1000 ms) | cheap counters |
 | GPU utilization / VRAM | every tick when the GPU module is enabled | PDH wildcard, cached instance list |
 | Process table | 2 s, **only while a view that shows processes is visible** | `NtQuerySystemInformation` allocates; ~4.75 ms per query |
-| Temperatures (GPU, disk, battery, ACPI) | 5 s | vendor libs / IOCTLs are not free |
+| Temperatures (ACPI 5 s, drive 5 min, battery 30 s) | **only while a detail surface is visible** | PDH wildcard and device IOCTLs are not free |
 | Static info (CPU model, core counts, volume list) | once, refreshed on `WM_DISPLAYCHANGE` | |
 
 Interval is user-selectable: 500 / 1000 / 2000 / 5000 ms.
@@ -54,20 +54,30 @@ Absent on systems without GPU performance counters → the module hides.
 **GPU temperature / fan / power**
 NVML (`nvml.dll`) and AMD ADL (`atiadlxx.dll`) are loaded lazily from the installed
 driver. No redistribution, no elevation. Missing DLL or unsupported device → `None`.
+**Not implemented yet**: current builds show GPU utilization and VRAM but no vendor
+temperature/fan/power; the row hides.
 
 **Battery**
 `GetSystemPowerStatus` (percent, AC, seconds left) plus
-`CallNtPowerInformation(SystemBatteryState)` (rate). Health from
-`IOCTL_BATTERY_QUERY_INFORMATION` (`BatteryInformation`: designed vs full capacity)
-and temperature where the firmware reports it.
+`CallNtPowerInformation(SystemBatteryState)` (rate) every tick. Health
+(`BatteryInformation`) and temperature (`BatteryTemperature`) come from
+`IOCTL_BATTERY_QUERY_INFORMATION` on the first battery device interface, cached for
+30 s and gated by surface visibility. Firmware that refuses the temperature IOCTL
+(`ERROR_INVALID_FUNCTION`) hides the value.
 
 **Thermal (ACPI)**
-PDH `\Thermal Zone Information(*)\Temperature` (deci-Kelvin → °C). Labelled **System**,
-never "CPU". Frequently unavailable on desktops; that is fine.
+PDH `\Thermal Zone Information(*)\Temperature`, refreshed every 5 s while a detail
+surface is visible. The counter is in **whole degrees Kelvin** (the underlying ACPI
+`_TMP` tenths are converted by the PDH bridge), so °C = value − 273.15; values outside
+−20..125 °C are discarded rather than displayed. The hottest valid zone wins.
+Labelled **System**, never "CPU".
 
 **Disk temperature**
-`IOCTL_STORAGE_QUERY_PROPERTY` with `StorageDeviceTemperatureProperty`, best effort.
-If the handle is denied or the device does not report it, the row disappears.
+`IOCTL_STORAGE_QUERY_PROPERTY` with `StorageDeviceTemperatureProperty`. The volume is
+mapped to a physical disk with `IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS`. Both IOCTLs cost
+~11 ms per volume, so the result is cached for **5 minutes** and only queried while a
+detail surface is visible. If a handle is denied or the device does not report a
+temperature, the field is `None`.
 
 **Processes**
 `NtQuerySystemInformation(SystemProcessInformation)` → PID, image name, user+kernel CPU

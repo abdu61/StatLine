@@ -21,7 +21,7 @@ struct Control {
 pub struct SamplerThread {
     control: Arc<(Mutex<Control>, Condvar)>,
     snapshot: Arc<ArcSwap<Snapshot>>,
-    process_visible: Arc<AtomicBool>,
+    details_visible: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -37,11 +37,11 @@ impl SamplerThread {
             Condvar::new(),
         ));
         let snapshot = Arc::new(ArcSwap::from_pointee(Snapshot::default()));
-        let process_visible = Arc::new(AtomicBool::new(false));
+        let details_visible = Arc::new(AtomicBool::new(false));
 
         let worker_control = Arc::clone(&control);
         let worker_snapshot = Arc::clone(&snapshot);
-        let worker_process = Arc::clone(&process_visible);
+        let worker_process = Arc::clone(&details_visible);
 
         let handle = std::thread::Builder::new()
             .name(String::from("statline-sampler"))
@@ -51,7 +51,7 @@ impl SamplerThread {
         Self {
             control,
             snapshot,
-            process_visible,
+            details_visible,
             handle,
         }
     }
@@ -65,8 +65,8 @@ impl SamplerThread {
     ///
     /// The next tick picks this up; there is no wake-up, so closing every
     /// process surface simply lets the next tick omit the table.
-    pub fn set_process_table(&self, enabled: bool) {
-        self.process_visible.store(enabled, Ordering::Relaxed);
+    pub fn set_detail_surfaces(&self, enabled: bool) {
+        self.details_visible.store(enabled, Ordering::Relaxed);
     }
 
     /// Change the cadence. Takes effect after the current tick.
@@ -111,13 +111,13 @@ impl Drop for SamplerThread {
 fn run(
     control: Arc<(Mutex<Control>, Condvar)>,
     snapshot: Arc<ArcSwap<Snapshot>>,
-    process_visible: Arc<AtomicBool>,
+    details_visible: Arc<AtomicBool>,
 ) {
     let mut sampler = Sampler::new();
 
     loop {
         let started = Instant::now();
-        sampler.set_process_table(process_visible.load(Ordering::Relaxed));
+        sampler.set_detail_surfaces(details_visible.load(Ordering::Relaxed));
         snapshot.store(Arc::new(sampler.sample()));
 
         let (lock, cvar) = &*control;
@@ -226,7 +226,7 @@ mod tests {
             "the process table must stay off until a process surface opens"
         );
 
-        thread.set_process_table(true);
+        thread.set_detail_surfaces(true);
         let deadline = Instant::now() + Duration::from_secs(3);
         loop {
             if let Some(processes) = thread.snapshot().processes.clone() {
@@ -241,7 +241,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
 
-        thread.set_process_table(false);
+        thread.set_detail_surfaces(false);
         let deadline = Instant::now() + Duration::from_secs(3);
         while thread.snapshot().processes.is_some() {
             assert!(

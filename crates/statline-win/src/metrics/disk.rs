@@ -2,9 +2,20 @@
 
 use crate::metrics::pdh::{PdhCounter, PdhQuery};
 use crate::to_wide;
+use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::mem::size_of;
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Storage::FileSystem::{
-    GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
+    CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE, GetDiskFreeSpaceExW,
+    GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
+    IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, OPEN_EXISTING,
+};
+use windows::Win32::System::IO::DeviceIoControl;
+use windows::Win32::System::Ioctl::{
+    IOCTL_STORAGE_QUERY_PROPERTY, PropertyStandardQuery, STORAGE_PROPERTY_QUERY,
+    STORAGE_TEMPERATURE_DATA_DESCRIPTOR, STORAGE_TEMPERATURE_VALUE_NOT_REPORTED,
+    StorageDeviceTemperatureProperty, VOLUME_DISK_EXTENTS,
 };
 use windows::core::PCWSTR;
 
@@ -109,6 +120,151 @@ pub fn volumes() -> Vec<VolumeInfo> {
         });
     }
     volumes
+}
+
+/// Temperature per mounted fixed volume.
+///
+/// Each entry costs a volume IOCTL plus a physical-disk IOCTL, which measured
+/// ~11 ms on an NVMe system: callers must cache this for minutes, not seconds.
+pub fn volume_temperatures() -> Vec<(String, Option<f32>)> {
+    let mut buffer = vec![0u16; 512];
+    // SAFETY: valid writable buffer; the return is the character count.
+    let written = unsafe { GetLogicalDriveStringsW(Some(&mut buffer)) };
+    if written == 0 || written as usize > buffer.len() {
+        return Vec::new();
+    }
+
+    // A machine can have several volumes on one disk; query its sensor once.
+    let mut by_disk: HashMap<u32, Option<f32>> = HashMap::new();
+    let mut result = Vec::new();
+    for root in split_drive_strings(&buffer[..written as usize]) {
+        let wide = to_wide(OsStr::new(&root));
+        // SAFETY: `path` is NUL-terminated and outlives the call.
+        if unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr())) } != DRIVE_FIXED {
+            continue;
+        }
+
+        let temperature = volume_disk_number(&root).and_then(|disk| {
+            *by_disk
+                .entry(disk)
+                .or_insert_with(|| disk_temperature(disk))
+        });
+        result.push((root.trim_end_matches('\\').to_string(), temperature));
+    }
+    result
+}
+
+/// Handle that closes itself, so every early return releases the device.
+struct OwnedHandle(HANDLE);
+
+impl Drop for OwnedHandle {
+    fn drop(&mut self) {
+        // SAFETY: the handle was opened by `open_device` and is closed once.
+        unsafe {
+            let _ = CloseHandle(self.0);
+        }
+    }
+}
+
+/// Open a device path with no access requested; attributes are enough for
+/// these IOCTLs, which avoids requiring read access to raw disks.
+fn open_device(path: &str) -> Option<OwnedHandle> {
+    let wide = to_wide(OsStr::new(path));
+    // SAFETY: the path is NUL-terminated and outlives the call; no security
+    // descriptor or template is needed.
+    let handle = unsafe {
+        CreateFileW(
+            PCWSTR(wide.as_ptr()),
+            0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+    }
+    .ok()?;
+    (!handle.is_invalid()).then_some(OwnedHandle(handle))
+}
+
+/// Physical disk number backing a mounted volume, e.g. `C:\` → `0`.
+fn volume_disk_number(mount: &str) -> Option<u32> {
+    let path = format!("\\\\.\\{}", mount.trim_end_matches('\\'));
+    let device = open_device(&path)?;
+
+    // u64 words keep the buffer 8-byte aligned for the extents structure.
+    let mut buffer = [0u64; 32];
+    let mut returned = 0u32;
+    // SAFETY: no input buffer; the output buffer is 256 bytes and aligned; the
+    // IOCTL reports the number of extents and fills at least one.
+    let result = unsafe {
+        DeviceIoControl(
+            device.0,
+            IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
+            None,
+            0,
+            Some(buffer.as_mut_ptr().cast()),
+            (buffer.len() * size_of::<u64>()) as u32,
+            Some(&mut returned),
+            None,
+        )
+    };
+    if result.is_err() || returned < size_of::<VOLUME_DISK_EXTENTS>() as u32 {
+        return None;
+    }
+
+    // SAFETY: the IOCTL wrote a VOLUME_DISK_EXTENTS whose header fits in
+    // `returned`, and the buffer can hold the declared extents.
+    let extents = unsafe { &*(buffer.as_ptr().cast::<VOLUME_DISK_EXTENTS>()) };
+    (extents.NumberOfDiskExtents > 0).then_some(extents.Extents[0].DiskNumber)
+}
+
+/// `StorageDeviceTemperatureProperty` for a physical disk, in °C.
+fn disk_temperature(disk: u32) -> Option<f32> {
+    let device = open_device(&format!("\\\\.\\PhysicalDrive{disk}"))?;
+
+    let query = STORAGE_PROPERTY_QUERY {
+        PropertyId: StorageDeviceTemperatureProperty,
+        QueryType: PropertyStandardQuery,
+        AdditionalParameters: [0],
+    };
+    let mut buffer = [0u64; 64];
+    let mut returned = 0u32;
+    // SAFETY: `query` is a valid descriptor; the output buffer is 512 bytes and
+    // aligned, and the IOCTL writes a variable-length descriptor into it.
+    let result = unsafe {
+        DeviceIoControl(
+            device.0,
+            IOCTL_STORAGE_QUERY_PROPERTY,
+            Some((&query as *const STORAGE_PROPERTY_QUERY).cast()),
+            size_of::<STORAGE_PROPERTY_QUERY>() as u32,
+            Some(buffer.as_mut_ptr().cast()),
+            (buffer.len() * size_of::<u64>()) as u32,
+            Some(&mut returned),
+            None,
+        )
+    };
+    if result.is_err() || returned < size_of::<STORAGE_TEMPERATURE_DATA_DESCRIPTOR>() as u32 {
+        return None;
+    }
+
+    // SAFETY: the descriptor header fits in `returned`; `InfoCount` says whether
+    // the trailing temperature entry is present.
+    let descriptor = unsafe {
+        &*(buffer
+            .as_ptr()
+            .cast::<STORAGE_TEMPERATURE_DATA_DESCRIPTOR>())
+    };
+    if descriptor.InfoCount == 0 {
+        return None;
+    }
+    let raw = descriptor.TemperatureInfo[0].Temperature;
+    if raw as u32 == STORAGE_TEMPERATURE_VALUE_NOT_REPORTED {
+        return None;
+    }
+
+    let celsius = raw as f32;
+    (-20.0..=125.0).contains(&celsius).then_some(celsius)
 }
 
 fn split_drive_strings(buffer: &[u16]) -> Vec<String> {
