@@ -59,6 +59,10 @@ from a screenshot.
 - Post synthetic input to test interaction: `PostMessage(strip, 0x0202 /*LBUTTONUP*/, 0,
   MAKELPARAM(x, y))`. Clicking the strip must create the flyout; a second click closes
   it. Reading the log alone is enough: `flyout window created` / `flyout closed`.
+- Capturing the companion (the only non-layered surface): `PrintWindow(hwnd, hdc, 1)`
+  works, but a DPI-unaware script gets a virtualized, cropped bitmap. Call
+  `SetProcessDPIAware()` before `GetClientRect`, and the capture matches the layout.
+  The strip and flyout are layered; capture those with `--render-snapshots` only.
 
 ## Layout
 
@@ -74,7 +78,7 @@ crates/statline-app      bin: main, cli, profile, strip_host, flyout_host, dashb
 docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 ```
 
-## State (all committed, 99 tests green, clippy clean)
+## State (all committed, 110 tests green, clippy clean)
 
 - **M0–M2 done**: workspace, docs, tray shell; metrics (CPU total/per-core/MHz, memory,
   PDH disk, per-adapter network, GPU util+VRAM, battery); software Direct2D renderer
@@ -87,24 +91,27 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   tier automatically.
 - **M4 done**: single instance, autostart commands, log rotation, panic hook, tray menu
   with Pause/Resume (parks the sampler on its condvar), Show/Hide strip, Dashboard, Exit.
-- **M5 verified**: flyout opens on strip click, toggles on a second click, closes on Esc
-  or focus loss; renders as a layered panel with interpolation-smoothed area charts.
+- **M5 partial**: flyout opens on strip click, toggles on a second click, closes on Esc
+  or focus loss; layered panel with smoothed area charts and the top five processes.
 - **M6 partial**: companion window is a real `WS_OVERLAPPEDWINDOW` (caption, system menu,
-  resizable, Windows 11 dark frame + rounded corners), painting a two-column card grid.
+  resizable, Windows 11 dark frame + rounded corners), painting a two-column card grid and
+  an eight-row process table.
+- **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
+  deltas and working sets. Task Manager scale (share of all cores); `None` until a baseline
+  exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
+  zero when both are closed.
 
 Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tray-only
 10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles, flat over
-90 s.
+90 s. Process table: **~4.75 ms per query** (~250 processes), i.e. ~0.24 % of one core at
+the 2 s cadence and only while a process surface is visible.
 
 ## Next work, in priority order
 
-1. **Process provider + per-app breakdown.** `NtQuerySystemInformation(SystemProcessInformation)`
-   with CPU-time deltas and working sets, sampled at 2 s only while a surface showing
-   processes is visible. Then: click a segment → flyout opens focused on that module with
-   its top processes; same table in the companion window. This is the feature the user
-   asked for explicitly ("press CPU, shows CPU usage of apps").
-2. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
+1. **Settings UI** (`statline-config` is written but unwired): theme, interval, placement,
    units, which modules show, autostart toggle, safe mode. Live-apply through the host.
+2. **Segment focus**: clicking CPU/MEM/GPU should open the flyout focused on that module
+   (highlight the card; sort the process table by CPU or memory to match).
 3. **Driver-free sensors (M7)**: GPU temp/fan/power via NVML/ADL, drive temperatures via
    `IOCTL_STORAGE_QUERY_PROPERTY`, battery temperature/health, ACPI thermal zone via PDH.
    Each degrades to hidden, never fakes a value. CPU package temp/fans are out of scope
@@ -134,6 +141,10 @@ Measured (release): 0.78 ms CPU per sample at 1 Hz = **0.078 % of one core**; tr
   as "another instance is running". Use a plain mutex name (no `Local\` prefix).
 - **Moving a layered window every tick swallows clicks** — mouse-down lands on one frame
   and mouse-up on the next. Only `MoveWindow` when the rect actually changes.
+- **windows-rs 0.62 hides `UserTime` / `KernelTime`** in `SYSTEM_PROCESS_INFORMATION`
+  behind `Reserved1: [u8; 48]`. Define the documented `repr(C)` prefix locally and walk
+  the `NextEntryOffset` chain with `read_unaligned`. The query costs **~4.8 ms** for
+  ~250 processes: never run it unless a surface showing processes is open.
 - **`Edit`-style PowerShell string surgery corrupts source files.** An array-flattening bug
   once replaced every `s` with `t`. Use the file tools; if using PowerShell, do single
   `.Replace()` calls and write with `UTF8Encoding($false)`. Never round-trip a file with

@@ -1,6 +1,6 @@
 # M6 — dashboard & settings
 
-**Status:** not started
+**Status:** in progress · overview window with live cards and the process table
 
 ## Goal
 
@@ -8,9 +8,12 @@ The place to configure and to explore, in one window.
 
 ## Checklist
 
-- [ ] Window shell: custom title area, DWM rounded corners, resize + remembered bounds
+- [x] Window shell: DWM rounded corners, native resize, dark frame
+- [x] Overview: live cards
+- [x] Overview: top-process table (8 rows, two columns, CPU + working set)
+- [ ] Window shell: custom title area, remembered bounds
 - [ ] Left navigation: Overview / Modules / Appearance / Behaviour / About
-- [ ] Overview: live cards, 5-minute chart with hover readout, sortable process table
+- [ ] Overview: 5-minute chart with hover readout, sortable process table
 - [ ] Modules: enable, reorder (drag), per-module meter/threshold/colour
 - [ ] Appearance: theme, accent, placement, density, labels, opacity
 - [ ] Behaviour: interval, autostart, secondary monitors, fullscreen, safe mode, units

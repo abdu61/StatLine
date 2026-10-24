@@ -50,6 +50,8 @@ pub struct Host {
     dashboard: Dashboard,
     /// `true` when the strip is a child of `Shell_TrayWnd` (ADR tier 1).
     parented: bool,
+    /// Last process-sampling request, so transitions are logged once.
+    process_visible: bool,
 }
 
 impl Host {
@@ -87,6 +89,7 @@ impl Host {
             last_rect: None,
             dashboard: Dashboard::new(palette, scale),
             parented,
+            process_visible: false,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -106,6 +109,17 @@ impl Host {
         self.set_visible(!should_hide && !self.user_hidden);
         if should_hide {
             return;
+        }
+
+        // The process table only runs while a surface showing it is open.
+        let process_visible = self.flyout.is_open() || self.dashboard.is_open();
+        if process_visible != self.process_visible {
+            self.process_visible = process_visible;
+            log::info!(
+                "process table sampling {}",
+                if process_visible { "on" } else { "off" }
+            );
+            self.sampler.set_process_table(process_visible);
         }
 
         let snapshot: std::sync::Arc<Snapshot> = self.sampler.snapshot();

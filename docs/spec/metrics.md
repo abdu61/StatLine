@@ -9,7 +9,7 @@ here is user-mode and requires no elevation.
 |---|---|---|
 | CPU, memory, network, disk I/O | every tick (default 1000 ms) | cheap counters |
 | GPU utilization / VRAM | every tick when the GPU module is enabled | PDH wildcard, cached instance list |
-| Process table | 5 s, **only while a view that shows processes is visible** | `NtQuerySystemInformation` allocates |
+| Process table | 2 s, **only while a view that shows processes is visible** | `NtQuerySystemInformation` allocates; ~4.75 ms per query |
 | Temperatures (GPU, disk, battery, ACPI) | 5 s | vendor libs / IOCTLs are not free |
 | Static info (CPU model, core counts, volume list) | once, refreshed on `WM_DISPLAYCHANGE` | |
 
@@ -70,10 +70,20 @@ never "CPU". Frequently unavailable on desktops; that is fine.
 If the handle is denied or the device does not report it, the row disappears.
 
 **Processes**
-`NtQuerySystemInformation(SystemProcessInformation)` → PID, image name, working set,
-CPU time delta since last sample, thread count. Sorted descending by CPU, top N.
+`NtQuerySystemInformation(SystemProcessInformation)` → PID, image name, user+kernel CPU
+time, working set. CPU percent is the CPU-time delta over wall time, expressed as a
+share of **total capacity** (the Task Manager scale): a saturated core on an eight-core
+machine reads 12.5 %, and the column sums to the CPU total. No delta exists on the first
+sample, or for a process that appeared between samples → `None`, which the UI renders
+as `—`; never a false `0%`. Images without a name (Idle) are skipped; System (PID 4)
+keeps its name.
 
-## Failure rules
+The query buffer is reused, and the provider is enabled only while the flyout or the
+companion is open. Top 12 are kept in the snapshot; the flyout shows 5, the companion 8.
+Measured cost: **~4.75 ms** per query on ~250 processes, i.e. ~0.24 % of one core at the
+2 s cadence, and zero when every process surface is closed.
+
+**Failure rules**
 
 - A provider that fails logs **once** at warn level, sets its field to `None`, and is
   retried on the next tick. No user-visible error unless a module is enabled and has

@@ -47,6 +47,7 @@ private bytes past 25 MB.
 | GPU PDH + DXGI | ~650 us |
 | Battery | ~12 us |
 | Volume enumeration | ~72–80 us |
+| Process table (`NtQuerySystemInformation`) | **~4.75 ms** (250 processes) |
 | Full `Sampler::sample` | ~0.47 ms (tight loop) |
 
 ## Design consequences baked in
@@ -56,7 +57,9 @@ private bytes past 25 MB.
 - GPU wildcard counters cost ~650 us, so they are cached for **3 s**.
 - Volume capacity is refreshed every **30 s**, not every tick.
 - PDH uses one cached query and English counter paths (localization-proof, stable cost).
-- Process tables are only sampled while a surface displaying them is visible.
+- The process table costs ~4.75 ms per query, so it runs at 2 s and **only while the
+  flyout or companion is open**; with every process surface closed it costs zero. That
+  is ~0.24 % of one core while a process view is visible, and none at idle.
 
 ## Rules for contributors
 

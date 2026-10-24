@@ -2,7 +2,8 @@
 
 use statline_core::model::Snapshot;
 use statline_core::units::{
-    UnitSystem, format_bytes, format_duration, format_percent, format_rate, format_rate_short,
+    UnitSystem, format_bytes, format_duration, format_percent, format_percent_precise, format_rate,
+    format_rate_short,
 };
 use statline_render::{Align, Color, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -24,12 +25,26 @@ pub struct Row {
     pub series: Vec<f32>,
 }
 
+/// One line of the process table.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ProcessRow {
+    pub name: String,
+    pub cpu: String,
+    pub memory: String,
+}
+
 /// Everything the panel shows.
 #[derive(Debug, Clone, Default)]
 pub struct Model {
     pub header: String,
     pub rows: Vec<Row>,
+    /// Busiest processes, already sorted; empty hides the section.
+    pub processes: Vec<ProcessRow>,
 }
+
+/// Process rows the flyout shows (the companion shows more).
+pub const PROCESS_ROWS: usize = 5;
+const PROCESS_ROW_HEIGHT: f32 = 17.0;
 
 fn series(values: &[f32], latest: f32) -> Vec<f32> {
     let mut series = values.to_vec();
@@ -152,7 +167,30 @@ pub fn model(snapshot: &Snapshot, history: &History) -> Model {
         });
     }
 
-    Model { header, rows }
+    let processes = snapshot
+        .processes
+        .as_ref()
+        .map(|sample| {
+            sample
+                .top
+                .iter()
+                .map(|entry| ProcessRow {
+                    name: entry.name.clone(),
+                    cpu: entry
+                        .cpu_percent
+                        .map(format_percent_precise)
+                        .unwrap_or_else(|| String::from("\u{2014}")),
+                    memory: format_bytes(entry.working_set_bytes, UnitSystem::Binary),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Model {
+        header,
+        rows,
+        processes,
+    }
 }
 
 fn label_style(scale: f32) -> TextStyle {
@@ -171,9 +209,26 @@ fn header_style(scale: f32) -> TextStyle {
     TextStyle::new(9.0 * scale, false, Align::Left)
 }
 
+fn process_style(scale: f32, semibold: bool) -> TextStyle {
+    TextStyle::new(9.5 * scale, semibold, Align::Left)
+}
+
+fn process_value_style(scale: f32) -> TextStyle {
+    TextStyle::new(9.5 * scale, false, Align::Right)
+}
+
 /// Panel width in physical pixels for a given scale.
 pub fn width(scale: f32) -> f32 {
     300.0 * scale
+}
+
+/// Height of the process section for the rows this surface shows.
+fn process_section(model: &Model, scale: f32, limit: usize) -> f32 {
+    let count = model.processes.len().min(limit);
+    if count == 0 {
+        return 0.0;
+    }
+    (space::M + 1.0 + space::XS + 12.0 + space::XXS + count as f32 * PROCESS_ROW_HEIGHT) * scale
 }
 
 /// Height needed for a model.
@@ -181,7 +236,11 @@ pub fn height(model: &Model, scale: f32) -> f32 {
     let padding = space::L * scale;
     let header = 18.0 * scale;
     let row = 52.0 * scale;
-    padding * 2.0 + header + row * model.rows.len() as f32 + space::S * scale
+    padding * 2.0
+        + header
+        + row * model.rows.len() as f32
+        + space::S * scale
+        + process_section(model, scale, PROCESS_ROWS)
 }
 
 /// Draw an area sparkline of `values` (0..=100) into `rect`.
@@ -308,6 +367,67 @@ pub fn render(
         y += row_height;
     }
 
+    if !model.processes.is_empty() {
+        y += space::M * scale;
+        surface.fill_rect(
+            padding,
+            y,
+            width - padding * 2.0,
+            1.0,
+            palette.surface_border,
+        );
+        y += 1.0 + space::XS * scale;
+
+        let _ = text.draw(
+            surface,
+            "TOP PROCESSES",
+            (padding, y, width - padding * 2.0, 12.0 * scale),
+            TextStyle::new(8.0 * scale, true, Align::Left),
+            palette.text_muted,
+        );
+        y += 12.0 * scale + space::XXS * scale;
+
+        let memory_width = 78.0 * scale;
+        let cpu_width = 38.0 * scale;
+        let gap = space::M * scale;
+        let name_width = width - padding * 2.0 - memory_width - cpu_width - gap * 2.0;
+
+        for process in model.processes.iter().take(PROCESS_ROWS) {
+            let _ = text.draw(
+                surface,
+                &process.name,
+                (padding, y, name_width, 14.0 * scale),
+                process_style(scale, false),
+                palette.text_primary,
+            );
+            let _ = text.draw(
+                surface,
+                &process.cpu,
+                (
+                    width - padding - memory_width - gap - cpu_width,
+                    y,
+                    cpu_width,
+                    14.0 * scale,
+                ),
+                process_value_style(scale),
+                palette.text_primary,
+            );
+            let _ = text.draw(
+                surface,
+                &process.memory,
+                (
+                    width - padding - memory_width,
+                    y,
+                    memory_width,
+                    14.0 * scale,
+                ),
+                process_value_style(scale),
+                palette.text_muted,
+            );
+            y += PROCESS_ROW_HEIGHT * scale;
+        }
+    }
+
     surface.end();
     (width, height)
 }
@@ -315,7 +435,7 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use statline_core::model::{CpuSample, MemorySample};
+    use statline_core::model::{CpuSample, MemorySample, ProcessEntry, ProcessSample};
 
     fn snapshot() -> Snapshot {
         Snapshot {
@@ -365,5 +485,55 @@ mod tests {
         let model = model(&snapshot(), &History::default());
         assert!(height(&model, 1.0) > 2.0 * 46.0);
         assert!(height(&Model::default(), 1.0) > 0.0);
+    }
+
+    #[test]
+    fn process_rows_are_formatted_from_the_snapshot() {
+        let mut snapshot = snapshot();
+        snapshot.processes = Some(ProcessSample {
+            total: 240,
+            top: vec![ProcessEntry {
+                pid: 42,
+                name: String::from("code.exe"),
+                cpu_percent: Some(4.2),
+                working_set_bytes: 640 * 1024 * 1024,
+            }],
+        });
+
+        let model = model(&snapshot, &History::default());
+        assert_eq!(model.processes.len(), 1);
+        assert_eq!(model.processes[0].name, "code.exe");
+        assert_eq!(model.processes[0].cpu, "4.2%");
+        assert_eq!(model.processes[0].memory, "640 MiB");
+    }
+
+    #[test]
+    fn process_without_a_baseline_shows_a_dash() {
+        let mut snapshot = snapshot();
+        snapshot.processes = Some(ProcessSample {
+            total: 1,
+            top: vec![ProcessEntry {
+                pid: 7,
+                name: String::from("new.exe"),
+                cpu_percent: None,
+                working_set_bytes: 1024,
+            }],
+        });
+
+        let model = model(&snapshot, &History::default());
+        assert_eq!(model.processes[0].cpu, "\u{2014}");
+    }
+
+    #[test]
+    fn process_section_adds_height() {
+        let plain = model(&snapshot(), &History::default());
+        let mut with_processes = plain.clone();
+        with_processes.processes = vec![ProcessRow::default(); 6];
+        // Six rows are present but only PROCESS_ROWS are drawn.
+        assert_eq!(
+            height(&with_processes, 1.0) - height(&plain, 1.0),
+            (space::M + 1.0 + space::XS + 12.0 + space::XXS)
+                + PROCESS_ROWS as f32 * PROCESS_ROW_HEIGHT
+        );
     }
 }

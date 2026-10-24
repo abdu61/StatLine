@@ -13,9 +13,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 const CLASS: &str = "StatlineCompanionWindow";
 
-/// Logical size of the window, in DIPs.
+/// Logical size of the window, in DIPs. Tall enough for the card grid plus the
+/// process table at 100 %.
 const WINDOW_WIDTH: i32 = 760;
-const WINDOW_HEIGHT: i32 = 560;
+const WINDOW_HEIGHT: i32 = 640;
 
 pub struct Dashboard {
     hwnd: Option<HWND>,

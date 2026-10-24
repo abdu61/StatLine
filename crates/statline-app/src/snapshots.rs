@@ -5,7 +5,8 @@
 //! code into a bitmap is the only reliable way to review the design here.
 
 use statline_core::model::{
-    CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample, Snapshot, VolumeSample,
+    CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample, ProcessEntry, ProcessSample,
+    Snapshot, SystemSample, VolumeSample,
 };
 use statline_render::{Color, Palette, Renderer};
 use statline_ui::{render, strip};
@@ -49,6 +50,53 @@ fn synthetic() -> Snapshot {
             rx_bytes_per_sec: 1_240_000.0,
             tx_bytes_per_sec: 84_000.0,
             ..Default::default()
+        }),
+        system: Some(SystemSample {
+            uptime_secs: 90_061,
+            processes: 248,
+            threads: 3_412,
+            handles: 112_908,
+        }),
+        processes: Some(ProcessSample {
+            total: 248,
+            top: vec![
+                ProcessEntry {
+                    pid: 4820,
+                    name: String::from("Code.exe"),
+                    cpu_percent: Some(4.2),
+                    working_set_bytes: 640_000_000,
+                },
+                ProcessEntry {
+                    pid: 7312,
+                    name: String::from("msedge.exe"),
+                    cpu_percent: Some(1.8),
+                    working_set_bytes: 388_000_000,
+                },
+                ProcessEntry {
+                    pid: 1180,
+                    name: String::from("explorer.exe"),
+                    cpu_percent: Some(0.9),
+                    working_set_bytes: 142_000_000,
+                },
+                ProcessEntry {
+                    pid: 9924,
+                    name: String::from("statline.exe"),
+                    cpu_percent: Some(0.4),
+                    working_set_bytes: 30_000_000,
+                },
+                ProcessEntry {
+                    pid: 644,
+                    name: String::from("dwm.exe"),
+                    cpu_percent: Some(0.3),
+                    working_set_bytes: 96_000_000,
+                },
+                ProcessEntry {
+                    pid: 2860,
+                    name: String::from("Teams.exe"),
+                    cpu_percent: Some(0.2),
+                    working_set_bytes: 512_000_000,
+                },
+            ],
         }),
         ..Snapshot::default()
     }
