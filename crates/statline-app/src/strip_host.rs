@@ -27,19 +27,18 @@ pub struct Host {
     scale: f32,
     height: f32,
     last_signature: Option<String>,
+    logged_first_frame: bool,
 }
 
 impl Host {
     /// Start sampling and create the strip window. Must be called on the UI thread.
     pub fn start(palette: Palette) -> windows::core::Result<Self> {
-        let geometry = taskbar::primary().ok_or_else(|| windows::core::Error::from_thread())?;
+        let geometry = taskbar::primary().ok_or_else(windows::core::Error::from_thread)?;
         let scale = geometry.dpi as f32 / 96.0;
         let height = ((geometry.height() as f32) - 8.0 * scale).max(16.0);
 
         let renderer = Renderer::new()?;
         let sampler = SamplerThread::start(Duration::from_millis(1000));
-
-        strip_window::register_strip_class(Some(strip_proc))?;
 
         let rect = RECT {
             left: 0,
@@ -47,8 +46,7 @@ impl Host {
             right: 1,
             bottom: height as i32,
         };
-        let hwnd = strip_window::create_layered_child(
-            geometry.taskbar,
+        let hwnd = strip_window::create_strip_window(
             strip_window::STRIP_CLASS,
             "Statline",
             Some(strip_proc),
@@ -64,6 +62,7 @@ impl Host {
             scale,
             height,
             last_signature: None,
+            logged_first_frame: false,
         };
         HOST.store(&mut host as *mut Host, Ordering::Release);
         host.tick();
@@ -76,10 +75,16 @@ impl Host {
             return;
         };
         if taskbar::is_hidden(geometry.taskbar) {
+            log::warn!("taskbar is hidden; skipping strip update");
             return;
         }
 
         let snapshot: std::sync::Arc<Snapshot> = self.sampler.snapshot();
+        // The sampler publishes its first frame a moment after start; drawing
+        // an empty snapshot would size the strip to a single pixel.
+        if snapshot.taken_at.is_none() {
+            return;
+        }
         let segments = strip::segments(&snapshot);
         let measured = render::measure(&mut self.renderer.text, &segments, self.scale);
         let width = measured.width.ceil().max(1.0);
@@ -113,22 +118,35 @@ impl Host {
         }
 
         let padding = (4.0 * self.scale) as i32;
-        let left = geometry.strip_left(width as i32, padding);
-        let top = geometry.rect.top + ((geometry.height() as f32 - self.height) / 2.0) as i32;
+        let screen_left = geometry.strip_left(width as i32, padding);
+        let screen_top =
+            geometry.rect.top + ((geometry.height() as f32 - self.height) / 2.0) as i32;
 
         strip_window::move_window(
             self.hwnd,
             RECT {
-                left,
-                top,
-                right: left + width as i32,
-                bottom: top + self.height as i32,
+                left: screen_left,
+                top: screen_top,
+                right: screen_left + width as i32,
+                bottom: screen_top + self.height as i32,
             },
         );
-        // The window is a layered child: painting happens through the surface.
-        // Repositioning changes the destination, so re-present every tick.
+
+        strip_window::keep_on_top(self.hwnd);
+
         if let Some(surface) = self.surface.as_ref() {
-            surface.present_layered(self.hwnd, 0, 0);
+            // A null destination in UPDATELAYEREDWINDOWINFO makes Windows use
+            // the window's own position, which is what a child window needs.
+            let presented = surface.present_layered(self.hwnd, 0, 0);
+
+            if !self.logged_first_frame {
+                self.logged_first_frame = true;
+                log::info!(
+                    "strip {}x{} at ({screen_left},{screen_top}) presented={presented}",
+                    surface.width(),
+                    surface.height()
+                );
+            }
         }
 
         if self.last_signature.as_deref() != Some(signature.as_str()) {
@@ -151,12 +169,12 @@ pub unsafe extern "system" fn strip_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     use windows::Win32::UI::WindowsAndMessaging::{
-        KillTimer, SetTimer, WM_TIMER, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        DefWindowProcW, KillTimer, SetTimer, WM_CREATE, WM_DESTROY, WM_TIMER,
     };
 
     match msg {
-        windows::Win32::UI::WindowsAndMessaging::WM_CREATE => {
-            // SAFETY: no pointers; one timer for the refresh cadence.
+        WM_CREATE => {
+            // SAFETY: no pointers; one timer drives the refresh cadence.
             unsafe {
                 SetTimer(Some(hwnd), TIMER_ID, 1000, None);
             }
@@ -173,14 +191,17 @@ pub unsafe extern "system" fn strip_proc(
             }
             LRESULT(0)
         }
-        windows::Win32::UI::WindowsAndMessaging::WM_DESTROY => {
-            // SAFETY: timer belongs to this window.
+        WM_DESTROY => {
+            // SAFETY: the timer belongs to this window.
             unsafe {
                 let _ = KillTimer(Some(hwnd), TIMER_ID);
             }
             LRESULT(0)
         }
-        _ => windows::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => {
+            // SAFETY: forwarding the exact arguments received by the procedure.
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+        }
     }
 }
 

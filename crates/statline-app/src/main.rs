@@ -77,12 +77,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("tray icon ready");
 
-    let host = strip_host::Host::start(strip_host::default_palette(true));
-    match &host {
-        Ok(_) => info!("taskbar strip attached"),
-        Err(err) => error!("taskbar strip unavailable: {err}"),
+    // The strip is behind a flag until presentation is finished: see
+    // docs/STATUS.md. The tray path is always safe.
+    let mut _strip = None;
+    if args.iter().any(|a| a == "--strip") {
+        match strip_host::Host::start(strip_host::default_palette(true)) {
+            Ok(host) => {
+                info!("taskbar strip attached");
+                _strip = Some(host);
+            }
+            Err(err) => error!("taskbar strip unavailable: {err}"),
+        }
     }
-    let _host = host.ok();
 
     let exit_code = MessageWindow::run_message_loop()?;
     info!("{APP_NAME} exiting with {exit_code}");

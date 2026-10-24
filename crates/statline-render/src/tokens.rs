@@ -4,7 +4,6 @@
 //! dashboard stay consistent and theming is a data change, not a code change.
 
 use crate::color::Color;
-use crate::text::TextStyle;
 
 /// Colours for one theme.
 #[derive(Debug, Clone, Copy)]

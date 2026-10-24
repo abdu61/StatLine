@@ -16,7 +16,7 @@ use windows::Win32::Graphics::Direct2D::Common::{
 use windows::Win32::Graphics::Direct2D::{
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_FEATURE_LEVEL_DEFAULT, D2D1_RENDER_TARGET_PROPERTIES,
     D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_ROUNDED_RECT,
-    D2D1CreateFactory, ID2D1Brush, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget,
+    D2D1CreateFactory, ID2D1Brush, ID2D1Factory, ID2D1RenderTarget,
     ID2D1SolidColorBrush,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -34,8 +34,6 @@ pub struct Surface {
     width: u32,
     height: u32,
     factory: ID2D1Factory,
-    /// Kept for `BindDC`; drawing goes through `render`.
-    target: ID2D1DCRenderTarget,
     render: ID2D1RenderTarget,
     dc: HDC,
     bitmap: HBITMAP,
@@ -57,15 +55,17 @@ impl Surface {
         let (width, height) = (width.max(1), height.max(1));
         let stride = width as usize * 4;
 
-        let mut header = BITMAPINFO::default();
-        header.bmiHeader = BITMAPINFOHEADER {
-            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: width as i32,
-            // Negative height requests a top-down DIB, matching render order.
-            biHeight: -(height as i32),
-            biPlanes: 1,
-            biBitCount: 32,
-            biCompression: BI_RGB.0,
+        let header = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width as i32,
+                // Negative height requests a top-down DIB, matching render order.
+                biHeight: -(height as i32),
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -140,7 +140,6 @@ impl Surface {
             width,
             height,
             factory,
-            target,
             render,
             dc,
             bitmap,
@@ -166,7 +165,7 @@ impl Surface {
         // SAFETY: BeginDraw is paired with `end`; the target is exclusively ours.
         unsafe {
             self.render.BeginDraw();
-            let _ = self.render.Clear(Some(&to_color_f(background)));
+            self.render.Clear(Some(&to_color_f(background)));
         }
         self.drawing = true;
     }
@@ -195,8 +194,8 @@ impl Surface {
         };
         // SAFETY: `rect` is valid; brush is surface-owned.
         unsafe {
-            let _ = self.brush.SetColor(&to_color_f(color));
-            let _ = self.render.FillRectangle(&rect, &self.brush_base);
+            self.brush.SetColor(&to_color_f(color));
+            self.render.FillRectangle(&rect, &self.brush_base);
         }
     }
 
@@ -224,8 +223,8 @@ impl Surface {
         };
         // SAFETY: `rounded` is valid; brush is surface-owned.
         unsafe {
-            let _ = self.brush.SetColor(&to_color_f(color));
-            let _ = self.render.FillRoundedRectangle(&rounded, &self.brush_base);
+            self.brush.SetColor(&to_color_f(color));
+            self.render.FillRoundedRectangle(&rounded, &self.brush_base);
         }
     }
 
@@ -233,7 +232,7 @@ impl Surface {
     pub(crate) fn brush_for(&self, color: Color) -> (&ID2D1SolidColorBrush, &ID2D1Brush) {
         // SAFETY: `SetColor` only reads the colour descriptor.
         unsafe {
-            let _ = self.brush.SetColor(&to_color_f(color));
+            self.brush.SetColor(&to_color_f(color));
         }
         (&self.brush, &self.brush_base)
     }
@@ -266,10 +265,18 @@ impl Surface {
 
         // SAFETY: every pointer in `info` refers to a live local; the surface
         // bitmap matches the described size.
-        unsafe { UpdateLayeredWindowIndirect(hwnd, &info).as_bool() }
+        let ok = unsafe { UpdateLayeredWindowIndirect(hwnd, &info).as_bool() };
+        if !ok {
+            log::warn!(
+                "UpdateLayeredWindowIndirect failed: {}",
+                windows::core::Error::from_thread()
+            );
+        }
+        ok
     }
 
     /// Straight-alpha RGBA copy of the surface, for snapshots and tests.
+    #[allow(clippy::manual_checked_ops)] // explicit alpha==0 guard reads better
     pub fn pixels_rgba(&self) -> Vec<u8> {
         let mut out = vec![0u8; self.width as usize * self.height as usize * 4];
         // SAFETY: the DIB is `stride * height` bytes and lives as long as self.

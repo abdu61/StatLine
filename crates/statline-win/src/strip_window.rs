@@ -1,22 +1,27 @@
-//! Create a layered child window parented to the taskbar.
+//! The strip window: a topmost, non-activating layered popup.
+//!
+//! Tier 2 of the integration strategy in `docs/adr/0002-taskbar-integration.md`.
+//! A cross-process child window looks right until presentation:
+//! `UpdateLayeredWindowIndirect` fails on it with `ERROR_GEN_FAILURE`, so the
+//! strip is a top-level layered window placed over the taskbar instead.
+//! Tier 1 (parented child) is revisited in M3 with DirectComposition.
 
 use crate::to_wide;
 use std::ffi::OsStr;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, GetWindowRect, MoveWindow, RegisterClassW, SW_SHOWNOACTIVATE, ShowWindow,
-    WINDOW_EX_STYLE, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPSIBLINGS,
+    CreateWindowExW, GetWindowRect, HWND_TOPMOST, MoveWindow, RegisterClassW, SWP_NOACTIVATE,
+    SWP_SHOWWINDOW, SetWindowPos, WINDOW_EX_STYLE, WNDCLASSW, WNDPROC, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
-use windows::core::{PCWSTR, Result, w};
+use windows::core::{PCWSTR, Result};
 
 /// Class name used by the strip window.
 pub const STRIP_CLASS: &str = "StatlineStripWindow";
 
-/// Create (or reuse) a layered child window of `parent` and show it without
-/// activating it.
-pub fn create_layered_child(
-    parent: HWND,
+/// Create the strip window and put it above the taskbar without activating it.
+pub fn create_strip_window(
     class_name: &str,
     title: &str,
     wndproc: WNDPROC,
@@ -32,31 +37,28 @@ pub fn create_layered_child(
         lpszClassName: PCWSTR(class_wide.as_ptr()),
         ..Default::default()
     };
-    // SAFETY: the class descriptor is fully initialized and the strings live
-    // for the duration of the call.
-    let atom = unsafe { RegisterClassW(&class) };
-    if atom == 0 {
-        // A pre-existing class is fine; anything else will fail below.
-        let _ = windows::core::Error::from_thread();
+    // SAFETY: the descriptor is fully initialized and its strings live for the
+    // duration of the call. A pre-existing class is fine.
+    unsafe {
+        let _ = RegisterClassW(&class);
     }
 
     let title_wide = to_wide(OsStr::new(title));
-    // SAFETY: strings are NUL-terminated and outlive the call; the parent is
-    // the shell's taskbar window.
+    let width = (rect.right - rect.left).max(1);
+    let height = (rect.bottom - rect.top).max(1);
+
+    // SAFETY: strings are NUL-terminated and outlive the call; there is no
+    // parent, so this is an ordinary top-level popup.
     let hwnd = unsafe {
         CreateWindowExW(
-            WINDOW_EX_STYLE(
-                windows::Win32::UI::WindowsAndMessaging::WS_EX_LAYERED.0
-                    | windows::Win32::UI::WindowsAndMessaging::WS_EX_NOACTIVATE.0
-                    | windows::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW.0,
-            ),
+            WINDOW_EX_STYLE(WS_EX_LAYERED.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0),
             PCWSTR(class_wide.as_ptr()),
             PCWSTR(title_wide.as_ptr()),
-            windows::Win32::UI::WindowsAndMessaging::WS_POPUP | WS_CLIPSIBLINGS,
+            WS_POPUP,
             rect.left,
             rect.top,
-            (rect.right - rect.left).max(1),
-            (rect.bottom - rect.top).max(1),
+            width,
+            height,
             None,
             None,
             Some(instance.into()),
@@ -64,31 +66,23 @@ pub fn create_layered_child(
         )
     }?;
 
-    // Cross-process parenting is only reliable after creation.
-    // SAFETY: both handles are live; SetParent changes only the parent link.
+    // SAFETY: the handle belongs to this thread; the call only changes
+    // z-order and visibility, and must not activate the window.
     unsafe {
-        // A child must carry WS_CHILD; SetParent alone leaves it a popup.
-        let style = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(
+        let _ = SetWindowPos(
             hwnd,
-            windows::Win32::UI::WindowsAndMessaging::GWL_STYLE,
+            Some(HWND_TOPMOST),
+            rect.left,
+            rect.top,
+            width,
+            height,
+            SWP_NOACTIVATE | SWP_SHOWWINDOW,
         );
-        let child = (style as u32 | windows::Win32::UI::WindowsAndMessaging::WS_CHILD.0)
-            & !windows::Win32::UI::WindowsAndMessaging::WS_POPUP.0;
-        let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
-            hwnd,
-            windows::Win32::UI::WindowsAndMessaging::GWL_STYLE,
-            child as isize,
-        );
-        let previous = windows::Win32::UI::WindowsAndMessaging::SetParent(hwnd, Some(parent));
-        if let Err(error) = previous {
-            log::warn!("could not parent strip to taskbar: {error}");
-        }
-        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
     Ok(hwnd)
 }
 
-/// Resize/move a strip window.
+/// Resize/move a strip window (screen coordinates).
 pub fn move_window(hwnd: HWND, rect: RECT) {
     // SAFETY: the handle is ours; repaint is delegated to the layered surface.
     unsafe {
@@ -103,7 +97,26 @@ pub fn move_window(hwnd: HWND, rect: RECT) {
     }
 }
 
-/// Client-independent window rect.
+/// Re-assert topmost order. Called on every tick because clicking the taskbar
+/// can raise the shell above us.
+pub fn keep_on_top(hwnd: HWND) {
+    // SAFETY: the handle is ours; no activation and no geometry change.
+    unsafe {
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            windows::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
+                | windows::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
+                | SWP_NOACTIVATE,
+        );
+    }
+}
+
+/// Screen rectangle of a window.
 pub fn window_rect(hwnd: HWND) -> RECT {
     let mut rect = RECT::default();
     // SAFETY: valid out-parameter for a live window.
@@ -111,27 +124,4 @@ pub fn window_rect(hwnd: HWND) -> RECT {
         let _ = GetWindowRect(hwnd, &mut rect);
     }
     rect
-}
-
-/// Ensure the class used by the strip exists before creating the window.
-pub fn register_strip_class(wndproc: WNDPROC) -> Result<()> {
-    let class_wide = to_wide(OsStr::new(STRIP_CLASS));
-    // SAFETY: module handle conversion only.
-    let instance = unsafe { GetModuleHandleW(None)? };
-    let class = WNDCLASSW {
-        lpfnWndProc: wndproc,
-        hInstance: instance.into(),
-        lpszClassName: PCWSTR(class_wide.as_ptr()),
-        ..Default::default()
-    };
-    // SAFETY: descriptor is valid for the call.
-    let atom = unsafe { RegisterClassW(&class) };
-    if atom == 0 {
-        let error = windows::core::Error::from_thread();
-        if (error.code().0 as u32) & 0xFFFF != 1410 {
-            return Err(error);
-        }
-    }
-    let _ = w!("strip");
-    Ok(())
 }

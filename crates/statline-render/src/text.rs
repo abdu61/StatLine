@@ -156,7 +156,7 @@ impl TextEngine {
 
         // SAFETY: all descriptors are valid; the brush and format outlive the call.
         unsafe {
-            let _ = surface.render_target().DrawText(
+            surface.render_target().DrawText(
                 &wide,
                 &format,
                 &rect,
