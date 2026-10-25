@@ -23,10 +23,11 @@ detail sampling on
   suppressed, hides for fullscreen and a hidden taskbar, recreates after an Explorer
   restart via the app message window. Topmost popup remains as an automatic fallback.
   Network leads so its varying rate text changes the strip's left edge instead of
-  shifting the other segments. Placement reads `TaskbarAl`: **Right** anchors to the
-  tray; **Left** uses the far-left free area on a centred taskbar, or the space after
-  the app-button group when the taskbar is left-aligned (so it never overlays Start or
-  the app buttons).
+  shifting the other segments. Rates use three significant digits with a reserved
+  segment width, so neither digits nor units move the strip. Placement reads
+  `TaskbarAl`: **Right** anchors to the tray; **Left** uses the far-left free area on a
+  centred taskbar, or the space after the app-button group when the taskbar is
+  left-aligned (so it never overlays Start or the app buttons).
 - **Flyout**: opens on strip click, toggles closed on a second click, closes on Esc or
   focus loss. A segment click shows only that module — CPU with per-core bars and the
   CPU process table, Memory with commit/cache and top memory apps, Disk with volumes,
@@ -39,7 +40,8 @@ detail sampling on
   per-core grid (percentage and clock) plus 1/5/15-minute averages and processes;
   memory cache and top memory apps; per-volume and per-adapter rows. Its position and
   size are remembered in `window.json` and restored only when still on a monitor.
-  Optional Mica DWM backdrop on the framed windows.
+  Optional Mica DWM backdrop on the framed windows. The shell has a LIVE chip, an accent
+  rule under page titles, outlined cards and an accent marker on the active nav item.
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
   with theme, accent presets, sampler interval, byte units, Mica, strip placement,
   start-with-Windows and per-module strip visibility. Mica shows a GPU/battery caution.
@@ -65,7 +67,8 @@ detail sampling on
   `SystemPageFileInformation`, all converted from pages to bytes.
 - **Disk detail**: aggregate read/write and per-volume used/total, temperature, plus
   per-physical-disk rates and busy percentage from named PDH instances (`Disk 0 C:`).
-- **Network detail**: per-adapter rates, session totals, the negotiated link speed
+- **Network detail**: only real interfaces (NDIS filter miniports are excluded), with
+  per-adapter rates, session totals, the negotiated link speed
   (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps") and, on WLAN, the SSID and
   signal quality from `wlanapi` (queried only while a detail surface is open).
 - **System detail**: Windows edition/build (corrected to "Windows 11" from the build

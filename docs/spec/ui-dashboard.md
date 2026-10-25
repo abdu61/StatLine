@@ -2,6 +2,9 @@
 
 One framed window, 880 × 680 dip, resizable. The renderer fills the client area.
 
+The nav carries a LIVE chip, the page title sits above a short accent rule, cards are
+outlined, and the active nav item gets an accent marker.
+
 ```
 ┌────────────┬───────────────────────────────────────────────┐
 │  Statline  │  Dashboard                                    │

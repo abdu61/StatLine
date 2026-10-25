@@ -8,12 +8,19 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Fixed
 
+- Network ignores NDIS filter miniports (`Native WiFi Filter Driver`, NPCAP, QoS
+  Packet Scheduler, WFP…). They duplicated the physical adapter's counters, flooding
+  the page with rows and multiplying the aggregate rate.
+- Strip rates use three significant digits and reserved widths. Changing digits or
+  units (KB/s vs MB/s) no longer resizes the network segment or shifts the strip.
 - Strip placement now respects Windows 11 taskbar alignment. Right anchors to the tray;
   Left uses the far-left free area on a centred taskbar, or the space after the app
   buttons when the taskbar is left-aligned, instead of overlapping Start/apps.
 
 ### Added
 
+- Visual refresh: a LIVE chip in the nav, a short accent rule under page titles,
+  outlined cards and an accent marker on the active nav item.
 - Disk page shows per-physical-disk read/write and busy percentage from named PDH
   instances (`Disk 0 C:`), alongside the aggregate and per-volume rows.
 - Network page shows the connected Wi-Fi SSID and signal quality (WLAN API). The query

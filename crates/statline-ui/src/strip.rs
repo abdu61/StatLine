@@ -8,8 +8,8 @@ use statline_core::units::{UnitSystem, format_percent, format_rate_short};
 /// Text used to reserve a stable width, so a changing number cannot make the
 /// strip jump around. Network is the worst offender: "1.1 KiB/s" and
 /// "12.4 MiB/s" must occupy the same slot.
-const RATE_SAMPLE_BINARY: &str = "\u{2193} 88.8 MiB/s";
-const RATE_SAMPLE_DECIMAL: &str = "\u{2193} 88.8 MB/s";
+const RATE_SAMPLE_BINARY: &str = "\u{2193} 99.9 MiB/s";
+const RATE_SAMPLE_DECIMAL: &str = "\u{2193} 99.9 MB/s";
 
 /// One readout in the strip.
 #[derive(Debug, Clone, PartialEq)]
@@ -32,10 +32,9 @@ pub struct Segment {
 
 impl Segment {
     fn new(label: &'static str, value: String, percent: Option<f32>) -> Self {
-        let (warn, critical) = match label {
-            "CPU" | "MEM" => (85.0, 95.0),
-            "GPU" | "DISK" => (90.0, 98.0),
-            _ => (0.0, 0.0),
+        let (warn, critical, width_sample) = match label {
+            "CPU" | "MEM" | "GPU" | "DISK" => (85.0, 95.0, "100%"),
+            _ => (0.0, 0.0, ""),
         };
         Self {
             label,
@@ -44,7 +43,7 @@ impl Segment {
             percent,
             warn,
             critical,
-            width_sample: "",
+            width_sample,
         }
     }
 }
@@ -200,8 +199,8 @@ mod tests {
         let segments = segments(&snapshot);
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].label, "");
-        assert_eq!(segments[0].value, "\u{2193} 1.2 MiB/s");
-        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 82 KiB/s"));
+        assert_eq!(segments[0].value, "\u{2193} 1.18 MiB/s");
+        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 82.0 KiB/s"));
         assert_eq!(segments[0].width_sample, RATE_SAMPLE_BINARY);
     }
 
@@ -247,8 +246,8 @@ mod tests {
             ..Default::default()
         };
         let segments = segments_with(&snapshot, UnitSystem::Decimal, VisibleModules::default());
-        assert_eq!(segments[0].value, "\u{2193} 1.2 MB/s");
-        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 84 KB/s"));
+        assert_eq!(segments[0].value, "\u{2193} 1.24 MB/s");
+        assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 84.0 KB/s"));
         assert_eq!(segments[0].width_sample, RATE_SAMPLE_DECIMAL);
     }
 

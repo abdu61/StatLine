@@ -147,7 +147,7 @@ fn detail_style(scale: f32) -> TextStyle {
 }
 
 fn title_style(scale: f32) -> TextStyle {
-    TextStyle::new(16.0 * scale, true, Align::Left)
+    TextStyle::new(18.0 * scale, true, Align::Left)
 }
 
 fn footer_style(scale: f32) -> TextStyle {
@@ -197,6 +197,36 @@ fn draw_nav(
         palette.text_muted,
     );
 
+    // A small live chip keeps the shell feeling alive without animating.
+    surface.fill_round_rect(
+        pad,
+        67.0 * scale,
+        48.0 * scale,
+        16.0 * scale,
+        8.0 * scale,
+        palette.accent.scaled_alpha(0.16),
+    );
+    surface.fill_round_rect(
+        pad + 8.0 * scale,
+        73.0 * scale,
+        4.0 * scale,
+        4.0 * scale,
+        2.0 * scale,
+        palette.accent,
+    );
+    let _ = text.draw(
+        surface,
+        "LIVE",
+        (
+            pad + 17.0 * scale,
+            68.0 * scale,
+            nav_width - pad * 2.0,
+            12.0 * scale,
+        ),
+        TextStyle::new(7.5 * scale, true, Align::Left),
+        palette.accent,
+    );
+
     let selected = page.index();
     for (index, label) in NAV_ITEMS.iter().enumerate() {
         let y = NAV_TOP * scale + index as f32 * NAV_ITEM * scale;
@@ -209,6 +239,14 @@ fn draw_nav(
                 28.0 * scale,
                 radius::HOVER * scale,
                 palette.hover,
+            );
+            surface.fill_round_rect(
+                8.0 * scale,
+                y + 9.0 * scale,
+                2.0 * scale,
+                14.0 * scale,
+                1.0 * scale,
+                palette.accent,
             );
         }
         let _ = text.draw(
@@ -242,18 +280,27 @@ fn draw_header(
     let _ = text.draw(
         surface,
         title,
-        (x, 24.0 * scale, width, 24.0 * scale),
+        (x, 22.0 * scale, width, 28.0 * scale),
         title_style(scale),
         palette.text_primary,
     );
     let _ = text.draw(
         surface,
         subtitle,
-        (x, 50.0 * scale, width, 14.0 * scale),
+        (x, 52.0 * scale, width, 14.0 * scale),
         footer_style(scale),
         palette.text_muted,
     );
-    84.0 * scale
+    // A short accent rule gives the page a clear masthead without a box.
+    surface.fill_round_rect(
+        x,
+        73.0 * scale,
+        28.0 * scale,
+        2.0 * scale,
+        1.0 * scale,
+        palette.accent,
+    );
+    88.0 * scale
 }
 
 fn card(
@@ -265,7 +312,15 @@ fn card(
     (x, y, w, h): (f32, f32, f32, f32),
 ) {
     let pad = space::XL * scale;
-    surface.fill_round_rect(x, y, w, h, radius::CARD * scale, palette.hover);
+    surface.fill_round_rect(x, y, w, h, radius::CARD * scale, palette.surface_border);
+    surface.fill_round_rect(
+        x + scale,
+        y + scale,
+        w - 2.0 * scale,
+        h - 2.0 * scale,
+        (radius::CARD * scale - scale).max(1.0),
+        palette.hover,
+    );
 
     let _ = text.draw(
         surface,

@@ -131,10 +131,12 @@ pub fn format_rate_compact(bytes_per_sec: f64, units: UnitSystem) -> String {
     }
 }
 
-/// Short rate for the strip: "1.1 KB/s", "82 KB/s", "12.4 MB/s".
+/// Short rate for the strip: three significant digits, adaptive unit.
 ///
-/// One decimal below 10 keeps small values readable without widening the
-/// segment much; above that the integer is plenty.
+/// Examples: `1.24 KiB/s`, `82.0 KiB/s`, `999 KiB/s`. Three digits keep the
+/// slot width stable while a value changes; the unit changes only when the
+/// magnitude does. A value that would round to 1000 is promoted to the next
+/// unit, so the number never grows a fourth digit.
 pub fn format_rate_short(bytes_per_sec: f64, units: UnitSystem) -> String {
     if !bytes_per_sec.is_finite() || bytes_per_sec <= 0.0 {
         return String::from("0 B/s");
@@ -148,8 +150,18 @@ pub fn format_rate_short(bytes_per_sec: f64, units: UnitSystem) -> String {
         scaled /= base;
         index += 1;
     }
+    if scaled >= 999.5 && index + 1 < suffixes.len() {
+        scaled /= base;
+        index += 1;
+    }
 
-    let decimals = if index > 0 && scaled < 10.0 { 1 } else { 0 };
+    let decimals = if index == 0 || scaled >= 99.95 {
+        0
+    } else if scaled >= 9.995 {
+        1
+    } else {
+        2
+    };
     format!("{scaled:.decimals$} {}/s", suffixes[index])
 }
 #[cfg(test)]

@@ -36,6 +36,16 @@ const IF_OPER_STATUS_UP: i32 = 1;
 const IF_TYPE_SOFTWARE_LOOPBACK: u32 = 24;
 const IF_TYPE_IEEE80211: u32 = 71;
 const TUNNEL_TYPE_NONE: i32 = 0;
+/// `MIB_IF_ROW2_0` bit 1: an NDIS filter miniport.
+///
+/// These (`Native WiFi Filter Driver`, NPCAP, QoS Packet Scheduler, WFP…) share
+/// the physical adapter's counters, so including them both floods the UI with
+/// duplicate rows and multiplies the aggregate rate.
+const FILTER_INTERFACE: u8 = 0x02;
+
+fn is_filter_miniport(flags: u8) -> bool {
+    flags & FILTER_INTERFACE != 0
+}
 
 /// Enumerate operational, non-loopback, non-tunnel interfaces with a real link.
 pub fn interfaces() -> Vec<InterfaceRef> {
@@ -56,6 +66,7 @@ pub fn interfaces() -> Vec<InterfaceRef> {
             if row.OperStatus.0 != IF_OPER_STATUS_UP
                 || row.Type == IF_TYPE_SOFTWARE_LOOPBACK
                 || row.TunnelType.0 != TUNNEL_TYPE_NONE
+                || is_filter_miniport(row.InterfaceAndOperStatusFlags._bitfield)
             {
                 continue;
             }
@@ -194,6 +205,13 @@ mod tests {
             buffer[index] = unit;
         }
         assert_eq!(wide_to_string(&buffer), "Wi-Fi");
+    }
+
+    #[test]
+    fn filter_miniports_are_identified_by_the_ndis_flag() {
+        assert!(is_filter_miniport(0b0000_0010));
+        assert!(!is_filter_miniport(0b0000_0001));
+        assert!(!is_filter_miniport(0));
     }
 
     #[test]

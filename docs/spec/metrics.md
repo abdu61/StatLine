@@ -52,10 +52,14 @@ Swap row hides.
 
 **Network**
 `GetIfTable2` each 15 s; sum `InOctets`/`OutOctets` deltas for interfaces that are
-`IF_OPER_STATUS_OPERATIONAL` and not loopback/tunnel. Per-adapter rows for the flyout,
-including `TransmitLinkSpeed` and the 802.11 flag. SSID and signal quality come from
-`wlanapi` (`WlanQueryInterface` / `wlan_intf_opcode_current_connection`), cached with the
-interface list and only queried while a detail surface is visible (~12 ms per refresh).
+`IF_OPER_STATUS_OPERATIONAL` and not loopback/tunnel. Exclude NDIS filter miniports
+(`InterfaceAndOperStatusFlags._bitfield & 0x02`): they mirror the physical adapter's
+counters and would duplicate rows and inflate the total. Per-adapter rows for the
+flyout, including `TransmitLinkSpeed` and the 802.11 flag. SSID and signal quality come
+from `wlanapi` (`WlanQueryInterface` / `wlan_intf_opcode_current_connection`), cached
+with the interface list and only queried while a detail surface is visible (~12 ms per
+refresh). Strip rates use three significant digits; the segment reserves a fixed width
+for the widest value (`99.9 MiB/s`).
 
 **Processes**
 `NtQuerySystemInformation(SystemProcessInformation)`; CPU share from cumulative CPU-time

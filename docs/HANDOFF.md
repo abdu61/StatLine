@@ -129,6 +129,15 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   `% Disk Time` via `PdhGetFormattedCounterArray` with instance names; `_Total` is the
   aggregate, the rest become per-disk rows. Volume capacity/temps are cached separately
   (30 s / 5 min).
+- **Network**: `GetIfTable2` excludes NDIS filter miniports via
+  `MIB_IF_ROW2_0._bitfield & 0x02` (`Native WiFi Filter Driver`, NPCAP, QoS, WFP…).
+  They share the physical adapter's counters, so including them duplicates rows and
+  multiplies the total. Rates use `format_rate_short` (three significant digits,
+  promote before 1000) and the strip reserves `99.9 MiB/s` plus `100%` samples so the
+  segment cannot resize as digits or units change.
+- **Companion look**: nav LIVE chip, accent rule under page titles, card outlines,
+  active-item accent marker. Keep new spacing inside `draw_header`'s 88 dip return so
+  pages do not drift.
 - **Window state**: the companion remembers its outer rectangle in
   `%APPDATA%\Statline\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
   when it still intersects a monitor. A separate file avoids racing the settings
