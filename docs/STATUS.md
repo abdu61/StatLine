@@ -45,8 +45,9 @@ detail sampling on
   MSIX manifest with `runFullTrust` + a user-toggleable startup task. Both build locally;
   CI verifies fmt/clippy/test/deny/build and produces tag artifacts.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
-  deltas; Task Manager scale (share of all cores); `—` until a baseline exists; sampled
-  at 2 s only while the flyout or companion is open (~4.75 ms per query).
+  deltas; Task Manager scale (share of all cores); instances of the same executable are
+  grouped into one row (Chrome, svchost); `—` until a baseline exists; sampled at 2 s
+  only while the flyout or companion is open (~4.75 ms per query).
 - **Sensors**: ACPI "System" temperature via PDH (5 s), drive temperatures via
   `IOCTL_STORAGE_QUERY_PROPERTY` (5 min cache, volume → disk mapping), battery health,
   temperature and cycle count via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). GPU vendor
@@ -54,8 +55,12 @@ detail sampling on
   (temperature, fan, power, clocks). Every source degrades to hidden; they share the
   process table's surface-visibility gate.
 - **CPU detail**: current load plus 1/5/15-minute exponentially smoothed averages
-  computed from real elapsed time, and a labelled core grid with each core's percentage
-  and current clock from `CallNtPowerInformation`.
+  computed from real elapsed time, a labelled core grid with each core's percentage and
+  clock from `CallNtPowerInformation`, the registry processor name and nominal base clock.
+- **Memory detail**: commit/cached plus aggregate page-file (swap) usage from
+  `SystemPageFileInformation`, all converted from pages to bytes.
+- **Network detail**: per-adapter rates, session totals and the negotiated link speed
+  (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps").
 - **Sampling**: 0.46 ms per sample in a tight loop with detail providers off; WS ~30 MB,
   private ~14.5 MB, handles flat.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic

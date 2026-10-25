@@ -37,7 +37,8 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
   (AMD) when the installed driver exposes them. Anything unavailable is hidden, never
   faked.
 - **Per-app detail**: process CPU is a share of total capacity (the Task Manager scale),
-  with working set. Sampling only runs while a surface showing processes is open.
+  with working set; instances of the same executable are grouped. Sampling only runs
+  while a surface showing processes is open.
 
 ## Privacy and footprint
 

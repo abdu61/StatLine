@@ -85,12 +85,23 @@ pub fn probe(count: u32, interval: Duration) {
         };
 
         let memory_text = match snapshot.memory.as_ref() {
-            Some(memory) => format!(
-                "mem {} / {} ({})",
-                format_bytes(memory.used_bytes, UnitSystem::Binary),
-                format_bytes(memory.total_bytes, UnitSystem::Binary),
-                format_percent(memory.percent())
-            ),
+            Some(memory) => {
+                let swap = if memory.swap_total_bytes > 0 {
+                    format!(
+                        "  swap {} / {}",
+                        format_bytes(memory.swap_used_bytes, UnitSystem::Binary),
+                        format_bytes(memory.swap_total_bytes, UnitSystem::Binary)
+                    )
+                } else {
+                    String::new()
+                };
+                format!(
+                    "mem {} / {} ({}){swap}",
+                    format_bytes(memory.used_bytes, UnitSystem::Binary),
+                    format_bytes(memory.total_bytes, UnitSystem::Binary),
+                    format_percent(memory.percent())
+                )
+            }
             None => String::from("mem  n/a"),
         };
 
@@ -156,6 +167,8 @@ pub fn probe(count: u32, interval: Duration) {
                 }
                 if let Some(fan) = gpu.fan_percent {
                     text.push_str(&format!("  {fan:.0}% fan"));
+                } else if let Some(rpm) = gpu.fan_rpm {
+                    text.push_str(&format!("  {rpm} RPM fan"));
                 }
                 if let Some(power) = gpu.power_w {
                     text.push_str(&format!("  {power:.0} W"));

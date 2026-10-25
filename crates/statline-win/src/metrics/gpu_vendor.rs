@@ -27,6 +27,7 @@ pub struct VendorReading {
     pub name: Option<String>,
     pub temperature_c: Option<f32>,
     pub fan_percent: Option<f32>,
+    pub fan_rpm: Option<u32>,
     pub power_w: Option<f32>,
     pub core_mhz: Option<u32>,
     pub memory_mhz: Option<u32>,
@@ -123,6 +124,7 @@ type NvmlHandle = unsafe extern "C" fn(u32, *mut *mut c_void) -> i32;
 type NvmlName = unsafe extern "C" fn(*mut c_void, *mut i8, u32) -> i32;
 type NvmlTemperature = unsafe extern "C" fn(*mut c_void, i32, *mut u32) -> i32;
 type NvmlFan = unsafe extern "C" fn(*mut c_void, *mut u32) -> i32;
+type NvmlFanRpm = unsafe extern "C" fn(*mut c_void, *mut u32) -> i32;
 type NvmlPower = unsafe extern "C" fn(*mut c_void, *mut u32) -> i32;
 type NvmlClock = unsafe extern "C" fn(*mut c_void, i32, *mut u32) -> i32;
 type NvmlUtilization = unsafe extern "C" fn(*mut c_void, *mut NvmlUtilizationRates) -> i32;
@@ -141,6 +143,7 @@ struct Nvml {
     name: Option<String>,
     temperature: Option<NvmlTemperature>,
     fan: Option<NvmlFan>,
+    fan_rpm: Option<NvmlFanRpm>,
     power: Option<NvmlPower>,
     clock: Option<NvmlClock>,
     utilization: Option<NvmlUtilization>,
@@ -195,6 +198,8 @@ impl Nvml {
         // SAFETY: see above.
         let fan: Option<NvmlFan> = unsafe { library.symbol(b"nvmlDeviceGetFanSpeed\0") };
         // SAFETY: see above.
+        let fan_rpm: Option<NvmlFanRpm> = unsafe { library.symbol(b"nvmlDeviceGetFanSpeedRPM\0") };
+        // SAFETY: see above.
         let power: Option<NvmlPower> = unsafe { library.symbol(b"nvmlDeviceGetPowerUsage\0") };
         // SAFETY: see above.
         let clock: Option<NvmlClock> = unsafe { library.symbol(b"nvmlDeviceGetClockInfo\0") };
@@ -226,6 +231,7 @@ impl Nvml {
             name,
             temperature,
             fan,
+            fan_rpm,
             power,
             clock,
             utilization,
@@ -253,6 +259,18 @@ impl Nvml {
             // SAFETY: as above.
             if unsafe { function(self.device, &mut value) } == NVML_SUCCESS && value <= 100 {
                 reading.fan_percent = Some(value as f32);
+            }
+        }
+
+        if reading.fan_percent.is_none() {
+            if let Some(function) = self.fan_rpm {
+                let mut value = 0u32;
+                // SAFETY: as above.
+                if unsafe { function(self.device, &mut value) } == NVML_SUCCESS
+                    && (1..=20_000).contains(&value)
+                {
+                    reading.fan_rpm = Some(value);
+                }
             }
         }
 
@@ -292,6 +310,7 @@ impl Nvml {
         (reading.name.is_some()
             || reading.temperature_c.is_some()
             || reading.fan_percent.is_some()
+            || reading.fan_rpm.is_some()
             || reading.power_w.is_some()
             || reading.core_mhz.is_some()
             || reading.memory_mhz.is_some()
@@ -551,6 +570,7 @@ impl Adl {
         let pmlog_has_data = pmlog.as_ref().is_some_and(|reading| {
             reading.temperature_c.is_some()
                 || reading.fan_percent.is_some()
+                || reading.fan_rpm.is_some()
                 || reading.power_w.is_some()
                 || reading.core_mhz.is_some()
                 || reading.memory_mhz.is_some()
@@ -582,9 +602,7 @@ impl Adl {
         )
         .map(|value| value as f32);
         let fan_percent = in_range(sensor(PMLOG_FAN_PERCENT), 0, 100).map(|value| value as f32);
-        // Fan RPM is a useful fallback only for the diagnostic; the card shows
-        // the percentage, which most laptop firmware reports.
-        let _ = sensor(PMLOG_FAN_RPM);
+        let fan_rpm = in_range(sensor(PMLOG_FAN_RPM), 1, 20_000).map(|value| value as u32);
         let power = in_range(sensor(PMLOG_ASIC_POWER), 1, 2000)
             .or_else(|| in_range(sensor(PMLOG_APU_POWER), 1, 2000))
             .or_else(|| in_range(sensor(PMLOG_BOARD_POWER), 1, 2000))
@@ -597,6 +615,7 @@ impl Adl {
             name,
             temperature_c: temperature,
             fan_percent,
+            fan_rpm,
             power_w: power,
             core_mhz,
             memory_mhz,
@@ -638,6 +657,16 @@ impl Adl {
             {
                 reading.fan_percent = Some(fan.i_fan_speed as f32);
             }
+            if reading.fan_percent.is_none() {
+                fan.i_speed_type = 2;
+                fan.i_fan_speed = 0;
+                // SAFETY: `context` is live and the struct is correctly sized.
+                if unsafe { function(self.context, self.adapter_index, 0, &mut fan) } == ADL_OK
+                    && (1..=20_000).contains(&fan.i_fan_speed)
+                {
+                    reading.fan_rpm = Some(fan.i_fan_speed as u32);
+                }
+            }
         }
 
         if let Some(function) = self.activity {
@@ -664,6 +693,7 @@ impl Adl {
         (reading.name.is_some()
             || reading.temperature_c.is_some()
             || reading.fan_percent.is_some()
+            || reading.fan_rpm.is_some()
             || reading.core_mhz.is_some()
             || reading.memory_mhz.is_some()
             || reading.utilization_percent.is_some())
@@ -722,6 +752,10 @@ mod tests {
             supported: 1,
             value: 42,
         };
+        output.sensors[PMLOG_FAN_RPM] = AdlSensorData {
+            supported: 1,
+            value: 2400,
+        };
         output.sensors[PMLOG_ASIC_POWER] = AdlSensorData {
             supported: 1,
             value: 35,
@@ -741,6 +775,7 @@ mod tests {
         let reading = Adl::from_pmlog(Some(String::from("Radeon")), &output);
         assert_eq!(reading.temperature_c, Some(61.0));
         assert_eq!(reading.fan_percent, Some(42.0));
+        assert_eq!(reading.fan_rpm, Some(2400));
         assert_eq!(reading.power_w, Some(35.0));
         assert_eq!(reading.core_mhz, Some(1800));
         assert_eq!(reading.memory_mhz, Some(1200));

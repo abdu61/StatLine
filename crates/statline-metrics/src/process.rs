@@ -84,6 +84,10 @@ impl ProcessState {
         }
         self.previous = previous;
 
+        // Aggregate instances of the same executable, as Task Manager and Stats
+        // do: Chrome's twenty renderers become one row whose CPU and memory sum.
+        let mut entries = group_by_name(entries);
+
         // Busiest first; memory breaks ties, which also gives the first sample
         // (no CPU history yet) a useful order instead of an arbitrary one.
         entries.sort_by(|a, b| {
@@ -101,6 +105,36 @@ impl ProcessState {
         self.last = Some(sample.clone());
         Some(sample)
     }
+}
+
+/// Aggregate rows that share an executable name (case-insensitive).
+///
+/// The representative row keeps the first PID and display name; CPU and memory
+/// are summed. A group with no CPU delta stays `None` so the UI shows "—".
+pub fn group_by_name(entries: Vec<ProcessEntry>) -> Vec<ProcessEntry> {
+    let mut grouped: Vec<ProcessEntry> = Vec::new();
+    let mut index: HashMap<String, usize> = HashMap::new();
+
+    for entry in entries {
+        let key = entry.name.to_lowercase();
+        if let Some(position) = index.get(&key).copied() {
+            let target = &mut grouped[position];
+            target.working_set_bytes = target
+                .working_set_bytes
+                .saturating_add(entry.working_set_bytes);
+            target.cpu_percent = match (target.cpu_percent, entry.cpu_percent) {
+                (Some(left), Some(right)) => Some((left + right).clamp(0.0, 100.0)),
+                (Some(left), None) => Some(left),
+                (None, Some(right)) => Some(right),
+                (None, None) => None,
+            };
+        } else {
+            index.insert(key, grouped.len());
+            grouped.push(entry);
+        }
+    }
+
+    grouped
 }
 
 /// `delta_ticks` of CPU time over `elapsed`, as a share of total capacity.
@@ -168,6 +202,36 @@ mod tests {
             ),
             "rows must be sorted by CPU descending"
         );
+    }
+
+    #[test]
+    fn grouping_sums_instances_of_the_same_name() {
+        let entries = vec![
+            ProcessEntry {
+                pid: 1,
+                name: String::from("chrome.exe"),
+                cpu_percent: Some(4.0),
+                working_set_bytes: 100,
+            },
+            ProcessEntry {
+                pid: 2,
+                name: String::from("CHROME.EXE"),
+                cpu_percent: Some(2.5),
+                working_set_bytes: 50,
+            },
+            ProcessEntry {
+                pid: 3,
+                name: String::from("explorer.exe"),
+                cpu_percent: None,
+                working_set_bytes: 80,
+            },
+        ];
+        let grouped = group_by_name(entries);
+        assert_eq!(grouped.len(), 2);
+        assert_eq!(grouped[0].name, "chrome.exe");
+        assert_eq!(grouped[0].cpu_percent, Some(6.5));
+        assert_eq!(grouped[0].working_set_bytes, 150);
+        assert_eq!(grouped[1].cpu_percent, None);
     }
 
     #[test]

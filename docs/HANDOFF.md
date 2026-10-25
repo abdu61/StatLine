@@ -103,9 +103,10 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   built from the focused flyout model. CPU adds 1/5/15-minute averages; the battery card
   shows health, temperature and cycle count. Optional DWM Mica backdrop on framed windows.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
-  deltas and working sets. Task Manager scale (share of all cores); `None` until a baseline
-  exists, rendered `—`. Sampled at 2 s only while the flyout or companion is open, and
-  zero when both are closed.
+  deltas and working sets. Instances of the same executable are grouped (Chrome's
+  renderers become one row). Task Manager scale (share of all cores); `None` until a
+  baseline exists, rendered `—`. Sampled at 2 s only while the flyout or companion is
+  open, and zero when both are closed.
 - **Settings**: framed window from the tray/strip menu or the companion nav. Theme
   (system/light/dark), accent presets (system/blue/green/purple/orange/teal/pink),
   interval, byte units, Mica, strip placement, autostart and per-module strip visibility,
@@ -117,6 +118,11 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   GPU vendor telemetry via lazily loaded NVML/ADL (3 s GPU cadence; AMD PMLog verified
   on this APU, Overdrive5 fallback; NVML needs an NVIDIA machine to exercise). They
   share the process table's visibility gate and hide when unavailable.
+- **Memory and network**: commit/cache from `GetPerformanceInfo`, aggregate page-file
+  usage from `SystemPageFileInformation` (pages × page size) and per-adapter link speed
+  from `MIB_IF_ROW2` (shown as "Wi-Fi · 866 Mbps"). CPU identity (processor name, base
+  clock) is read once from the registry. Cores show percentage and clock in a labelled
+  grid.
 - **Packaging**: `scripts/package.ps1` builds `dist/Statline-<v>-x64.zip` (exe, README,
   changelog, licence texts) plus a SHA-256. `scripts/build-msix.ps1` stages the layout and
   runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and

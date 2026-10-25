@@ -20,10 +20,15 @@ pub struct InterfaceRef {
     pub name: String,
     /// Raw `NET_LUID_LH.Value`, kept as an integer so the struct stays simple.
     pub luid: u64,
+    /// Negotiated link speed in bits per second.
+    pub link_speed_bps: u64,
+    /// IEEE 802.11 interface.
+    pub wireless: bool,
 }
 
 const IF_OPER_STATUS_UP: i32 = 1;
 const IF_TYPE_SOFTWARE_LOOPBACK: u32 = 24;
+const IF_TYPE_IEEE80211: u32 = 71;
 const TUNNEL_TYPE_NONE: i32 = 0;
 
 /// Enumerate operational, non-loopback, non-tunnel interfaces with a real link.
@@ -57,6 +62,8 @@ pub fn interfaces() -> Vec<InterfaceRef> {
             found.push(InterfaceRef {
                 name: wide_to_string(&row.Alias),
                 luid,
+                link_speed_bps: row.TransmitLinkSpeed.max(row.ReceiveLinkSpeed),
+                wireless: row.Type == IF_TYPE_IEEE80211,
             });
         }
         found

@@ -31,6 +31,10 @@ pub struct CpuSample {
     pub per_core_mhz: Vec<u32>,
     /// Current average core clock, if the platform reports it.
     pub mhz: Option<u32>,
+    /// Processor marketing name, e.g. "AMD Ryzen 7 7840U …".
+    pub name: Option<String>,
+    /// Nominal base clock in MHz from the registry.
+    pub base_mhz: Option<u32>,
     /// Exponentially smoothed busy percentage over the last minute.
     pub average_1m_percent: f32,
     /// Exponentially smoothed busy percentage over the last five minutes.
@@ -46,6 +50,9 @@ pub struct MemorySample {
     pub commit_bytes: u64,
     pub commit_limit_bytes: u64,
     pub cached_bytes: u64,
+    /// Page-file (swap) usage in bytes; both zero when no page file exists.
+    pub swap_used_bytes: u64,
+    pub swap_total_bytes: u64,
 }
 
 impl MemorySample {
@@ -67,6 +74,8 @@ pub struct GpuSample {
     pub name: Option<String>,
     pub temperature_c: Option<f32>,
     pub fan_percent: Option<f32>,
+    /// Fan speed when the firmware only reports RPM.
+    pub fan_rpm: Option<u32>,
     pub power_w: Option<f32>,
     /// Current graphics clock in MHz.
     pub core_mhz: Option<u32>,
@@ -121,6 +130,10 @@ pub struct AdapterSample {
     pub name: String,
     pub rx_bytes_per_sec: f64,
     pub tx_bytes_per_sec: f64,
+    /// Negotiated link speed in bits per second; 0 when unknown.
+    pub link_speed_bps: u64,
+    /// IEEE 802.11 interface.
+    pub wireless: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

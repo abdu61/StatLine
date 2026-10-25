@@ -102,6 +102,7 @@ impl GpuState {
             name: vendor.name,
             temperature_c: vendor.temperature_c,
             fan_percent: vendor.fan_percent,
+            fan_rpm: vendor.fan_rpm,
             power_w: vendor.power_w,
             core_mhz: vendor.core_mhz,
             memory_mhz: vendor.memory_mhz,

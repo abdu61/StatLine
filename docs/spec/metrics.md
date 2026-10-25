@@ -40,10 +40,22 @@ One cached PDH query opened at startup with `PdhAddEnglishCounterW`
 (localization-proof): `\PhysicalDisk(*)\Disk Read Bytes/sec`, `Disk Write Bytes/sec`,
 `% Disk Time`. Busy % is clamped to 100. Aggregate across instances for the strip.
 
+**Memory**
+`GlobalMemoryStatusEx` for physical totals; `GetPerformanceInfo` for commit limit/usage,
+system cache and object counts. Aggregate page-file usage comes from
+`NtQuerySystemInformation(SystemPageFileInformation, 0x12)`: one entry per page file,
+`TotalSize`/`TotalInUse` in pages × `dwPageSize`. No page file → both stay zero and the
+Swap row hides.
+
 **Network**
-`GetIfTable2` each tick; sum `InOctets`/`OutOctets` deltas for interfaces that are
-`IF_OPER_STATUS_OPERATIONAL` and not loopback/tunnel. Per-adapter rows for the flyout.
-Session totals accumulate in the sampler from process start.
+`GetIfTable2` each 15 s; sum `InOctets`/`OutOctets` deltas for interfaces that are
+`IF_OPER_STATUS_OPERATIONAL` and not loopback/tunnel. Per-adapter rows for the flyout,
+including `TransmitLinkSpeed` and the 802.11 flag.
+
+**Processes**
+`NtQuerySystemInformation(SystemProcessInformation)`; CPU share from cumulative CPU-time
+deltas over the measured interval and total core capacity. Rows are grouped by executable
+name (case-insensitive), summing CPU and working set.
 
 **GPU utilization**
 PDH `\GPU Engine(*)\Utilization Percentage`, summed per engine and clamped to 100.

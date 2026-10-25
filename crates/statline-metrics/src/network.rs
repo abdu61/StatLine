@@ -27,7 +27,7 @@ impl NetworkState {
     /// totals still update.
     pub fn update(
         &mut self,
-        interfaces: Vec<(String, u64, u64)>,
+        interfaces: Vec<(String, u64, u64, u64, bool)>,
         elapsed: Option<Duration>,
     ) -> NetworkSample {
         let seconds = elapsed.map(|d| d.as_secs_f64()).filter(|s| *s > 0.0);
@@ -36,7 +36,7 @@ impl NetworkState {
         let mut total_rx = 0.0;
         let mut total_tx = 0.0;
 
-        for (name, in_octets, out_octets) in interfaces {
+        for (name, in_octets, out_octets, link_speed_bps, wireless) in interfaces {
             let (rx, tx) = match (self.previous.get(&name), seconds) {
                 (Some(&(prev_in, prev_out)), Some(seconds)) => {
                     let rx = in_octets.saturating_sub(prev_in) as f64 / seconds;
@@ -59,6 +59,8 @@ impl NetworkState {
                 name,
                 rx_bytes_per_sec: rx,
                 tx_bytes_per_sec: tx,
+                link_speed_bps,
+                wireless,
             });
         }
 
@@ -82,8 +84,8 @@ impl NetworkState {
 mod tests {
     use super::*;
 
-    fn iface(name: &str, rx: u64, tx: u64) -> (String, u64, u64) {
-        (name.to_string(), rx, tx)
+    fn iface(name: &str, rx: u64, tx: u64) -> (String, u64, u64, u64, bool) {
+        (name.to_string(), rx, tx, 866_000_000, name == "Wi-Fi")
     }
 
     #[test]
@@ -126,6 +128,8 @@ mod tests {
             .find(|a| a.name == "Wi-Fi")
             .expect("wifi adapter");
         assert_eq!(wifi.rx_bytes_per_sec, 0.0);
+        assert_eq!(wifi.link_speed_bps, 866_000_000);
+        assert!(wifi.wireless);
     }
 
     #[test]

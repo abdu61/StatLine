@@ -43,6 +43,9 @@ pub fn run(iterations: u32) {
     time("performance_counters", iterations, || {
         black_box(metrics::performance_counters());
     });
+    time("page file (NtQuery)", iterations, || {
+        black_box(metrics::page_file_usage());
+    });
     time("interfaces (GetIfTable2)", iterations, || {
         black_box(metrics::net::interfaces());
     });
@@ -74,6 +77,11 @@ pub fn run(iterations: u32) {
     if let Some(gpu) = statline_win::metrics::gpu::GpuCounters::open() {
         time("gpu sample (PDH + DXGI)", iterations, || {
             black_box(gpu.sample());
+        });
+    }
+    if let Some(mut vendor) = statline_win::metrics::VendorSensors::open() {
+        time("gpu vendor (NVML/ADL)", iterations, || {
+            black_box(vendor.read());
         });
     }
     time("volumes", iterations, || {

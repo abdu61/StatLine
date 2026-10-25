@@ -5,8 +5,8 @@
 //! code into a bitmap is the only reliable way to review the design here.
 
 use statline_core::model::{
-    BatterySample, CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample, ProcessEntry,
-    ProcessSample, Snapshot, SystemSample, ThermalSample, VolumeSample,
+    AdapterSample, BatterySample, CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample,
+    ProcessEntry, ProcessSample, Snapshot, SystemSample, ThermalSample, VolumeSample,
 };
 use statline_render::{Color, Palette, Renderer};
 use statline_ui::{render, strip};
@@ -21,6 +21,8 @@ fn synthetic() -> Snapshot {
             per_core_percent: vec![12.0, 44.0, 8.0, 31.0, 5.0, 61.0, 17.0, 9.0],
             per_core_mhz: vec![3200, 3400, 3100, 3300, 3200, 3500, 3100, 3000],
             mhz: Some(2400),
+            name: Some(String::from("AMD Ryzen 7 7840U w/ Radeon 780M Graphics")),
+            base_mhz: Some(3300),
             average_1m_percent: 21.0,
             average_5m_percent: 19.0,
             average_15m_percent: 17.0,
@@ -31,6 +33,8 @@ fn synthetic() -> Snapshot {
             commit_bytes: 11_200_000_000,
             commit_limit_bytes: 20_000_000_000,
             cached_bytes: 3_100_000_000,
+            swap_used_bytes: 1_200_000_000,
+            swap_total_bytes: 4_000_000_000,
         }),
         gpu: Some(GpuSample {
             utilization_percent: 8.0,
@@ -39,6 +43,7 @@ fn synthetic() -> Snapshot {
             name: Some(String::from("Radeon 780M")),
             temperature_c: Some(62.0),
             fan_percent: Some(41.0),
+            fan_rpm: None,
             power_w: Some(35.0),
             core_mhz: Some(1800),
             memory_mhz: Some(1200),
@@ -58,7 +63,15 @@ fn synthetic() -> Snapshot {
         network: Some(NetworkSample {
             rx_bytes_per_sec: 1_240_000.0,
             tx_bytes_per_sec: 84_000.0,
-            ..Default::default()
+            adapters: vec![AdapterSample {
+                name: String::from("Wi-Fi"),
+                rx_bytes_per_sec: 1_240_000.0,
+                tx_bytes_per_sec: 84_000.0,
+                link_speed_bps: 866_000_000,
+                wireless: true,
+            }],
+            session_rx_bytes: 8_400_000_000,
+            session_tx_bytes: 1_200_000_000,
         }),
         system: Some(SystemSample {
             uptime_secs: 90_061,
@@ -378,6 +391,43 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let path = dir.join("dashboard-gpu-100.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
+
+        for (page, focus, file) in [
+            (
+                Page::Memory,
+                flyout::Focus::Memory,
+                "dashboard-memory-100.png",
+            ),
+            (
+                Page::Network,
+                flyout::Focus::Network,
+                "dashboard-network-100.png",
+            ),
+            (
+                Page::Battery,
+                flyout::Focus::Battery,
+                "dashboard-battery-100.png",
+            ),
+        ] {
+            let model = flyout::model_focused(
+                &snapshot,
+                &history,
+                Some(focus),
+                statline_core::units::UnitSystem::Binary,
+            );
+            let mut surface = renderer.surface(width, height)?;
+            dashboard::render(
+                &mut surface,
+                &mut renderer.text,
+                &palette,
+                &model,
+                scale,
+                page,
+            );
+            let path = dir.join(file);
+            surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+            written.push(path);
+        }
 
         // About page.
         let mut surface = renderer.surface(width, height)?;

@@ -17,13 +17,13 @@ pub mod process;
 pub mod thermal;
 
 pub use cpu::{
-    CpuTimes, average_mhz, current_mhz, logical_core_count, per_core_mhz, per_core_times,
-    system_times,
+    CpuTimes, average_mhz, base_mhz, current_mhz, logical_core_count, per_core_mhz, per_core_times,
+    processor_name, system_times,
 };
 pub use gpu_vendor::{VendorReading, VendorSensors};
 pub use memory::{
     MemoryStatus, PerformanceCounters, ProcessMemory, current_process_memory, memory_status,
-    performance_counters, process_cpu_time, uptime_secs,
+    page_file_usage, performance_counters, process_cpu_time, uptime_secs,
 };
 
 use windows::Win32::Foundation::FILETIME;

@@ -9,9 +9,17 @@ use windows::Win32::Foundation::FILETIME;
 use windows::Win32::System::Power::{
     CallNtPowerInformation, PROCESSOR_POWER_INFORMATION, ProcessorInformation,
 };
+use windows::Win32::System::Registry::{
+    HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RegGetValueW,
+};
 use windows::Win32::System::SystemInformation::{GetSystemInfo, SYSTEM_INFO};
 use windows::Win32::System::Threading::GetSystemTimes;
 use windows::Win32::System::WindowsProgramming::SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION;
+use windows::core::{PCWSTR, w};
+
+const CPU_KEY: PCWSTR = w!("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0");
+const CPU_NAME_VALUE: PCWSTR = w!("ProcessorNameString");
+const CPU_BASE_VALUE: PCWSTR = w!("~MHz");
 
 /// Processor time counters, in 100 ns ticks.
 ///
@@ -127,6 +135,55 @@ pub fn current_mhz() -> Option<u32> {
     average_mhz(&per_core_mhz())
 }
 
+/// Processor marketing name from the registry, e.g. "AMD Ryzen 7 7840U …".
+pub fn processor_name() -> Option<String> {
+    let mut buffer = [0u16; 256];
+    let mut size = (buffer.len() * size_of::<u16>()) as u32;
+
+    // SAFETY: static key/value names; the buffer is `size` bytes and the output
+    // size is a valid out-parameter.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            CPU_KEY,
+            CPU_NAME_VALUE,
+            RRF_RT_REG_SZ,
+            None,
+            Some(buffer.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
+    };
+    if status.is_err() {
+        return None;
+    }
+
+    let length = (size as usize / size_of::<u16>()).min(buffer.len());
+    let name = String::from_utf16_lossy(&buffer[..length]);
+    let name = name.trim_matches('\0').trim();
+    (!name.is_empty()).then(|| String::from(name))
+}
+
+/// Nominal base clock in MHz from the registry.
+pub fn base_mhz() -> Option<u32> {
+    let mut value = 0u32;
+    let mut size = size_of::<u32>() as u32;
+
+    // SAFETY: static key/value names; `value` and `size` are valid DWORD
+    // out-parameters.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            CPU_KEY,
+            CPU_BASE_VALUE,
+            RRF_RT_REG_DWORD,
+            None,
+            Some((&mut value as *mut u32).cast()),
+            Some(&mut size),
+        )
+    };
+    (status.is_ok() && (100..=10_000).contains(&value)).then_some(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,6 +216,20 @@ mod tests {
         if let Some(mhz) = current_mhz() {
             assert!(mhz > 100, "implausible clock: {mhz} MHz");
             assert!(mhz < 10_000, "implausible clock: {mhz} MHz");
+        }
+    }
+
+    #[test]
+    fn processor_identity_queries_are_plausible() {
+        if let Some(name) = processor_name() {
+            assert!(!name.is_empty());
+            assert!(!name.contains('\0'));
+        }
+        if let Some(mhz) = base_mhz() {
+            assert!(
+                (100..=10_000).contains(&mhz),
+                "implausible base clock: {mhz}"
+            );
         }
     }
 

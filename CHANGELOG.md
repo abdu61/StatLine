@@ -8,6 +8,12 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Per-process rows are grouped by executable, so Chrome, svchost and friends appear once
+  with summed CPU and memory.
+- Memory page shows commit, **swap/page-file** usage (`SystemPageFileInformation`) and
+  cache; network rows show link speed (e.g. "Wi-Fi · 866 Mbps"); the battery page shows
+  time left, rate and design/full capacity.
+- Processor name and base clock from the registry, shown on the CPU card.
 - GPU vendor telemetry loaded lazily from the installed driver: NVML for NVIDIA and ADL
   PMLog/Overdrive5 for AMD. Temperature, fan, power and clocks appear on the GPU page
   and in `--probe`. Verified on this AMD APU (Radeon graphics, 56 °C, 4 W, 400 MHz /

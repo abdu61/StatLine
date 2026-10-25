@@ -42,6 +42,9 @@ pub struct Sampler {
     process: ProcessState,
     thermal: ThermalState,
     battery: BatteryState,
+    /// Static processor identity, read once.
+    cpu_name: Option<String>,
+    cpu_base_mhz: Option<u32>,
     /// Smoothed CPU percentages for the 1/5/15 minute figures.
     average_1m: f32,
     average_5m: f32,
@@ -71,6 +74,8 @@ impl Sampler {
             process: ProcessState::new(),
             thermal: ThermalState::new(),
             battery: BatteryState::new(),
+            cpu_name: metrics::processor_name(),
+            cpu_base_mhz: metrics::base_mhz(),
             average_1m: 0.0,
             average_5m: 0.0,
             average_15m: 0.0,
@@ -177,6 +182,8 @@ impl Sampler {
             per_core_percent,
             per_core_mhz: core_mhz.clone(),
             mhz: metrics::average_mhz(&core_mhz),
+            name: self.cpu_name.clone(),
+            base_mhz: self.cpu_base_mhz,
             average_1m_percent: self.average_1m,
             average_5m_percent: self.average_5m,
             average_15m_percent: self.average_15m,
@@ -201,7 +208,15 @@ impl Sampler {
             .interfaces
             .iter()
             .filter_map(|interface| {
-                metrics::net::counters(interface).map(|(rx, tx)| (interface.name.clone(), rx, tx))
+                metrics::net::counters(interface).map(|(rx, tx)| {
+                    (
+                        interface.name.clone(),
+                        rx,
+                        tx,
+                        interface.link_speed_bps,
+                        interface.wireless,
+                    )
+                })
             })
             .collect();
 
@@ -212,6 +227,7 @@ impl Sampler {
 fn sample_memory() -> Option<MemorySample> {
     let status = metrics::memory_status()?;
     let counters = metrics::performance_counters()?;
+    let (swap_used, swap_total) = metrics::page_file_usage().unwrap_or((0, 0));
 
     Some(MemorySample {
         used_bytes: status.total_bytes.saturating_sub(status.available_bytes),
@@ -219,6 +235,8 @@ fn sample_memory() -> Option<MemorySample> {
         commit_bytes: counters.commit_bytes,
         commit_limit_bytes: counters.commit_limit_bytes,
         cached_bytes: counters.cached_bytes,
+        swap_used_bytes: swap_used,
+        swap_total_bytes: swap_total,
     })
 }
 

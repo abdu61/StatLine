@@ -159,13 +159,21 @@ pub fn model_focused(
 
     if let Some(cpu) = snapshot.cpu.as_ref() {
         if overview || focus == Some(Focus::Cpu) {
-            let detail = match cpu.mhz {
-                Some(mhz) => format!(
-                    "{} cores \u{00b7} {}",
-                    cpu.per_core_percent.len().max(1),
-                    format_frequency(mhz)
-                ),
-                None => format!("{} cores", cpu.per_core_percent.len().max(1)),
+            let detail = match (focus, cpu.name.as_ref()) {
+                (Some(Focus::Cpu), Some(name)) => {
+                    format!(
+                        "{name} \u{00b7} {} cores",
+                        cpu.per_core_percent.len().max(1)
+                    )
+                }
+                _ => match cpu.mhz {
+                    Some(mhz) => format!(
+                        "{} cores \u{00b7} {}",
+                        cpu.per_core_percent.len().max(1),
+                        format_frequency(mhz)
+                    ),
+                    None => format!("{} cores", cpu.per_core_percent.len().max(1)),
+                },
             };
             rows.push(Row {
                 label: "CPU",
@@ -195,6 +203,12 @@ pub fn model_focused(
                         format_percent(cpu.average_15m_percent)
                     ),
                 });
+                if let Some(base) = cpu.base_mhz {
+                    detail_rows.push(DetailRow {
+                        label: String::from("Base clock"),
+                        value: format_frequency(base),
+                    });
+                }
             }
         }
     }
@@ -217,11 +231,39 @@ pub fn model_focused(
                 critical: 95.0,
             });
 
-            if focus == Some(Focus::Memory) && memory.cached_bytes > 0 {
-                detail_rows.push(DetailRow {
-                    label: String::from("Cached"),
-                    value: format_bytes(memory.cached_bytes, units),
-                });
+            if focus == Some(Focus::Memory) {
+                if memory.commit_limit_bytes > 0 {
+                    let percent = (memory.commit_bytes as f64 / memory.commit_limit_bytes as f64
+                        * 100.0)
+                        .clamp(0.0, 100.0);
+                    detail_rows.push(DetailRow {
+                        label: String::from("Commit"),
+                        value: format!(
+                            "{} / {} ({percent:.0}%)",
+                            format_bytes(memory.commit_bytes, units),
+                            format_bytes(memory.commit_limit_bytes, units)
+                        ),
+                    });
+                }
+                if memory.swap_total_bytes > 0 {
+                    let percent = (memory.swap_used_bytes as f64 / memory.swap_total_bytes as f64
+                        * 100.0)
+                        .clamp(0.0, 100.0);
+                    detail_rows.push(DetailRow {
+                        label: String::from("Swap"),
+                        value: format!(
+                            "{} / {} ({percent:.0}%)",
+                            format_bytes(memory.swap_used_bytes, units),
+                            format_bytes(memory.swap_total_bytes, units)
+                        ),
+                    });
+                }
+                if memory.cached_bytes > 0 {
+                    detail_rows.push(DetailRow {
+                        label: String::from("Cached"),
+                        value: format_bytes(memory.cached_bytes, units),
+                    });
+                }
             }
         }
     }
@@ -242,6 +284,8 @@ pub fn model_focused(
             }
             if let Some(fan) = gpu.fan_percent {
                 detail.push_str(&format!(" \u{00b7} fan {fan:.0}%"));
+            } else if let Some(rpm) = gpu.fan_rpm {
+                detail.push_str(&format!(" \u{00b7} fan {rpm} RPM"));
             }
             if let Some(power) = gpu.power_w {
                 detail.push_str(&format!(" \u{00b7} {power:.0} W"));
@@ -356,8 +400,14 @@ pub fn model_focused(
 
             if focus == Some(Focus::Network) {
                 for adapter in &network.adapters {
+                    let link = format_link_speed(adapter.link_speed_bps);
+                    let label = if link.is_empty() {
+                        adapter.name.clone()
+                    } else {
+                        format!("{} \u{00b7} {link}", adapter.name)
+                    };
                     detail_rows.push(DetailRow {
-                        label: adapter.name.clone(),
+                        label,
                         value: format!(
                             "\u{2193} {}  \u{2191} {}",
                             format_rate_short(adapter.rx_bytes_per_sec, units),
@@ -433,6 +483,34 @@ pub fn model_focused(
         rows.extend(system_row);
     }
 
+    if focus == Some(Focus::Battery) {
+        if let Some(battery) = snapshot.battery.as_ref() {
+            if let Some(seconds) = battery.seconds_left {
+                detail_rows.push(DetailRow {
+                    label: String::from("Time left"),
+                    value: format_duration(seconds as u64),
+                });
+            }
+            if let Some(rate) = battery.rate_mw {
+                let value = if rate.unsigned_abs() >= 1000 {
+                    format!("{:.1} W", rate as f32 / 1000.0)
+                } else {
+                    format!("{rate} mW")
+                };
+                detail_rows.push(DetailRow {
+                    label: String::from("Rate"),
+                    value,
+                });
+            }
+            if let (Some(design), Some(full)) = (battery.designed_mwh, battery.full_mwh) {
+                detail_rows.push(DetailRow {
+                    label: String::from("Capacity"),
+                    value: format!("{full} / {design} mWh"),
+                });
+            }
+        }
+    }
+
     // Only CPU and Memory ask "which app is responsible"; the other modules
     // have no per-app data, so their focused view has no process table.
     let processes = match focus {
@@ -474,6 +552,18 @@ pub fn model_focused(
         cores,
         processes,
         focus,
+    }
+}
+
+fn format_link_speed(bits_per_second: u64) -> String {
+    if bits_per_second == 0 {
+        return String::new();
+    }
+    let gbps = bits_per_second as f64 / 1_000_000_000.0;
+    if gbps >= 1.0 {
+        format!("{gbps:.1} Gbps")
+    } else {
+        format!("{:.0} Mbps", bits_per_second as f64 / 1_000_000.0)
     }
 }
 
@@ -896,6 +986,7 @@ mod tests {
                 commit_bytes: 9,
                 commit_limit_bytes: 20,
                 cached_bytes: 3,
+                ..MemorySample::default()
             }),
             ..Default::default()
         }
