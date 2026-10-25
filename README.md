@@ -12,8 +12,9 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 ## What it does
 
 - **Strip in the taskbar**: CPU, memory, GPU, disk and a two-line network readout,
-  anchored beside the tray (or after Start). It is a real child of `Shell_TrayWnd`, so
-  the Start menu no longer covers it, and clicking it never steals focus.
+  anchored beside the tray (or the leftmost free area on a centred taskbar). It is a
+  real child of `Shell_TrayWnd`, so the Start menu no longer covers it, and clicking it
+  never steals focus.
 - **Flyout**: clicking a segment opens just that module — CPU shows per-core bars and
   the CPU process table, Memory shows commit/cache and the top memory apps, Disk and
   Network add per-volume and per-adapter rows. System and Battery stay visible.

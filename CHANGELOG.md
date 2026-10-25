@@ -6,6 +6,12 @@ All notable changes to Statline are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Strip placement now respects Windows 11 taskbar alignment. Right anchors to the tray;
+  Left uses the far-left free area on a centred taskbar, or the space after the app
+  buttons when the taskbar is left-aligned, instead of overlapping Start/apps.
+
 ### Added
 
 - The GPU card includes the adapter name; the companion remembers its position and size

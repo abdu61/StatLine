@@ -66,7 +66,7 @@ Tray icon or strip right-click → **Settings…**. Rows cycle on click:
 | Units | Binary (KiB) ↔ Decimal (kB) |
 | Accent | System → Blue → Green → Purple → Orange → Teal → Pink |
 | Mica window effect | On ↔ Off (`DWMWA_SYSTEMBACKDROP_TYPE` on the framed windows) |
-| Strip placement | Right ↔ Left (left anchors past Start, clamped at the tray) |
+| Strip placement | Right ↔ Left (Left is the leftmost free area: far-left on a centred taskbar, after the app-button group on a left-aligned one) |
 | Start with Windows | On ↔ Off (writes `HKCU\...\Run`) |
 | Strip CPU / memory / GPU / disk / network | On ↔ Off (the flyout and companion stay complete) |
 

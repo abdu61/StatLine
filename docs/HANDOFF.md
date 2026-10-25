@@ -164,6 +164,11 @@ table: **~4.75 ms per query** (~250 processes). With a detail surface open the a
 - **A parented strip is a child window.** Position it in taskbar-client coordinates
   (`ScreenToClient`), handle `TaskbarCreated` in a top-level window (broadcasts skip
   children), and look it up with `FindWindowEx`, not `FindWindow`.
+- **Taskbar placement depends on alignment.** `TaskbarAl` (0 left, 1 centre) plus
+  `ReBarWindow32` and `Start` rects decide the left slot. On a left-aligned taskbar the
+  app buttons own the left edge, so "Left" must anchor after `ReBarWindow32`; anchoring
+  at the taskbar edge overlaps Start/apps. On a centred taskbar the left region is free,
+  so it anchors at the edge (clamped before the centred group).
 - **Never store a pointer to a value you then move.** The strip host is boxed exactly
   because the window procedure reads it through a static pointer.
 - **GDI destruction must follow Direct2D teardown.** `GdiSurface` drops after the D2D

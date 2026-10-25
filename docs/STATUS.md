@@ -23,7 +23,10 @@ detail sampling on
   suppressed, hides for fullscreen and a hidden taskbar, recreates after an Explorer
   restart via the app message window. Topmost popup remains as an automatic fallback.
   Network leads so its varying rate text changes the strip's left edge instead of
-  shifting the other segments.
+  shifting the other segments. Placement reads `TaskbarAl`: **Right** anchors to the
+  tray; **Left** uses the far-left free area on a centred taskbar, or the space after
+  the app-button group when the taskbar is left-aligned (so it never overlays Start or
+  the app buttons).
 - **Flyout**: opens on strip click, toggles closed on a second click, closes on Esc or
   focus loss. A segment click shows only that module — CPU with per-core bars and the
   CPU process table, Memory with commit/cache and top memory apps, Disk with volumes,
