@@ -65,6 +65,8 @@ detail sampling on
   `SystemPageFileInformation`, all converted from pages to bytes.
 - **Disk detail**: aggregate read/write and per-volume used/total, temperature, plus
   per-physical-disk rates and busy percentage from named PDH instances (`Disk 0 C:`).
+- **Network detail**: per-adapter rates, session totals, the negotiated link speed
+  (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps") and, on WLAN, the SSID and
   signal quality from `wlanapi` (queried only while a detail surface is open).
 - **System detail**: Windows edition/build (corrected to "Windows 11" from the build
   number, since ProductName still says Windows 10 on many builds) and computer name,

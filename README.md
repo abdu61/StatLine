@@ -40,6 +40,8 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 - **Per-app detail**: process CPU is a share of total capacity (the Task Manager scale),
   with working set; instances of the same executable are grouped. Sampling only runs
   while a surface showing processes is open.
+- **Disk and network**: per-volume capacity/temperature, per-physical-disk activity,
+  adapter rates and link speed, and the Wi-Fi SSID/signal when connected.
 
 ## Privacy and footprint
 
