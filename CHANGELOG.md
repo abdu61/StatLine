@@ -8,6 +8,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- The companion remembers its position and size in `window.json` and only restores a
+  rectangle that still intersects a monitor. Closing it with X now lets the Dashboard
+  menu open it again.
 - System page shows the Windows edition/build and computer name (registry, read once),
   alongside process count, thermal state and battery summary.
 - Memory page gains an Available row; the network card shows its link speed; the bench

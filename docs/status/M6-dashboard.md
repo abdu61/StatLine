@@ -17,7 +17,7 @@ The place to configure and to explore, in one window.
       adapters, GPU/battery/system detail
 - [x] Settings window: theme, interval, units, Mica, strip placement, autostart; changes
       live-apply and persist atomically
-- [ ] Window shell: custom title area, remembered bounds
+- [ ] Window shell: custom title area, remembered bounds (bounds done)
 - [ ] Overview: 5-minute chart with hover readout, sortable process table
 - [ ] Modules: reorder (drag), per-module meter/threshold/colour (strip visibility done)
 - [ ] Appearance: density, labels, opacity

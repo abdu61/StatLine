@@ -89,6 +89,7 @@ fn open() -> windows::core::Result<()> {
         height,
         dark,
         settings.appearance.mica,
+        None,
     )?;
     let mut window = Box::new(SettingsWindow {
         hwnd,

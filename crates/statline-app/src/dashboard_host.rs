@@ -1,15 +1,17 @@
 //! Hosts the companion window: a normal framed Windows app.
 
+use statline_config::WindowBounds;
 use statline_core::model::Snapshot;
 use statline_core::units::UnitSystem;
 use statline_render::{Palette, Renderer, Surface};
 use statline_ui::dashboard::{self, Page};
 use statline_ui::flyout::{self, Model};
-use statline_win::{HWND, LPARAM, LRESULT, WPARAM, window};
+use statline_win::{HWND, LPARAM, LRESULT, WPARAM, paths, window};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetClientRect, WM_CLOSE, WM_LBUTTONUP, WM_PAINT, WM_SIZE,
+    DefWindowProcW, GetClientRect, GetWindowRect, IsIconic, WM_CLOSE, WM_EXITSIZEMOVE,
+    WM_LBUTTONUP, WM_PAINT, WM_SIZE,
 };
 
 const CLASS: &str = "StatlineCompanionWindow";
@@ -92,6 +94,19 @@ impl Dashboard {
 
         let width = (WINDOW_WIDTH as f32 * self.scale) as i32;
         let height = (WINDOW_HEIGHT as f32 * self.scale) as i32;
+        let bounds = WindowBounds::load(&paths::window_state_file())
+            .map(|bounds| {
+                (
+                    bounds.x,
+                    bounds.y,
+                    bounds.width as i32,
+                    bounds.height as i32,
+                )
+            })
+            .filter(|bounds| window::rect_is_visible(*bounds));
+        let (log_width, log_height) = bounds
+            .map(|(_, _, width, height)| (width, height))
+            .unwrap_or((width, height));
         match window::create_frame_window(
             CLASS,
             "Statline",
@@ -100,12 +115,13 @@ impl Dashboard {
             height,
             self.palette.is_dark,
             self.mica,
+            bounds,
         ) {
             Ok(hwnd) => {
                 self.hwnd = Some(hwnd);
                 COMPANION.store(self as *mut Dashboard, std::sync::atomic::Ordering::Release);
                 self.render_surface(renderer, hwnd);
-                log::info!("companion opened {width}x{height}");
+                log::info!("companion opened {log_width}x{log_height}");
             }
             Err(error) => log::error!("could not open companion: {error}"),
         }
@@ -170,6 +186,7 @@ impl Dashboard {
 
     pub fn close(&mut self) {
         if let Some(hwnd) = self.hwnd.take() {
+            self.save_bounds(hwnd);
             // SAFETY: our window; DestroyWindow triggers WM_DESTROY on this thread.
             unsafe {
                 let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
@@ -177,6 +194,29 @@ impl Dashboard {
             log::info!("companion closed");
         }
         self.surface = None;
+    }
+
+    /// Persist the outer window rectangle for the next open.
+    pub(crate) fn save_bounds(&self, hwnd: HWND) {
+        // A minimized window reports a wild rectangle; keep the last good one.
+        // SAFETY: our window.
+        if unsafe { IsIconic(hwnd) }.as_bool() {
+            return;
+        }
+        let mut rect = RECT::default();
+        // SAFETY: `rect` is a valid out-parameter for a live window.
+        if unsafe { GetWindowRect(hwnd, &mut rect) }.is_err() {
+            return;
+        }
+        let bounds = WindowBounds {
+            x: rect.left,
+            y: rect.top,
+            width: (rect.right - rect.left).max(1) as u32,
+            height: (rect.bottom - rect.top).max(1) as u32,
+        };
+        if let Err(error) = bounds.save(&paths::window_state_file()) {
+            log::warn!("could not save window bounds: {error}");
+        }
     }
 }
 
@@ -241,10 +281,35 @@ unsafe extern "system" fn companion_proc(
             }
             LRESULT(0)
         }
+        WM_EXITSIZEMOVE => {
+            let pointer = COMPANION.load(std::sync::atomic::Ordering::Acquire);
+            if !pointer.is_null() {
+                // SAFETY: the pointer is a live companion owned by this thread.
+                unsafe {
+                    (*pointer).save_bounds(hwnd);
+                }
+            }
+            LRESULT(0)
+        }
         WM_CLOSE => {
+            let pointer = COMPANION.load(std::sync::atomic::Ordering::Acquire);
+            if !pointer.is_null() {
+                // SAFETY: the pointer is a live companion owned by this thread.
+                unsafe {
+                    (*pointer).save_bounds(hwnd);
+                }
+            }
             // SAFETY: our window.
             unsafe {
                 let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
+            }
+            if !pointer.is_null() {
+                // SAFETY: the Dashboard outlives its window (it is owned by the
+                // strip host); WM_DESTROY only clears the static pointer.
+                unsafe {
+                    (*pointer).hwnd = None;
+                    (*pointer).surface = None;
+                }
             }
             LRESULT(0)
         }

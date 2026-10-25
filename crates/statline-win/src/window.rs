@@ -127,6 +127,7 @@ pub fn create_frame_window(
     height: i32,
     dark: bool,
     mica: bool,
+    bounds: Option<(i32, i32, i32, i32)>,
 ) -> Result<HWND> {
     let class_wide = to_wide(OsStr::new(class_name));
     let instance = unsafe { GetModuleHandleW(None)? };
@@ -149,6 +150,15 @@ pub fn create_frame_window(
     }
 
     let title_wide = to_wide(OsStr::new(title));
+    let (x, y, width, height) = match bounds {
+        Some((x, y, width, height)) => (x, y, width, height),
+        None => (
+            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            width,
+            height,
+        ),
+    };
     // SAFETY: strings outlive the call; a normal overlapped window with a
     // caption and a system menu.
     let hwnd = unsafe {
@@ -157,8 +167,8 @@ pub fn create_frame_window(
             PCWSTR(class_wide.as_ptr()),
             PCWSTR(title_wide.as_ptr()),
             windows::Win32::UI::WindowsAndMessaging::WS_OVERLAPPEDWINDOW,
-            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
-            windows::Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
+            x,
+            y,
             width,
             height,
             None,
@@ -178,6 +188,26 @@ pub fn create_frame_window(
         );
     }
     Ok(hwnd)
+}
+
+/// Whether any part of `rect` intersects a monitor.
+///
+/// Used before restoring a remembered window position; a monitor that was
+/// disconnected since the last run must not strand the window off-screen.
+pub fn rect_is_visible(rect: (i32, i32, i32, i32)) -> bool {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONULL, MonitorFromRect};
+
+    let (x, y, width, height) = rect;
+    let rect = RECT {
+        left: x,
+        top: y,
+        right: x.saturating_add(width),
+        bottom: y.saturating_add(height),
+    };
+    // SAFETY: `rect` is a live, fully initialized RECT.
+    let monitor = unsafe { MonitorFromRect(&rect, MONITOR_DEFAULTTONULL) };
+    !monitor.0.is_null()
 }
 
 fn apply_frame_style(hwnd: HWND, dark: bool, mica: bool) {

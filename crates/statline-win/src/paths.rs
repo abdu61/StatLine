@@ -33,6 +33,11 @@ pub fn settings_file() -> PathBuf {
     data_dir().join("settings.json")
 }
 
+/// Path to the remembered companion window rectangle.
+pub fn window_state_file() -> PathBuf {
+    data_dir().join("window.json")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,5 +47,6 @@ mod tests {
         assert!(data_dir().ends_with(APP_DIR));
         assert!(log_dir().ends_with("logs"));
         assert!(settings_file().ends_with("settings.json"));
+        assert!(window_state_file().ends_with("window.json"));
     }
 }

@@ -123,6 +123,11 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   from `MIB_IF_ROW2` (shown as "Wi-Fi · 866 Mbps"). CPU identity (processor name, base
   clock) and the Windows edition/build + computer name are read once from the registry.
   Cores show percentage and clock in a labelled grid.
+- **Window state**: the companion remembers its outer rectangle in
+  `%APPDATA%\Statline\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
+  when it still intersects a monitor. A separate file avoids racing the settings
+  window's full-document saves. Closing via X now clears the host's `hwnd`, so the next
+  Dashboard toggle reopens it instead of doing nothing.
 - **Packaging**: `scripts/package.ps1` builds `dist/Statline-<v>-x64.zip` (exe, README,
   changelog, licence texts) plus a SHA-256. `scripts/build-msix.ps1` stages the layout and
   runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and

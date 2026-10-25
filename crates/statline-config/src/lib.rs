@@ -17,6 +17,57 @@ pub const SCHEMA_VERSION: u32 = 1;
 /// Sample intervals the UI offers, in milliseconds.
 pub const INTERVALS_MS: [u32; 4] = [500, 1000, 2000, 5000];
 
+/// Remembered outer rectangle of the companion window, in physical pixels.
+///
+/// It lives in its own `window.json`: window placement changes on every drag,
+/// and folding that into the settings document would make every host fight over
+/// the same file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl WindowBounds {
+    /// Reject absurd or minimized rectangles before they reach the window API.
+    pub fn is_sane(&self) -> bool {
+        (480..=10_000).contains(&self.width)
+            && (360..=10_000).contains(&self.height)
+            && self.x.abs() < 100_000
+            && self.y.abs() < 100_000
+    }
+
+    pub fn load(path: &Path) -> Option<Self> {
+        let text = std::fs::read_to_string(path).ok()?;
+        let bounds: Self = serde_json::from_str(&text).ok()?;
+        bounds.is_sane().then_some(bounds)
+    }
+
+    pub fn save(&self, path: &Path) -> Result<(), ConfigError> {
+        if !self.is_sane() {
+            return Ok(());
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|source| ConfigError::Write {
+                path: parent.to_path_buf(),
+                source,
+            })?;
+        }
+        let json = serde_json::to_vec_pretty(self)?;
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, &json).map_err(|source| ConfigError::Write {
+            path: tmp.clone(),
+            source,
+        })?;
+        std::fs::rename(&tmp, path).map_err(|source| ConfigError::Write {
+            path: path.to_path_buf(),
+            source,
+        })
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("failed to read {path}: {source}")]
@@ -394,6 +445,43 @@ mod tests {
         assert!(!loaded.modules.gpu);
         assert!(!loaded.modules.network);
         assert!(loaded.modules.cpu);
+    }
+
+    #[test]
+    fn window_bounds_round_trip() {
+        let dir = std::env::temp_dir().join("statline-config-test-window");
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = dir.join("window.json");
+        let bounds = WindowBounds {
+            x: 120,
+            y: 80,
+            width: 900,
+            height: 700,
+        };
+        bounds.save(&path).expect("save");
+        assert_eq!(WindowBounds::load(&path), Some(bounds));
+    }
+
+    #[test]
+    fn absurd_window_bounds_are_rejected() {
+        assert!(
+            !WindowBounds {
+                x: 0,
+                y: 0,
+                width: 10,
+                height: 10,
+            }
+            .is_sane()
+        );
+        assert!(
+            !WindowBounds {
+                x: -40_000,
+                y: 0,
+                width: 800,
+                height: 600,
+            }
+            .is_sane()
+        );
     }
 
     #[test]
