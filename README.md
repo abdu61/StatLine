@@ -34,9 +34,9 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
   ![Settings](docs/images/settings.jpg)
 
 - **Sensors without a driver**: ACPI "System" temperature, drive temperature, battery
-  health/temperature, and GPU temperature/fan/power/clocks via NVML (NVIDIA) or ADL
-  (AMD) when the installed driver exposes them. Anything unavailable is hidden, never
-  faked.
+  health/temperature, GPU temperature/fan/power/clocks via NVML (NVIDIA) or ADL
+  (AMD), and Wi-Fi SSID/signal, when the installed driver exposes them. Anything
+  unavailable is hidden, never faked.
 - **Per-app detail**: process CPU is a share of total capacity (the Task Manager scale),
   with working set; instances of the same executable are grouped. Sampling only runs
   while a surface showing processes is open.

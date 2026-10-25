@@ -34,9 +34,10 @@ As much thermal/power data as Windows gives without a kernel driver.
 | Drive temperatures (2 IOCTLs/volume) | ~12 ms | 300 s |
 | Battery details (SetupAPI + IOCTL) | ~0.14 ms | 30 s |
 | ADL PMLog (GPU vendor) | ~0.1 ms | 3 s (GPU cadence) |
+| WLAN SSID/signal (wlanapi) | ~12 ms | 15 s, detail surfaces only |
 
 The detail providers share the process table's visibility gate, so none of them run
-while only the strip is visible. Idle tight-loop cost stays at ~0.46 ms per sample;
+while only the strip is visible. Idle tight-loop cost stays at ~0.415 ms per sample;
 opening the flyout or companion raises the average to ~2.3 ms/sample because the
 process table dominates (4.75 ms every 2 s).
 

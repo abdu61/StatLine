@@ -123,6 +123,14 @@ pub struct NetworkSample {
     pub session_rx_bytes: u64,
     /// Bytes sent since the app started.
     pub session_tx_bytes: u64,
+    /// Connected WLAN details, when the machine is on Wi-Fi.
+    pub wifi: Option<WifiSample>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WifiSample {
+    pub ssid: String,
+    pub signal_percent: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

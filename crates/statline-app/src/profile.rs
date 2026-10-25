@@ -49,6 +49,9 @@ pub fn run(iterations: u32) {
     time("interfaces (GetIfTable2)", iterations, || {
         black_box(metrics::net::interfaces());
     });
+    time("wifi (WLAN)", iterations, || {
+        black_box(metrics::net::wifi());
+    });
     let interfaces_for_counters = interfaces.clone();
     time("counters (GetIfEntry2 xN)", iterations, || {
         for interface in &interfaces_for_counters {

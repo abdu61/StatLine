@@ -72,6 +72,10 @@ fn synthetic() -> Snapshot {
             }],
             session_rx_bytes: 8_400_000_000,
             session_tx_bytes: 1_200_000_000,
+            wifi: Some(statline_core::model::WifiSample {
+                ssid: String::from("Statline-5G"),
+                signal_percent: 82,
+            }),
         }),
         system: Some(SystemSample {
             uptime_secs: 90_061,

@@ -26,6 +26,7 @@ pub use memory::{
     MemoryStatus, PerformanceCounters, ProcessMemory, current_process_memory, memory_status,
     page_file_usage, performance_counters, process_cpu_time, uptime_secs,
 };
+pub use net::WifiInfo;
 pub use os::PlatformInfo;
 
 use windows::Win32::Foundation::FILETIME;

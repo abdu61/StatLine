@@ -9,10 +9,16 @@
 //!   microseconds), so the per-tick cost stays small.
 
 use std::ffi::c_void;
+use windows::Win32::Foundation::HANDLE;
 use windows::Win32::NetworkManagement::IpHelper::{
     FreeMibTable, GetIfEntry2, GetIfTable2, MIB_IF_ROW2, MIB_IF_TABLE2,
 };
 use windows::Win32::NetworkManagement::Ndis::NET_LUID_LH;
+use windows::Win32::NetworkManagement::WiFi::{
+    WLAN_CONNECTION_ATTRIBUTES, WLAN_INTERFACE_INFO_LIST, WlanCloseHandle, WlanEnumInterfaces,
+    WlanFreeMemory, WlanOpenHandle, WlanQueryInterface, wlan_interface_state_connected,
+    wlan_intf_opcode_current_connection,
+};
 
 /// A cached, named interface, cheap to re-read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,7 +80,87 @@ pub fn interfaces() -> Vec<InterfaceRef> {
     result
 }
 
-/// Current octet totals for one interface.
+/// Connected WLAN details, when the machine is on Wi-Fi.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WifiInfo {
+    pub ssid: String,
+    pub signal_percent: u32,
+}
+
+/// Current SSID and signal quality from the WLAN API.
+///
+/// Opens and closes a WLAN handle per call; callers cache it (the interface
+/// list already refreshes every 15 s). Returns `None` when wired, disconnected,
+/// or when the service is unavailable.
+pub fn wifi() -> Option<WifiInfo> {
+    let mut handle = HANDLE::default();
+    let mut negotiated = 0u32;
+    // SAFETY: standard WLAN client open; the out-parameters are valid.
+    if unsafe { WlanOpenHandle(2, None, &mut negotiated, &mut handle) } != 0 {
+        return None;
+    }
+
+    let mut list: *mut WLAN_INTERFACE_INFO_LIST = std::ptr::null_mut();
+    // SAFETY: `list` is a valid out-parameter that the API allocates.
+    if unsafe { WlanEnumInterfaces(handle, None, &mut list) } != 0 || list.is_null() {
+        // SAFETY: balances the successful open.
+        unsafe {
+            let _ = WlanCloseHandle(handle, None);
+        }
+        return None;
+    }
+
+    let mut best: Option<WifiInfo> = None;
+    // SAFETY: on success the API returns a list with `dwNumberOfItems` entries
+    // laid out contiguously from `InterfaceInfo`; every pointer is checked.
+    unsafe {
+        let count = (*list).dwNumberOfItems as usize;
+        let infos = (*list).InterfaceInfo.as_ptr();
+        for index in 0..count {
+            let info = &*infos.add(index);
+            if info.isState != wlan_interface_state_connected {
+                continue;
+            }
+
+            let mut size = 0u32;
+            let mut data: *mut c_void = std::ptr::null_mut();
+            let status = WlanQueryInterface(
+                handle,
+                &info.InterfaceGuid,
+                wlan_intf_opcode_current_connection,
+                None,
+                &mut size,
+                &mut data,
+                None,
+            );
+            if status != 0 || data.is_null() {
+                continue;
+            }
+
+            let attributes = &*data.cast::<WLAN_CONNECTION_ATTRIBUTES>();
+            let association = &attributes.wlanAssociationAttributes;
+            let length = (association.dot11Ssid.uSSIDLength as usize).min(32);
+            let ssid = String::from_utf8_lossy(&association.dot11Ssid.ucSSID[..length]).to_string();
+            let signal = association.wlanSignalQuality.min(100);
+            if !ssid.is_empty()
+                && best
+                    .as_ref()
+                    .map(|current| signal > current.signal_percent)
+                    .unwrap_or(true)
+            {
+                best = Some(WifiInfo {
+                    ssid,
+                    signal_percent: signal,
+                });
+            }
+            WlanFreeMemory(data.cast());
+        }
+        WlanFreeMemory(list.cast());
+        let _ = WlanCloseHandle(handle, None);
+    }
+
+    best
+}
 pub fn counters(interface: &InterfaceRef) -> Option<(u64, u64)> {
     let mut row = MIB_IF_ROW2 {
         InterfaceLuid: NET_LUID_LH {
@@ -108,6 +194,14 @@ mod tests {
             buffer[index] = unit;
         }
         assert_eq!(wide_to_string(&buffer), "Wi-Fi");
+    }
+
+    #[test]
+    fn wifi_query_does_not_panic() {
+        if let Some(info) = wifi() {
+            assert!(!info.ssid.is_empty());
+            assert!(info.signal_percent <= 100);
+        }
     }
 
     #[test]

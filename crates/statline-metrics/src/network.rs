@@ -76,6 +76,7 @@ impl NetworkState {
             adapters,
             session_rx_bytes: self.session_rx,
             session_tx_bytes: self.session_tx,
+            wifi: None,
         }
     }
 }

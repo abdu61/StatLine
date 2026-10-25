@@ -131,11 +131,17 @@ pub fn probe(count: u32, interval: Duration) {
         };
 
         let net_text = match snapshot.network.as_ref() {
-            Some(network) => format!(
-                "net down {} up {}",
-                format_rate(network.rx_bytes_per_sec, UnitSystem::Binary),
-                format_rate(network.tx_bytes_per_sec, UnitSystem::Binary)
-            ),
+            Some(network) => {
+                let mut text = format!(
+                    "net down {} up {}",
+                    format_rate(network.rx_bytes_per_sec, UnitSystem::Binary),
+                    format_rate(network.tx_bytes_per_sec, UnitSystem::Binary)
+                );
+                if let Some(wifi) = network.wifi.as_ref() {
+                    text.push_str(&format!("  ssid {} {}%", wifi.ssid, wifi.signal_percent));
+                }
+                text
+            }
             None => String::from("net  n/a"),
         };
 

@@ -120,9 +120,11 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   share the process table's visibility gate and hide when unavailable.
 - **Memory and network**: commit/cache from `GetPerformanceInfo`, aggregate page-file
   usage from `SystemPageFileInformation` (pages × page size) and per-adapter link speed
-  from `MIB_IF_ROW2` (shown as "Wi-Fi · 866 Mbps"). CPU identity (processor name, base
-  clock) and the Windows edition/build + computer name are read once from the registry.
-  Cores show percentage and clock in a labelled grid.
+  from `MIB_IF_ROW2` (shown as "Wi-Fi · 866 Mbps"). SSID/signal come from `wlanapi`
+  (`WlanOpenHandle` → `WlanEnumInterfaces` → `WlanQueryInterface`); the query is ~12 ms
+  and gated to detail surfaces, refreshing with the 15 s interface list. CPU identity
+  (processor name, base clock) and the Windows edition/build + computer name are read
+  once from the registry. Cores show percentage and clock in a labelled grid.
 - **Window state**: the companion remembers its outer rectangle in
   `%APPDATA%\Statline\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
   when it still intersects a monitor. A separate file avoids racing the settings

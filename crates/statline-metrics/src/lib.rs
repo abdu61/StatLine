@@ -37,6 +37,7 @@ pub struct Sampler {
     network: NetworkState,
     interfaces: Vec<InterfaceRef>,
     interfaces_at: Option<Instant>,
+    wifi: Option<metrics::WifiInfo>,
     disk: DiskState,
     gpu: GpuState,
     process: ProcessState,
@@ -73,6 +74,7 @@ impl Sampler {
             network: NetworkState::new(),
             interfaces: Vec::new(),
             interfaces_at: None,
+            wifi: None,
             disk: DiskState::new(),
             gpu: GpuState::new(),
             process: ProcessState::new(),
@@ -106,6 +108,12 @@ impl Sampler {
         self.disk.set_details_visible(visible);
         self.battery.set_details_visible(visible);
         self.thermal.invalidate();
+        // Wi-Fi costs ~12 ms per query; only fetch it for a detail surface, and
+        // force the next sample to refresh when one opens.
+        self.interfaces_at = None;
+        if !visible {
+            self.wifi = None;
+        }
     }
 
     /// Take one reading of everything v1 measures.
@@ -208,6 +216,7 @@ impl Sampler {
         if stale || self.interfaces.is_empty() {
             self.interfaces = metrics::net::interfaces();
             self.interfaces_at = Some(now);
+            self.wifi = self.details_visible.then(metrics::net::wifi).flatten();
         }
 
         let counters = self
@@ -226,7 +235,15 @@ impl Sampler {
             })
             .collect();
 
-        self.network.update(counters, elapsed)
+        let mut sample = self.network.update(counters, elapsed);
+        sample.wifi = self
+            .wifi
+            .as_ref()
+            .map(|wifi| statline_core::model::WifiSample {
+                ssid: wifi.ssid.clone(),
+                signal_percent: wifi.signal_percent,
+            });
+        sample
     }
 
     fn sample_system(&self) -> Option<SystemSample> {

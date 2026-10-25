@@ -63,12 +63,16 @@ detail sampling on
   clock from `CallNtPowerInformation`, the registry processor name and nominal base clock.
 - **Memory detail**: commit/cached plus aggregate page-file (swap) usage from
   `SystemPageFileInformation`, all converted from pages to bytes.
+- **Network detail**: per-adapter rates, session totals, the negotiated link speed
+  (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps") and, on WLAN, the SSID and
+  signal quality from `wlanapi` (queried only while a detail surface is open).
 - **System detail**: Windows edition/build (corrected to "Windows 11" from the build
   number, since ProductName still says Windows 10 on many builds) and computer name,
   read once from the registry, plus process count.
 - **Sampling**: 0.415 ms per sample in a tight loop with detail providers off; WS ~30 MB,
-  private ~14.5 MB, handles flat. `--bench` uses wall-clock sample time (the per-sample
-  CPU figure is scheduler-quantized); idle wall mean is ~1.4–2.0 ms at a 1 s cadence.
+  private ~14.5 MB, handles flat. `--bench` uses the median wall sample time (mean/p95
+  include scheduler preemption); idle median is ~1.7 ms at a 1 s cadence. The WLAN query
+  is ~12 ms but runs every 15 s only while a detail surface is open.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic
   hook, `--tray-only`.
 

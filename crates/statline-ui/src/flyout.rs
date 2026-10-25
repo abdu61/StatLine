@@ -432,6 +432,12 @@ pub fn model_focused(
                         ),
                     });
                 }
+                if let Some(wifi) = network.wifi.as_ref() {
+                    detail_rows.push(DetailRow {
+                        label: String::from("SSID"),
+                        value: format!("{} \u{00b7} {}% signal", wifi.ssid, wifi.signal_percent),
+                    });
+                }
                 detail_rows.push(DetailRow {
                     label: String::from("Session"),
                     value: format!(
