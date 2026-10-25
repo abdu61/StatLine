@@ -128,11 +128,13 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and
   the tile assets live under `packaging/msix/Assets`. CI has a tag-only packaging job.
 
-Measured (release): 0.46 ms CPU per sample in a tight loop with detail providers off;
-tray-only 10.6 MB WS / 1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles,
-flat over 90 s. Process table: **~4.75 ms per query** (~250 processes). With a detail
-surface open the average is ~2.3 ms/sample; sensors add 1.16 ms per 5 s (ACPI), 0.14 ms
-per 30 s (battery) and ~11 ms per 5 min (drive temps).
+Measured (release): 0.46 ms CPU per sample in a tight loop with detail providers off
+(0.415 ms after the newest providers); `--bench` reports wall-clock sample time because
+the per-sample CPU figure is quantized to the 15.6 ms scheduler tick. Tray-only 10.6 MB WS /
+1.8 MB private; parented strip 30.0 MB / 14.5 MB / 314 handles, flat over 90 s. Process
+table: **~4.75 ms per query** (~250 processes). With a detail surface open the average is
+~2.3 ms/sample; sensors add 1.16 ms per 5 s (ACPI), 0.14 ms per 30 s (battery),
+~11 ms per 5 min (drive temps), and ~0.5 ms per 3 s (GPU vendor).
 
 ## Next work, in priority order
 

@@ -232,6 +232,13 @@ pub fn model_focused(
             });
 
             if focus == Some(Focus::Memory) {
+                detail_rows.push(DetailRow {
+                    label: String::from("Available"),
+                    value: format_bytes(
+                        memory.total_bytes.saturating_sub(memory.used_bytes),
+                        units,
+                    ),
+                });
                 if memory.commit_limit_bytes > 0 {
                     let percent = (memory.commit_bytes as f64 / memory.commit_limit_bytes as f64
                         * 100.0)
@@ -392,7 +399,14 @@ pub fn model_focused(
                     format_rate_compact(network.tx_bytes_per_sec, units)
                 ),
                 detail: match network.adapters.first() {
-                    Some(adapter) => adapter.name.clone(),
+                    Some(adapter) => {
+                        let link = format_link_speed(adapter.link_speed_bps);
+                        if link.is_empty() {
+                            adapter.name.clone()
+                        } else {
+                            format!("{} \u{00b7} {link}", adapter.name)
+                        }
+                    }
                     None => String::from("no active adapter"),
                 },
                 ..Row::default()

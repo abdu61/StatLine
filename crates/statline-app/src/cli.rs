@@ -331,8 +331,14 @@ pub fn bench(count: u32, interval: Duration) {
         "cpu mean     {cpu_mean_ms:.3} ms  ({core_share:.3}% of one core)"
     ));
     console::write_line("");
-    console::write_line("development gate: cpu mean < 2.000 ms per sample, working set < 30 MB");
-    console::write_line(if cpu_mean_ms < 2.0 {
+    console::write_line("development gate: wall mean < 2.000 ms per sample, working set < 30 MB");
+    console::write_line(
+        "note: cpu/sample is quantized to the 15.6 ms scheduler tick; --profile measures the tight loop",
+    );
+    let working_set = memory
+        .map(|memory| memory.working_set_bytes as f64 / (1024.0 * 1024.0))
+        .unwrap_or(0.0);
+    console::write_line(if mean < 2.0 && working_set < 30.0 {
         "result: within budget"
     } else {
         "result: OVER BUDGET"

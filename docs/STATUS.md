@@ -61,8 +61,9 @@ detail sampling on
   `SystemPageFileInformation`, all converted from pages to bytes.
 - **Network detail**: per-adapter rates, session totals and the negotiated link speed
   (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps").
-- **Sampling**: 0.46 ms per sample in a tight loop with detail providers off; WS ~30 MB,
-  private ~14.5 MB, handles flat.
+- **Sampling**: 0.415 ms per sample in a tight loop with detail providers off; WS ~30 MB,
+  private ~14.5 MB, handles flat. `--bench` uses wall-clock sample time (the per-sample
+  CPU figure is scheduler-quantized); idle wall mean is ~1.4–2.0 ms at a 1 s cadence.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic
   hook, `--tray-only`.
 

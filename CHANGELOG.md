@@ -8,6 +8,8 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Memory page gains an Available row; the network card shows its link speed; the bench
+  gate now uses the wall-clock sample time instead of the scheduler-quantized CPU time.
 - Per-process rows are grouped by executable, so Chrome, svchost and friends appear once
   with summed CPU and memory.
 - Memory page shows commit, **swap/page-file** usage (`SystemPageFileInformation`) and
