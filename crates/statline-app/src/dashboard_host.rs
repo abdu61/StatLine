@@ -111,11 +111,13 @@ impl Dashboard {
             CLASS,
             "Statline",
             Some(companion_proc),
-            width,
-            height,
-            self.palette.is_dark,
-            self.mica,
-            bounds,
+            window::FrameOptions {
+                width,
+                height,
+                dark: self.palette.is_dark,
+                mica: self.mica,
+                bounds,
+            },
         ) {
             Ok(hwnd) => {
                 self.hwnd = Some(hwnd);

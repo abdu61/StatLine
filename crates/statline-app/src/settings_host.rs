@@ -85,11 +85,13 @@ fn open() -> windows::core::Result<()> {
         CLASS,
         "Statline Settings",
         Some(settings_proc),
-        width,
-        height,
-        dark,
-        settings.appearance.mica,
-        None,
+        window::FrameOptions {
+            width,
+            height,
+            dark,
+            mica: settings.appearance.mica,
+            bounds: None,
+        },
     )?;
     let mut window = Box::new(SettingsWindow {
         hwnd,

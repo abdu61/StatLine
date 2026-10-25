@@ -35,8 +35,8 @@ impl WindowBounds {
     pub fn is_sane(&self) -> bool {
         (480..=10_000).contains(&self.width)
             && (360..=10_000).contains(&self.height)
-            && self.x.abs() < 100_000
-            && self.y.abs() < 100_000
+            && (-20_000..=20_000).contains(&self.x)
+            && (-20_000..=20_000).contains(&self.y)
     }
 
     pub fn load(path: &Path) -> Option<Self> {

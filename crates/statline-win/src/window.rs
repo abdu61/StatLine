@@ -114,6 +114,17 @@ pub fn taskbar_created_message() -> u32 {
     })
 }
 
+/// Options for a framed window.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FrameOptions {
+    pub width: i32,
+    pub height: i32,
+    pub dark: bool,
+    pub mica: bool,
+    /// Remembered outer rectangle (x, y, width, height) in physical pixels.
+    pub bounds: Option<(i32, i32, i32, i32)>,
+}
+
 /// Create an ordinary framed window: caption, system menu, minimise and close.
 ///
 /// The companion and settings windows are normal Windows apps, so they get a
@@ -123,12 +134,15 @@ pub fn create_frame_window(
     class_name: &str,
     title: &str,
     wndproc: WNDPROC,
-    width: i32,
-    height: i32,
-    dark: bool,
-    mica: bool,
-    bounds: Option<(i32, i32, i32, i32)>,
+    options: FrameOptions,
 ) -> Result<HWND> {
+    let FrameOptions {
+        width,
+        height,
+        dark,
+        mica,
+        bounds,
+    } = options;
     let class_wide = to_wide(OsStr::new(class_name));
     let instance = unsafe { GetModuleHandleW(None)? };
 
