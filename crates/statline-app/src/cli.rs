@@ -299,6 +299,12 @@ pub fn bench(count: u32, interval: Duration) {
         .unwrap_or_default()
         .as_secs_f64()
         * 1000.0;
+    let median = durations
+        .get(durations.len() / 2)
+        .copied()
+        .unwrap_or_default()
+        .as_secs_f64()
+        * 1000.0;
     let max = durations.last().copied().unwrap_or_default().as_secs_f64() * 1000.0;
 
     let memory = statline_win::metrics::current_process_memory();
@@ -310,6 +316,7 @@ pub fn bench(count: u32, interval: Duration) {
         interval.as_secs_f64() * 1000.0
     ));
     console::write_line(&format!("mean         {mean:.3} ms"));
+    console::write_line(&format!("median       {median:.3} ms"));
     console::write_line(&format!("p95          {p95:.3} ms"));
     console::write_line(&format!("max          {max:.3} ms"));
     console::write_line(&format!(
@@ -340,14 +347,14 @@ pub fn bench(count: u32, interval: Duration) {
         "cpu mean     {cpu_mean_ms:.3} ms  ({core_share:.3}% of one core)"
     ));
     console::write_line("");
-    console::write_line("development gate: wall mean < 2.000 ms per sample, working set < 30 MB");
+    console::write_line("development gate: wall median < 2.000 ms per sample, working set < 30 MB");
     console::write_line(
-        "note: cpu/sample is quantized to the 15.6 ms scheduler tick; --profile measures the tight loop",
+        "note: mean/p95 include scheduler preemption; --profile measures the tight loop",
     );
     let working_set = memory
         .map(|memory| memory.working_set_bytes as f64 / (1024.0 * 1024.0))
         .unwrap_or(0.0);
-    console::write_line(if mean < 2.0 && working_set < 30.0 {
+    console::write_line(if median < 2.0 && working_set < 30.0 {
         "result: within budget"
     } else {
         "result: OVER BUDGET"

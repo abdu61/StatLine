@@ -286,6 +286,9 @@ pub fn model_focused(
             } else {
                 String::from("VRAM unavailable")
             };
+            if let Some(name) = gpu.name.as_ref() {
+                detail = format!("{name} \u{00b7} {detail}");
+            }
             if let Some(celsius) = gpu.temperature_c {
                 detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
             }

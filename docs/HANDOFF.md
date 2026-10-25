@@ -143,8 +143,7 @@ table: **~4.75 ms per query** (~250 processes). With a detail surface open the a
 
 ## Next work, in priority order
 
-1. **Settings, remaining**: module reorder, density, safe mode, remembered window
-   bounds.
+1. **Settings, remaining**: module reorder, density, safe mode.
 2. **GPU sensors**: implemented for NVML/ADL. An NVIDIA machine is still needed to
    exercise the NVML path; AMD is verified on this APU. CPU package temperature and fan
    RPM need a kernel driver and stay out of scope.

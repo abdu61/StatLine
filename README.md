@@ -20,8 +20,8 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 
   ![Flyout](docs/images/flyout.jpg)
 - **Companion window**: a normal resizable Windows 11 window with a left navigation —
-  Dashboard, CPU, Memory, GPU, Disk, Network, Battery, System, Settings and About — and
-  a detail page for each module.
+  Dashboard, CPU, Memory, GPU, Disk, Network, Battery, System, Settings and About — a
+  detail page for each module, and remembered position/size.
 
   ![Companion window](docs/images/dashboard.jpg)
 
