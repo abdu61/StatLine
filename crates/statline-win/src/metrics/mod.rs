@@ -9,13 +9,18 @@ pub mod cpu;
 pub mod disk;
 pub mod dxgi;
 pub mod gpu;
+pub mod gpu_vendor;
 pub mod memory;
 pub mod net;
 pub mod pdh;
 pub mod process;
 pub mod thermal;
 
-pub use cpu::{CpuTimes, current_mhz, logical_core_count, per_core_times, system_times};
+pub use cpu::{
+    CpuTimes, average_mhz, current_mhz, logical_core_count, per_core_mhz, per_core_times,
+    system_times,
+};
+pub use gpu_vendor::{VendorReading, VendorSensors};
 pub use memory::{
     MemoryStatus, PerformanceCounters, ProcessMemory, current_process_memory, memory_status,
     performance_counters, process_cpu_time, uptime_secs,

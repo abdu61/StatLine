@@ -26,6 +26,9 @@ pub struct CpuSample {
     pub total_percent: f32,
     /// Busy percentage per logical core, 0..=100. Empty until two samples exist.
     pub per_core_percent: Vec<f32>,
+    /// Current clock per logical core in MHz, in the same order; empty if the
+    /// power subsystem does not report per-core clocks.
+    pub per_core_mhz: Vec<u32>,
     /// Current average core clock, if the platform reports it.
     pub mhz: Option<u32>,
     /// Exponentially smoothed busy percentage over the last minute.
@@ -60,9 +63,15 @@ pub struct GpuSample {
     pub utilization_percent: f32,
     pub vram_used_bytes: u64,
     pub vram_total_bytes: u64,
+    /// Adapter name from the vendor driver, when available.
+    pub name: Option<String>,
     pub temperature_c: Option<f32>,
     pub fan_percent: Option<f32>,
     pub power_w: Option<f32>,
+    /// Current graphics clock in MHz.
+    pub core_mhz: Option<u32>,
+    /// Current memory clock in MHz.
+    pub memory_mhz: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

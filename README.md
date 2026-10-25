@@ -20,8 +20,8 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 
   ![Flyout](docs/images/flyout.jpg)
 - **Companion window**: a normal resizable Windows 11 window with a left navigation —
-  Dashboard, CPU, Memory, GPU, Disk, Network, Battery, System and Settings — and a
-  detail page for each module.
+  Dashboard, CPU, Memory, GPU, Disk, Network, Battery, System, Settings and About — and
+  a detail page for each module.
 
   ![Companion window](docs/images/dashboard.jpg)
 
@@ -32,9 +32,10 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 
   ![Settings](docs/images/settings.jpg)
 
-- **Sensors without a driver**: ACPI "System" temperature, drive temperature, and battery
-  health/temperature where the firmware exposes them. Anything unavailable is hidden,
-  never faked.
+- **Sensors without a driver**: ACPI "System" temperature, drive temperature, battery
+  health/temperature, and GPU temperature/fan/power/clocks via NVML (NVIDIA) or ADL
+  (AMD) when the installed driver exposes them. Anything unavailable is hidden, never
+  faked.
 - **Per-app detail**: process CPU is a share of total capacity (the Task Manager scale),
   with working set. Sampling only runs while a surface showing processes is open.
 
@@ -99,8 +100,9 @@ Logs: `%LOCALAPPDATA%\Statline\logs\statline.log` (1 MB, three rotations).
 ## What it deliberately does not do
 
 - No CPU package temperature or fan RPM: Windows has no user-mode API, and shipping a
-  driver is out of scope. GPU vendor temperature/fan/power is planned but not in 0.1.0;
-  GPU utilization and VRAM do work.
+  driver is out of scope. GPU vendor telemetry is best effort: NVML/ADL only when the
+  installed driver exposes it. GPU utilization and VRAM work through the Windows
+  performance counters.
 - No network requests of any kind.
 - No code from other monitor projects; Win32 usage is implemented from the public API
   documentation.

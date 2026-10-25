@@ -32,9 +32,10 @@ detail sampling on
   final anchored rect and re-anchors upward when the process table arrives. With Mica
   on, the panel is lightly translucent.
 - **Companion**: framed resizable window with a left nav (Dashboard, CPU, Memory, GPU,
-  Disk, Network, Battery, System, Settings, About). Module pages show CPU cores,
-  1/5/15-minute averages and processes; memory cache and top memory apps; per-volume
-  and per-adapter rows. Optional Mica DWM backdrop on the framed windows.
+  Disk, Network, Battery, System, Settings, About). Module pages show a labelled
+  per-core grid (percentage and clock) plus 1/5/15-minute averages and processes;
+  memory cache and top memory apps; per-volume and per-adapter rows. Optional Mica DWM
+  backdrop on the framed windows.
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
   with theme, accent presets, sampler interval, byte units, Mica, strip placement,
   start-with-Windows and per-module strip visibility. Mica shows a GPU/battery caution.
@@ -48,10 +49,13 @@ detail sampling on
   at 2 s only while the flyout or companion is open (~4.75 ms per query).
 - **Sensors**: ACPI "System" temperature via PDH (5 s), drive temperatures via
   `IOCTL_STORAGE_QUERY_PROPERTY` (5 min cache, volume → disk mapping), battery health,
-  temperature and cycle count via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). Every source
-  degrades to hidden; they share the process table's surface-visibility gate.
+  temperature and cycle count via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). GPU vendor
+  telemetry rides the 3 s GPU cadence: NVML for NVIDIA, ADL PMLog/Overdrive5 for AMD
+  (temperature, fan, power, clocks). Every source degrades to hidden; they share the
+  process table's surface-visibility gate.
 - **CPU detail**: current load plus 1/5/15-minute exponentially smoothed averages
-  computed from real elapsed time, per-core bars and the CPU process table.
+  computed from real elapsed time, and a labelled core grid with each core's percentage
+  and current clock from `CallNtPowerInformation`.
 - **Sampling**: 0.46 ms per sample in a tight loop with detail providers off; WS ~30 MB,
   private ~14.5 MB, handles flat.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic
@@ -61,9 +65,9 @@ detail sampling on
 
 1. **Settings, remaining**: module reorder, density, safe mode, remembered window
    bounds.
-2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power; current builds show
-   utilization and VRAM only. This machine is an AMD APU, so an AMD discrete GPU is
-   needed to verify the ADL path; NVML can be exercised on any NVIDIA machine.
+2. **Sensors out of reach**: CPU package/per-core temperature and fan RPM need a kernel
+   driver; GPU vendor telemetry is implemented (NVML/ADL), so an NVIDIA machine is only
+   needed to exercise that path.
 3. **Packaging, remaining**: app `.ico`, icon in the executable/tray, a 1-hour soak and
    `--bench 300`, then the local `v0.1.0` tag.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,

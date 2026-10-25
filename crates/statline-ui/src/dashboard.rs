@@ -4,7 +4,7 @@
 //! blitted. The nav is pure layout plus hit-testing, so the page logic is
 //! testable without a window.
 
-use crate::flyout::{Focus, Model, Row, core_bars, sparkline};
+use crate::flyout::{Focus, Model, Row, core_grid, core_grid_height, sparkline};
 use statline_core::{APP_NAME, VERSION};
 use statline_render::{Align, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -506,26 +506,16 @@ fn render_module(
         }
 
         if !model.cores.is_empty() {
-            let _ = text.draw(
+            core_grid(
                 surface,
-                "CORES",
-                (x, y + 4.0 * scale, 52.0 * scale, 12.0 * scale),
-                label_style(scale),
-                palette.text_muted,
-            );
-            core_bars(
-                surface,
+                text,
                 &model.cores,
-                (
-                    x + 56.0 * scale,
-                    y + 4.0 * scale,
-                    width - 56.0 * scale,
-                    14.0 * scale,
-                ),
-                palette.accent.scaled_alpha(0.8),
-                palette.meter_track,
+                (x, y + 4.0 * scale, width),
+                4,
+                scale,
+                palette,
             );
-            y += 26.0 * scale;
+            y += core_grid_height(model.cores.len(), 4) * scale;
         }
 
         for detail in &model.detail_rows {
@@ -598,7 +588,10 @@ fn render_about(
             "Sensors",
             "ACPI, drive and battery readings where Windows exposes them; missing values hide.",
         ),
-        ("Not yet", "GPU vendor temperature/fan/power (NVML/ADL)."),
+        (
+            "GPU sensors",
+            "NVML/ADL where the driver exposes them; CPU package temperature needs a driver.",
+        ),
     ];
 
     for (label, value) in entries {

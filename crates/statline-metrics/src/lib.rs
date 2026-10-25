@@ -171,10 +171,12 @@ impl Sampler {
         self.previous_total = Some(total);
         self.previous_cores = cores;
 
+        let core_mhz = metrics::per_core_mhz();
         Some(CpuSample {
             total_percent,
             per_core_percent,
-            mhz: metrics::current_mhz(),
+            per_core_mhz: core_mhz.clone(),
+            mhz: metrics::average_mhz(&core_mhz),
             average_1m_percent: self.average_1m,
             average_5m_percent: self.average_5m,
             average_15m_percent: self.average_15m,

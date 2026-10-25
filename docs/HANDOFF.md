@@ -113,9 +113,10 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   on shows a GPU/battery caution. The Run key is treated as the truth for startup.
 - **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
   `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
-  battery health/temperature via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). They share
-  the process table's visibility gate and hide when unavailable. GPU vendor
-  temperature/fan/power (NVML/ADL) is still pending.
+  battery health/temperature/cycles via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s), and
+  GPU vendor telemetry via lazily loaded NVML/ADL (3 s GPU cadence; AMD PMLog verified
+  on this APU, Overdrive5 fallback; NVML needs an NVIDIA machine to exercise). They
+  share the process table's visibility gate and hide when unavailable.
 - **Packaging**: `scripts/package.ps1` builds `dist/Statline-<v>-x64.zip` (exe, README,
   changelog, licence texts) plus a SHA-256. `scripts/build-msix.ps1` stages the layout and
   runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and
@@ -131,9 +132,9 @@ per 30 s (battery) and ~11 ms per 5 min (drive temps).
 
 1. **Settings, remaining**: module reorder, density, safe mode, remembered window
    bounds.
-2. **GPU vendor sensors (M7)**: NVML/ADL temperature, fan and power. The current build
-   shows utilization and VRAM only. This machine is an AMD APU, so ADL needs an AMD
-   discrete GPU to verify; NVML can be exercised on any NVIDIA machine.
+2. **GPU sensors**: implemented for NVML/ADL. An NVIDIA machine is still needed to
+   exercise the NVML path; AMD is verified on this APU. CPU package temperature and fan
+   RPM need a kernel driver and stay out of scope.
 3. **Packaging, remaining**: a multi-size `.ico` for the executable/tray, the one-hour
    soak and `--bench 300`, then the local annotated `v0.1.0` tag. Store/trademark checks
    are human tasks.

@@ -93,6 +93,14 @@ pub struct DetailRow {
     pub value: String,
 }
 
+/// One logical core in the CPU detail grid.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CoreReadout {
+    pub percent: f32,
+    /// Current clock in MHz, when the platform reports it.
+    pub mhz: Option<u32>,
+}
+
 /// Everything the panel shows.
 #[derive(Debug, Clone, Default)]
 pub struct Model {
@@ -100,8 +108,8 @@ pub struct Model {
     pub rows: Vec<Row>,
     /// Focused-module lines under the first card (volumes, adapters).
     pub detail_rows: Vec<DetailRow>,
-    /// Per-core busy percentages; drawn as bars under the CPU card.
-    pub cores: Vec<f32>,
+    /// Per-core readouts; drawn as a labelled grid under the CPU card.
+    pub cores: Vec<CoreReadout>,
     /// Busiest processes, already sorted; empty hides the section.
     pub processes: Vec<ProcessRow>,
     /// Module the panel was opened from, highlighted and used to sort processes.
@@ -169,7 +177,15 @@ pub fn model_focused(
                 critical: 95.0,
             });
             if focus == Some(Focus::Cpu) {
-                cores = cpu.per_core_percent.clone();
+                cores = cpu
+                    .per_core_percent
+                    .iter()
+                    .enumerate()
+                    .map(|(index, percent)| CoreReadout {
+                        percent: *percent,
+                        mhz: cpu.per_core_mhz.get(index).copied().filter(|mhz| *mhz > 0),
+                    })
+                    .collect();
                 detail_rows.push(DetailRow {
                     label: String::from("Averages"),
                     value: format!(
@@ -239,6 +255,28 @@ pub fn model_focused(
                 warn: 90.0,
                 critical: 98.0,
             });
+
+            if focus == Some(Focus::Gpu) {
+                if let Some(name) = gpu.name.as_ref() {
+                    detail_rows.push(DetailRow {
+                        label: String::from("Adapter"),
+                        value: name.clone(),
+                    });
+                }
+                let mut clocks = Vec::new();
+                if let Some(core) = gpu.core_mhz {
+                    clocks.push(format!("{} core", format_frequency(core)));
+                }
+                if let Some(memory) = gpu.memory_mhz {
+                    clocks.push(format!("{} memory", format_frequency(memory)));
+                }
+                if !clocks.is_empty() {
+                    detail_rows.push(DetailRow {
+                        label: String::from("Clocks"),
+                        value: clocks.join(" \u{00b7} "),
+                    });
+                }
+            }
         }
     }
 
@@ -478,18 +516,29 @@ fn process_section(model: &Model, scale: f32, limit: usize) -> f32 {
 }
 
 const DETAIL_ROW_HEIGHT: f32 = 17.0;
-const CORES_HEIGHT: f32 = 24.0;
+const CORE_CELL_HEIGHT: f32 = 28.0;
+
+/// Number of core rows for a column count.
+pub(crate) fn core_grid_rows(count: usize, columns: usize) -> usize {
+    let columns = columns.max(1);
+    count.div_ceil(columns)
+}
+
+/// Height needed for the core grid in physical pixels.
+pub(crate) fn core_grid_height(count: usize, columns: usize) -> f32 {
+    if count == 0 {
+        0.0
+    } else {
+        core_grid_rows(count, columns) as f32 * CORE_CELL_HEIGHT + 4.0
+    }
+}
 
 /// Height needed for a model.
 pub fn height(model: &Model, scale: f32) -> f32 {
     let padding = space::L * scale;
     let header = 18.0 * scale;
     let row = 52.0 * scale;
-    let cores = if model.cores.is_empty() {
-        0.0
-    } else {
-        CORES_HEIGHT * scale
-    };
+    let cores = core_grid_height(model.cores.len(), 2) * scale;
     padding * 2.0
         + header
         + row * model.rows.len() as f32
@@ -538,33 +587,78 @@ pub(crate) fn sparkline(
     }
 }
 
-/// One bar per logical core, height = busy percentage.
-pub(crate) fn core_bars(
+/// Labelled per-core grid: core number, frequency, percentage and meter.
+pub(crate) fn core_grid(
     surface: &mut Surface,
-    values: &[f32],
-    (x, y, width, height): (f32, f32, f32, f32),
-    color: Color,
-    track: Color,
+    text: &mut TextEngine,
+    cores: &[CoreReadout],
+    (x, y, width): (f32, f32, f32),
+    columns: usize,
+    scale: f32,
+    palette: &Palette,
 ) {
-    if values.is_empty() || width < 4.0 || height < 2.0 {
+    if cores.is_empty() || width < 40.0 {
         return;
     }
+    let columns = columns.max(1);
+    let gap = 10.0 * scale;
+    let cell_width =
+        ((width - gap * (columns.saturating_sub(1)) as f32) / columns as f32).max(20.0);
+    let cell_height = CORE_CELL_HEIGHT * scale;
 
-    let count = values.len() as f32;
-    let gap = (2.0_f32).min(width / count * 0.25);
-    let bar_width = ((width - gap * (count - 1.0)) / count).max(1.0);
+    for (index, core) in cores.iter().enumerate() {
+        let column = index % columns;
+        let row = index / columns;
+        let cx = x + column as f32 * (cell_width + gap);
+        let cy = y + row as f32 * cell_height;
 
-    surface.fill_rect(x, y + height - 1.0, width, 1.0, track.scaled_alpha(0.5));
-    for (index, value) in values.iter().enumerate() {
-        let normalized = value.clamp(0.0, 100.0) / 100.0;
-        let bar = (height * normalized).max(1.0);
-        surface.fill_rect(
-            x + index as f32 * (bar_width + gap),
-            y + height - bar,
-            bar_width,
-            bar,
-            color,
+        let label = format!("Core {}", index + 1);
+        let _ = text.draw(
+            surface,
+            &label,
+            (cx, cy, cell_width, 11.0 * scale),
+            TextStyle::new(8.5 * scale, true, Align::Left),
+            palette.text_muted,
         );
+        let value = format_percent(core.percent);
+        let _ = text.draw(
+            surface,
+            &value,
+            (cx, cy, cell_width, 11.0 * scale),
+            TextStyle::new(8.5 * scale, true, Align::Right),
+            palette.value_color(core.percent, 85.0, 95.0),
+        );
+        if let Some(mhz) = core.mhz {
+            let frequency = format_frequency(mhz);
+            let _ = text.draw(
+                surface,
+                &frequency,
+                (cx, cy + 12.0 * scale, cell_width, 9.0 * scale),
+                TextStyle::new(7.0 * scale, false, Align::Left),
+                palette.text_muted,
+            );
+        }
+
+        let meter_y = cy + 22.0 * scale;
+        surface.fill_round_rect(
+            cx,
+            meter_y,
+            cell_width,
+            3.0 * scale,
+            1.5 * scale,
+            palette.meter_track,
+        );
+        let filled = cell_width * (core.percent.clamp(0.0, 100.0) / 100.0);
+        if filled > 0.5 {
+            let tone = if core.percent >= 95.0 {
+                palette.critical
+            } else if core.percent >= 85.0 {
+                palette.warning
+            } else {
+                palette.accent
+            };
+            surface.fill_round_rect(cx, meter_y, filled, 3.0 * scale, 1.5 * scale, tone);
+        }
     }
 }
 
@@ -672,26 +766,16 @@ pub fn render(
 
         if index == 0 {
             if !model.cores.is_empty() {
-                let _ = text.draw(
+                core_grid(
                     surface,
-                    "CORES",
-                    (padding, y + 3.0 * scale, 40.0 * scale, 10.0 * scale),
-                    TextStyle::new(7.5 * scale, true, Align::Left),
-                    palette.text_muted,
-                );
-                core_bars(
-                    surface,
+                    text,
                     &model.cores,
-                    (
-                        padding + 40.0 * scale,
-                        y + 2.0 * scale,
-                        width - padding * 2.0 - 40.0 * scale,
-                        12.0 * scale,
-                    ),
-                    palette.accent.scaled_alpha(0.8),
-                    palette.meter_track,
+                    (padding, y + 3.0 * scale, width - padding * 2.0),
+                    2,
+                    scale,
+                    palette,
                 );
-                y += CORES_HEIGHT * scale;
+                y += core_grid_height(model.cores.len(), 2) * scale;
             }
 
             for detail in &model.detail_rows {
@@ -802,6 +886,7 @@ mod tests {
             cpu: Some(CpuSample {
                 total_percent: 23.0,
                 per_core_percent: vec![10.0, 20.0],
+                per_core_mhz: vec![3000, 2000],
                 mhz: Some(2400),
                 ..CpuSample::default()
             }),
@@ -999,7 +1084,10 @@ mod tests {
         );
         let labels: Vec<&str> = model.rows.iter().map(|row| row.label).collect();
         assert_eq!(labels, vec!["CPU", "Battery", "System"]);
-        assert_eq!(model.cores.len(), 2, "per-core values feed the bars");
+        assert_eq!(model.cores.len(), 2, "per-core values feed the grid");
+        assert_eq!(model.cores[0].percent, 10.0);
+        assert_eq!(model.cores[0].mhz, Some(3000));
+        assert_eq!(model.cores[1].mhz, Some(2000));
         assert_eq!(model.processes.len(), 1);
         assert_eq!(model.detail_rows.len(), 1);
         assert_eq!(model.detail_rows[0].label, "Averages");
@@ -1070,6 +1158,15 @@ mod tests {
         assert_eq!(row.value_color(&palette), palette.warning);
         row.current = 99.0;
         assert_eq!(row.value_color(&palette), palette.critical);
+    }
+
+    #[test]
+    fn core_grid_rows_round_up() {
+        assert_eq!(core_grid_rows(8, 2), 4);
+        assert_eq!(core_grid_rows(8, 4), 2);
+        assert_eq!(core_grid_rows(5, 4), 2);
+        assert_eq!(core_grid_rows(0, 2), 0);
+        assert!(core_grid_height(8, 2) > core_grid_height(8, 4));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # M7 — driver-free sensors
 
-**Status:** in progress · drive, battery and ACPI zones are live; GPU vendor sensors pending
+**Status:** live · drive, battery, ACPI and GPU vendor sensors; CPU package temperature needs a driver
 
 ## Goal
 
@@ -18,10 +18,13 @@ As much thermal/power data as Windows gives without a kernel driver.
       5 min; failures retry at 1 min and never fake a value
 - [x] Flyout/companion show the System card (`°C`, uptime, threads, handles), the Disk
       card appends the drive temperature, and the Battery card appends health and temp
-- [ ] GPU temp / fan / power via NVML, loaded lazily from the installed driver
-- [ ] AMD path via ADL, same lazy-load contract (this machine is AMD integrated, so
-      this needs an AMD discrete GPU to verify)
-- [ ] Settings → About explains why CPU package temperature is absent
+- [x] GPU temp / fan / power / clocks via NVML, loaded lazily from the installed driver
+- [x] AMD path via ADL: PMLog first (edge/hotspot, fan %, ASIC/APU power, clocks,
+      activity), Overdrive5 fallback. Verified on this APU as "AMD Radeon(TM) Graphics"
+      (56 °C, 4 W, 400 MHz core, 1.2 GHz memory); fan is absent on this firmware.
+      NVIDIA hardware was not available here, so the NVML path is compiled and guarded
+      but not exercised on a real device.
+- [x] About explains that CPU package temperature needs a driver
 
 ## Measured on this machine
 
@@ -30,6 +33,7 @@ As much thermal/power data as Windows gives without a kernel driver.
 | ACPI thermal (PDH wildcard) | ~1.13 ms | 5 s |
 | Drive temperatures (2 IOCTLs/volume) | ~12 ms | 300 s |
 | Battery details (SetupAPI + IOCTL) | ~0.14 ms | 30 s |
+| ADL PMLog (GPU vendor) | ~0.1 ms | 3 s (GPU cadence) |
 
 The detail providers share the process table's visibility gate, so none of them run
 while only the strip is visible. Idle tight-loop cost stays at ~0.46 ms per sample;

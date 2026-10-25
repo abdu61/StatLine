@@ -19,6 +19,7 @@ fn synthetic() -> Snapshot {
         cpu: Some(CpuSample {
             total_percent: 23.0,
             per_core_percent: vec![12.0, 44.0, 8.0, 31.0, 5.0, 61.0, 17.0, 9.0],
+            per_core_mhz: vec![3200, 3400, 3100, 3300, 3200, 3500, 3100, 3000],
             mhz: Some(2400),
             average_1m_percent: 21.0,
             average_5m_percent: 19.0,
@@ -35,7 +36,12 @@ fn synthetic() -> Snapshot {
             utilization_percent: 8.0,
             vram_used_bytes: 1_100_000_000,
             vram_total_bytes: 6_000_000_000,
-            ..Default::default()
+            name: Some(String::from("Radeon 780M")),
+            temperature_c: Some(62.0),
+            fan_percent: Some(41.0),
+            power_w: Some(35.0),
+            core_mhz: Some(1800),
+            memory_mhz: Some(1200),
         }),
         disk: Some(DiskSample {
             read_bytes_per_sec: 12_400_000.0,
@@ -280,6 +286,27 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let path = dir.join("flyout-dark-125-cpu.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
+
+        // Focused on GPU, with the vendor adapter name and clocks.
+        let model = flyout::model_focused(
+            &snapshot,
+            &history,
+            Some(flyout::Focus::Gpu),
+            statline_core::units::UnitSystem::Binary,
+        );
+        let height = flyout::height(&model, scale).ceil() as u32;
+        let mut surface = renderer.surface(width, height)?;
+        flyout::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &model,
+            scale,
+            false,
+        );
+        let path = dir.join("flyout-dark-125-gpu.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
     }
     // Companion window at 100 %: dashboard and a module page.
     {
@@ -329,6 +356,26 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
             Page::Cpu,
         );
         let path = dir.join("dashboard-cpu-100.png");
+        surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
+        written.push(path);
+
+        // GPU page, with the vendor adapter and clocks.
+        let gpu_model = flyout::model_focused(
+            &snapshot,
+            &history,
+            Some(flyout::Focus::Gpu),
+            statline_core::units::UnitSystem::Binary,
+        );
+        let mut surface = renderer.surface(width, height)?;
+        dashboard::render(
+            &mut surface,
+            &mut renderer.text,
+            &palette,
+            &gpu_model,
+            scale,
+            Page::Gpu,
+        );
+        let path = dir.join("dashboard-gpu-100.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;
         written.push(path);
 

@@ -141,12 +141,33 @@ pub fn probe(count: u32, interval: Duration) {
             .unwrap_or_default();
 
         let gpu_text = match snapshot.gpu.as_ref() {
-            Some(gpu) => format!(
-                "gpu {}  vram {} / {}",
-                format_percent(gpu.utilization_percent),
-                format_bytes(gpu.vram_used_bytes, UnitSystem::Binary),
-                format_bytes(gpu.vram_total_bytes, UnitSystem::Binary)
-            ),
+            Some(gpu) => {
+                let mut text = format!(
+                    "gpu {}  vram {} / {}",
+                    format_percent(gpu.utilization_percent),
+                    format_bytes(gpu.vram_used_bytes, UnitSystem::Binary),
+                    format_bytes(gpu.vram_total_bytes, UnitSystem::Binary)
+                );
+                if let Some(name) = gpu.name.as_ref() {
+                    text.push_str(&format!("  {name}"));
+                }
+                if let Some(celsius) = gpu.temperature_c {
+                    text.push_str(&format!("  {}", format_temperature(celsius)));
+                }
+                if let Some(fan) = gpu.fan_percent {
+                    text.push_str(&format!("  {fan:.0}% fan"));
+                }
+                if let Some(power) = gpu.power_w {
+                    text.push_str(&format!("  {power:.0} W"));
+                }
+                if let Some(core) = gpu.core_mhz {
+                    text.push_str(&format!("  core {}", format_frequency(core)));
+                }
+                if let Some(memory) = gpu.memory_mhz {
+                    text.push_str(&format!("  mem {}", format_frequency(memory)));
+                }
+                text
+            }
             None => String::from("gpu  n/a"),
         };
 

@@ -8,6 +8,12 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- GPU vendor telemetry loaded lazily from the installed driver: NVML for NVIDIA and ADL
+  PMLog/Overdrive5 for AMD. Temperature, fan, power and clocks appear on the GPU page
+  and in `--probe`. Verified on this AMD APU (Radeon graphics, 56 °C, 4 W, 400 MHz /
+  1.2 GHz).
+- CPU core grid with per-core percentage and clock from `CallNtPowerInformation`, in the
+  flyout (two columns) and companion (four columns).
 - Per-module strip visibility in Settings (CPU, memory, GPU, disk, network); the flyout
   and companion stay complete.
 - About page in the companion: version, privacy posture, settings/log folders, licence

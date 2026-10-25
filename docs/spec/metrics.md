@@ -51,11 +51,14 @@ Instance list cached for 15 s; on `PDH_INVALID_HANDLE` the query is rebuilt once
 VRAM: `IDXGIAdapter3::QueryVideoMemoryInfo` (`CurrentUsage` / `Budget`).
 Absent on systems without GPU performance counters → the module hides.
 
-**GPU temperature / fan / power**
+**GPU temperature / fan / power / clocks**
 NVML (`nvml.dll`) and AMD ADL (`atiadlxx.dll`) are loaded lazily from the installed
 driver. No redistribution, no elevation. Missing DLL or unsupported device → `None`.
-**Not implemented yet**: current builds show GPU utilization and VRAM but no vendor
-temperature/fan/power; the row hides.
+NVIDIA: NVML device 0, temperature/fan/power/clocks/utilization. AMD: ADL PMLog
+(`ADL2_New_QueryPMLogData_Get`, edge/hotspot/GFX temperature, fan percentage,
+ASIC/APU/board power, GFX/memory clock, GFX activity), falling back to Overdrive5
+when that deprecated export is absent. Verified on an AMD APU; values are merged into
+the GPU card and the Adapter/Clocks detail rows, and shown by `--probe`.
 
 **Battery**
 `GetSystemPowerStatus` (percent, AC, seconds left) plus

@@ -84,8 +84,11 @@ pub fn per_core_times() -> Vec<CpuTimes> {
         .collect()
 }
 
-/// Average current core clock in MHz, as reported by the power subsystem.
-pub fn current_mhz() -> Option<u32> {
+/// Current clock per logical core in MHz, in processor order.
+///
+/// Returns an empty vector if the power subsystem refuses the query. A zero
+/// entry means the core did not report a clock; callers should hide it.
+pub fn per_core_mhz() -> Vec<u32> {
     let cores = logical_core_count() as usize;
     let mut buffer = vec![PROCESSOR_POWER_INFORMATION::default(); cores];
     let bytes = (cores * size_of::<PROCESSOR_POWER_INFORMATION>()) as u32;
@@ -102,15 +105,26 @@ pub fn current_mhz() -> Option<u32> {
         )
     };
     if status.0 < 0 {
-        return None;
+        return Vec::new();
     }
 
-    let total: u64 = buffer.iter().map(|info| info.CurrentMhz as u64).sum();
-    if total == 0 {
-        None
-    } else {
-        Some((total / cores as u64) as u32)
-    }
+    buffer.into_iter().map(|info| info.CurrentMhz).collect()
+}
+
+/// Average of the reported per-core clocks, ignoring cores reporting zero.
+pub fn average_mhz(values: &[u32]) -> Option<u32> {
+    let (total, count) = values
+        .iter()
+        .filter(|mhz| **mhz > 0)
+        .fold((0u64, 0u64), |(total, count), mhz| {
+            (total + *mhz as u64, count + 1)
+        });
+    total.checked_div(count).map(|average| average as u32)
+}
+
+/// Average current core clock in MHz, as reported by the power subsystem.
+pub fn current_mhz() -> Option<u32> {
+    average_mhz(&per_core_mhz())
 }
 
 #[cfg(test)]
@@ -145,6 +159,22 @@ mod tests {
         if let Some(mhz) = current_mhz() {
             assert!(mhz > 100, "implausible clock: {mhz} MHz");
             assert!(mhz < 10_000, "implausible clock: {mhz} MHz");
+        }
+    }
+
+    #[test]
+    fn average_clock_ignores_zero_entries() {
+        assert_eq!(average_mhz(&[0, 3000, 1000]), Some(2000));
+        assert_eq!(average_mhz(&[0, 0]), None);
+        assert_eq!(average_mhz(&[]), None);
+    }
+
+    #[test]
+    fn per_core_clocks_are_plausible_when_reported() {
+        let values = per_core_mhz();
+        assert!(values.len() <= logical_core_count() as usize);
+        for mhz in values.into_iter().filter(|mhz| *mhz > 0) {
+            assert!(mhz > 100 && mhz < 10_000, "implausible clock: {mhz} MHz");
         }
     }
 
