@@ -141,6 +141,62 @@ impl PdhCounter {
         }
         Some(values)
     }
+    /// Same as [`Self::values`], but keeps the PDH instance name.
+    ///
+    /// Used for per-disk rows; the array order is not stable across collections.
+    pub fn named_values(&self) -> Option<Vec<(String, f64)>> {
+        let mut size = 0u32;
+        let mut count = 0u32;
+
+        // SAFETY: a null buffer asks PDH for the required size; both
+        // out-parameters are valid.
+        let first = unsafe {
+            PdhGetFormattedCounterArrayW(self.handle, PDH_FMT_DOUBLE, &mut size, &mut count, None)
+        };
+        if first != PDH_MORE_DATA && first != 0 {
+            return None;
+        }
+        if size == 0 || count == 0 {
+            return Some(Vec::new());
+        }
+
+        let words = size.div_ceil(8) as usize;
+        let mut buffer = vec![0u64; words];
+        let items = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
+
+        // SAFETY: the buffer is at least `size` bytes and suitably aligned.
+        let status = unsafe {
+            PdhGetFormattedCounterArrayW(
+                self.handle,
+                PDH_FMT_DOUBLE,
+                &mut size,
+                &mut count,
+                Some(items),
+            )
+        };
+        if status != 0 {
+            return None;
+        }
+
+        let mut values = Vec::with_capacity(count as usize);
+        for index in 0..count as usize {
+            // SAFETY: PDH wrote `count` items into the buffer.
+            let item = unsafe { &*items.add(index) };
+            if item.FmtValue.CStatus != 0 {
+                continue;
+            }
+            // SAFETY: PDH_FMT_DOUBLE was requested.
+            let value = unsafe { item.FmtValue.Anonymous.doubleValue };
+            let name = if item.szName.is_null() {
+                String::new()
+            } else {
+                // SAFETY: PDH owns a NUL-terminated string for this array.
+                unsafe { item.szName.to_string().unwrap_or_default() }
+            };
+            values.push((name, value));
+        }
+        Some(values)
+    }
 }
 
 #[cfg(test)]
@@ -167,6 +223,21 @@ mod tests {
         assert!(query.collect());
         if let Some(values) = counter.values() {
             assert!(values.iter().all(|v| *v >= 0.0));
+        }
+    }
+
+    #[test]
+    fn named_values_keeps_the_total_instance_name() {
+        let query = PdhQuery::open().expect("PdhOpenQuery");
+        let counter = query
+            .add_english("\\PhysicalDisk(_Total)\\Disk Read Bytes/sec")
+            .expect("disk counter");
+        assert!(query.collect());
+        if let Some(values) = counter.named_values() {
+            assert!(
+                values.iter().any(|(name, _)| name == "_Total"),
+                "the aggregate instance must keep its name"
+            );
         }
     }
 

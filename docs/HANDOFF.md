@@ -125,6 +125,10 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   and gated to detail surfaces, refreshing with the 15 s interface list. CPU identity
   (processor name, base clock) and the Windows edition/build + computer name are read
   once from the registry. Cores show percentage and clock in a labelled grid.
+- **Disk**: PDH `\PhysicalDisk(*)\Disk Read Bytes/sec`, `Write Bytes/sec` and
+  `% Disk Time` via `PdhGetFormattedCounterArray` with instance names; `_Total` is the
+  aggregate, the rest become per-disk rows. Volume capacity/temps are cached separately
+  (30 s / 5 min).
 - **Window state**: the companion remembers its outer rectangle in
   `%APPDATA%\Statline\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
   when it still intersects a monitor. A separate file avoids racing the settings

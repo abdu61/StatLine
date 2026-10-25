@@ -63,8 +63,8 @@ detail sampling on
   clock from `CallNtPowerInformation`, the registry processor name and nominal base clock.
 - **Memory detail**: commit/cached plus aggregate page-file (swap) usage from
   `SystemPageFileInformation`, all converted from pages to bytes.
-- **Network detail**: per-adapter rates, session totals, the negotiated link speed
-  (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps") and, on WLAN, the SSID and
+- **Disk detail**: aggregate read/write and per-volume used/total, temperature, plus
+  per-physical-disk rates and busy percentage from named PDH instances (`Disk 0 C:`).
   signal quality from `wlanapi` (queried only while a detail surface is open).
 - **System detail**: Windows edition/build (corrected to "Windows 11" from the build
   number, since ProductName still says Windows 10 on many builds) and computer name,

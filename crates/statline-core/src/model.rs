@@ -89,6 +89,17 @@ pub struct DiskSample {
     pub write_bytes_per_sec: f64,
     pub busy_percent: f32,
     pub volumes: Vec<VolumeSample>,
+    /// Per-physical-disk activity, when PDH exposes named instances.
+    pub disks: Vec<DiskActivitySample>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DiskActivitySample {
+    /// PDH instance name, e.g. `0 C:`.
+    pub name: String,
+    pub read_bytes_per_sec: f64,
+    pub write_bytes_per_sec: f64,
+    pub busy_percent: f32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

@@ -14,6 +14,8 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Disk page shows per-physical-disk read/write and busy percentage from named PDH
+  instances (`Disk 0 C:`), alongside the aggregate and per-volume rows.
 - Network page shows the connected Wi-Fi SSID and signal quality (WLAN API). The query
   costs ~12 ms, so it only runs while a detail surface is open and refreshes with the
   15 s interface list.

@@ -1,6 +1,6 @@
 //! Disk sampling: PDH rates plus cached volume capacity and temperatures.
 
-use statline_core::model::{DiskSample, VolumeSample};
+use statline_core::model::{DiskActivitySample, DiskSample, VolumeSample};
 use statline_win::metrics::disk::{DiskCounters, volume_temperatures, volumes};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -92,6 +92,16 @@ impl DiskState {
             write_bytes_per_sec: rates.write_bytes_per_sec,
             busy_percent: rates.busy_percent,
             volumes: self.volumes.clone(),
+            disks: rates
+                .disks
+                .iter()
+                .map(|disk| DiskActivitySample {
+                    name: disk.name.clone(),
+                    read_bytes_per_sec: disk.read_bytes_per_sec,
+                    write_bytes_per_sec: disk.write_bytes_per_sec,
+                    busy_percent: disk.busy_percent,
+                })
+                .collect(),
         })
     }
 }

@@ -369,6 +369,17 @@ pub fn model_focused(
                         format_rate(disk.write_bytes_per_sec, units)
                     ),
                 });
+                for activity in &disk.disks {
+                    detail_rows.push(DetailRow {
+                        label: format!("Disk {}", activity.name),
+                        value: format!(
+                            "\u{2193} {}  \u{2191} {}  \u{00b7}  {}",
+                            format_rate(activity.read_bytes_per_sec, units),
+                            format_rate(activity.write_bytes_per_sec, units),
+                            format_percent(activity.busy_percent)
+                        ),
+                    });
+                }
                 for volume in &disk.volumes {
                     let label = if volume.label.is_empty() {
                         volume.mount.clone()
@@ -1252,6 +1263,7 @@ mod tests {
                     temperature_c: None,
                 },
             ],
+            disks: Vec::new(),
         });
         snapshot.processes = Some(ProcessSample {
             total: 1,

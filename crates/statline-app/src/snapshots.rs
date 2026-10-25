@@ -59,6 +59,12 @@ fn synthetic() -> Snapshot {
                 total_bytes: 931_000_000_000,
                 temperature_c: Some(41.0),
             }],
+            disks: vec![statline_core::model::DiskActivitySample {
+                name: String::from("0 C:"),
+                read_bytes_per_sec: 12_400_000.0,
+                write_bytes_per_sec: 3_100_000.0,
+                busy_percent: 4.0,
+            }],
         }),
         network: Some(NetworkSample {
             rx_bytes_per_sec: 1_240_000.0,
@@ -404,6 +410,7 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                 flyout::Focus::Memory,
                 "dashboard-memory-100.png",
             ),
+            (Page::Disk, flyout::Focus::Disk, "dashboard-disk-100.png"),
             (
                 Page::Network,
                 flyout::Focus::Network,

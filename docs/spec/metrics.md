@@ -37,8 +37,12 @@ and system cache. "Used" = total − available (matches Task Manager's In use).
 
 **Disk**
 One cached PDH query opened at startup with `PdhAddEnglishCounterW`
-(localization-proof): `\PhysicalDisk(*)\Disk Read Bytes/sec`, `Disk Write Bytes/sec`,
-`% Disk Time`. Busy % is clamped to 100. Aggregate across instances for the strip.
+**Disk**
+PDH wildcard counters (English paths): `\PhysicalDisk(*)\Disk Read Bytes/sec`,
+`Disk Write Bytes/sec`, `% Disk Time`. `PdhGetFormattedCounterArrayW` keeps the instance
+name; `_Total` is the aggregate and the remaining instances (`0 C:`) become per-disk
+rows. Busy % is clamped to 100. Volume capacity is cached for 30 s; drive temperature
+IOCTLs for 5 min while a detail surface is visible.
 
 **Memory**
 `GlobalMemoryStatusEx` for physical totals; `GetPerformanceInfo` for commit limit/usage,

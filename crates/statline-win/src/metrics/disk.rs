@@ -22,12 +22,23 @@ use windows::core::PCWSTR;
 /// `DRIVE_FIXED` from winbase.h; the constant is not generated in this binding.
 const DRIVE_FIXED: u32 = 3;
 
-/// Throughput rates for the aggregate of all physical disks.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+/// Throughput rates for one physical disk.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DiskActivity {
+    /// PDH instance name, e.g. `0 C:`.
+    pub name: String,
+    pub read_bytes_per_sec: f64,
+    pub write_bytes_per_sec: f64,
+    pub busy_percent: f32,
+}
+
+/// Throughput rates for the aggregate plus each physical disk.
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct DiskRates {
     pub read_bytes_per_sec: f64,
     pub write_bytes_per_sec: f64,
     pub busy_percent: f32,
+    pub disks: Vec<DiskActivity>,
 }
 
 /// One open PDH query holding every disk counter we need.
@@ -39,12 +50,12 @@ pub struct DiskCounters {
 }
 
 impl DiskCounters {
-    /// Open the query and add the three aggregate counters.
+    /// Open the query and add the three wildcard counters.
     pub fn open() -> Option<Self> {
         let query = PdhQuery::open()?;
-        let read = query.add_english("\\PhysicalDisk(_Total)\\Disk Read Bytes/sec")?;
-        let write = query.add_english("\\PhysicalDisk(_Total)\\Disk Write Bytes/sec")?;
-        let busy = query.add_english("\\PhysicalDisk(_Total)\\% Disk Time")?;
+        let read = query.add_english("\\PhysicalDisk(*)\\Disk Read Bytes/sec")?;
+        let write = query.add_english("\\PhysicalDisk(*)\\Disk Write Bytes/sec")?;
+        let busy = query.add_english("\\PhysicalDisk(*)\\% Disk Time")?;
         // Prime the rate counters; the first sample has no interval.
         let _ = query.collect();
         Some(Self {
@@ -55,15 +66,62 @@ impl DiskCounters {
         })
     }
 
-    /// Refresh and read the current rates.
+    /// Refresh and read the aggregate plus per-disk rates.
     pub fn sample(&self) -> Option<DiskRates> {
         if !self.query.collect() {
             return None;
         }
+
+        let reads = self.read.named_values()?;
+        let writes = self.write.named_values().unwrap_or_default();
+        let busy = self.busy.named_values().unwrap_or_default();
+
+        let mut rows: HashMap<String, DiskActivity> = HashMap::new();
+        for (name, value) in reads {
+            rows.entry(name.clone())
+                .or_insert_with(|| DiskActivity {
+                    name,
+                    ..DiskActivity::default()
+                })
+                .read_bytes_per_sec = value.max(0.0);
+        }
+        for (name, value) in writes {
+            rows.entry(name.clone())
+                .or_insert_with(|| DiskActivity {
+                    name,
+                    ..DiskActivity::default()
+                })
+                .write_bytes_per_sec = value.max(0.0);
+        }
+        for (name, value) in busy {
+            rows.entry(name.clone())
+                .or_insert_with(|| DiskActivity {
+                    name,
+                    ..DiskActivity::default()
+                })
+                .busy_percent = value.clamp(0.0, 100.0) as f32;
+        }
+
+        let total = rows.remove("_Total");
+        let mut disks: Vec<DiskActivity> = rows.into_values().collect();
+        disks.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let aggregate = total.unwrap_or_else(|| DiskActivity {
+            name: String::from("_Total"),
+            read_bytes_per_sec: disks.iter().map(|disk| disk.read_bytes_per_sec).sum(),
+            write_bytes_per_sec: disks.iter().map(|disk| disk.write_bytes_per_sec).sum(),
+            busy_percent: disks
+                .iter()
+                .map(|disk| disk.busy_percent)
+                .sum::<f32>()
+                .clamp(0.0, 100.0),
+        });
+
         Some(DiskRates {
-            read_bytes_per_sec: self.read.value().unwrap_or(0.0).max(0.0),
-            write_bytes_per_sec: self.write.value().unwrap_or(0.0).max(0.0),
-            busy_percent: self.busy.value().unwrap_or(0.0).clamp(0.0, 100.0) as f32,
+            read_bytes_per_sec: aggregate.read_bytes_per_sec,
+            write_bytes_per_sec: aggregate.write_bytes_per_sec,
+            busy_percent: aggregate.busy_percent,
+            disks,
         })
     }
 }
