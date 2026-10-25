@@ -78,6 +78,8 @@ fn synthetic() -> Snapshot {
             processes: 248,
             threads: 3_412,
             handles: 112_908,
+            os: Some(String::from("Windows 11 Pro 24H2 (build 26100.2033)")),
+            computer: Some(String::from("STATLINE-DEMO")),
         }),
         thermal: Some(ThermalSample { system_c: 54.0 }),
         battery: Some(BatterySample {
@@ -407,6 +409,11 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                 Page::Battery,
                 flyout::Focus::Battery,
                 "dashboard-battery-100.png",
+            ),
+            (
+                Page::System,
+                flyout::Focus::System,
+                "dashboard-system-100.png",
             ),
         ] {
             let model = flyout::model_focused(

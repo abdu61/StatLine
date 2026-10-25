@@ -525,6 +525,27 @@ pub fn model_focused(
         }
     }
 
+    if focus == Some(Focus::System) {
+        if let Some(system) = snapshot.system.as_ref() {
+            if let Some(os) = system.os.as_ref() {
+                detail_rows.push(DetailRow {
+                    label: String::from("OS"),
+                    value: os.clone(),
+                });
+            }
+            if let Some(computer) = system.computer.as_ref() {
+                detail_rows.push(DetailRow {
+                    label: String::from("Computer"),
+                    value: computer.clone(),
+                });
+            }
+            detail_rows.push(DetailRow {
+                label: String::from("Processes"),
+                value: system.processes.to_string(),
+            });
+        }
+    }
+
     // Only CPU and Memory ask "which app is responsible"; the other modules
     // have no per-app data, so their focused view has no process table.
     let processes = match focus {
@@ -1119,6 +1140,7 @@ mod tests {
             processes: 240,
             threads: 3_000,
             handles: 90_000,
+            ..Default::default()
         });
 
         let model = model(&snapshot, &History::default());

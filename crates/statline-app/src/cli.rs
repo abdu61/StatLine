@@ -142,7 +142,16 @@ pub fn probe(count: u32, interval: Duration) {
         let system_text = snapshot
             .system
             .as_ref()
-            .map(|system| format!("procs {}", system.processes))
+            .map(|system| {
+                let mut text = format!("procs {}", system.processes);
+                if let Some(os) = system.os.as_ref() {
+                    text.push_str(&format!("  {os}"));
+                }
+                if let Some(computer) = system.computer.as_ref() {
+                    text.push_str(&format!("  @{computer}"));
+                }
+                text
+            })
             .unwrap_or_default();
 
         let thermal_text = snapshot

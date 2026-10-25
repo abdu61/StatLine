@@ -45,6 +45,9 @@ pub struct Sampler {
     /// Static processor identity, read once.
     cpu_name: Option<String>,
     cpu_base_mhz: Option<u32>,
+    /// Static platform identity, read once.
+    os: Option<String>,
+    computer: Option<String>,
     /// Smoothed CPU percentages for the 1/5/15 minute figures.
     average_1m: f32,
     average_5m: f32,
@@ -62,6 +65,7 @@ impl Default for Sampler {
 
 impl Sampler {
     pub fn new() -> Self {
+        let platform = metrics::PlatformInfo::read();
         Self {
             previous_total: None,
             previous_cores: Vec::new(),
@@ -76,6 +80,8 @@ impl Sampler {
             battery: BatteryState::new(),
             cpu_name: metrics::processor_name(),
             cpu_base_mhz: metrics::base_mhz(),
+            os: platform.os,
+            computer: platform.computer,
             average_1m: 0.0,
             average_5m: 0.0,
             average_15m: 0.0,
@@ -126,7 +132,7 @@ impl Sampler {
             } else {
                 None
             },
-            system: sample_system(),
+            system: self.sample_system(),
             processes: self.sample_processes(now),
         }
     }
@@ -222,6 +228,18 @@ impl Sampler {
 
         self.network.update(counters, elapsed)
     }
+
+    fn sample_system(&self) -> Option<SystemSample> {
+        let counters = metrics::performance_counters()?;
+        Some(SystemSample {
+            uptime_secs: metrics::uptime_secs(),
+            processes: counters.processes,
+            threads: counters.threads,
+            handles: counters.handles,
+            os: self.os.clone(),
+            computer: self.computer.clone(),
+        })
+    }
 }
 
 fn sample_memory() -> Option<MemorySample> {
@@ -237,16 +255,6 @@ fn sample_memory() -> Option<MemorySample> {
         cached_bytes: counters.cached_bytes,
         swap_used_bytes: swap_used,
         swap_total_bytes: swap_total,
-    })
-}
-
-fn sample_system() -> Option<SystemSample> {
-    let counters = metrics::performance_counters()?;
-    Some(SystemSample {
-        uptime_secs: metrics::uptime_secs(),
-        processes: counters.processes,
-        threads: counters.threads,
-        handles: counters.handles,
     })
 }
 

@@ -175,6 +175,10 @@ pub struct SystemSample {
     pub processes: u32,
     pub threads: u32,
     pub handles: u32,
+    /// Windows edition/build, e.g. "Windows 11 Pro 24H2 (build 26100.2033)".
+    pub os: Option<String>,
+    /// Computer name.
+    pub computer: Option<String>,
 }
 
 /// The per-app breakdown.

@@ -12,6 +12,7 @@ pub mod gpu;
 pub mod gpu_vendor;
 pub mod memory;
 pub mod net;
+pub mod os;
 pub mod pdh;
 pub mod process;
 pub mod thermal;
@@ -25,6 +26,7 @@ pub use memory::{
     MemoryStatus, PerformanceCounters, ProcessMemory, current_process_memory, memory_status,
     page_file_usage, performance_counters, process_cpu_time, uptime_secs,
 };
+pub use os::PlatformInfo;
 
 use windows::Win32::Foundation::FILETIME;
 

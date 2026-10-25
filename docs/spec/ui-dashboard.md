@@ -33,7 +33,8 @@ accent colour.
 - **GPU** — utilization, VRAM, and vendor temperature/fan/power when available.
 - **Disk** — capacity/rate card, then per-volume used/total and temperature rows.
 - **Network** — compact down/up card, then per-adapter rates and session totals.
-- **Battery / System** — the two always-on cards, ordered for the page.
+- **Battery / System** — the two always-on cards, ordered for the page. The System page
+  adds the Windows edition/build, computer name and process count.
 - **About** — version, privacy statement, settings/log folders, licence, and what the
   sensor stack does and does not provide.
 

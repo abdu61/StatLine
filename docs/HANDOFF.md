@@ -121,8 +121,8 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **Memory and network**: commit/cache from `GetPerformanceInfo`, aggregate page-file
   usage from `SystemPageFileInformation` (pages × page size) and per-adapter link speed
   from `MIB_IF_ROW2` (shown as "Wi-Fi · 866 Mbps"). CPU identity (processor name, base
-  clock) is read once from the registry. Cores show percentage and clock in a labelled
-  grid.
+  clock) and the Windows edition/build + computer name are read once from the registry.
+  Cores show percentage and clock in a labelled grid.
 - **Packaging**: `scripts/package.ps1` builds `dist/Statline-<v>-x64.zip` (exe, README,
   changelog, licence texts) plus a SHA-256. `scripts/build-msix.ps1` stages the layout and
   runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and
