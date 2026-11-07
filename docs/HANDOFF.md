@@ -13,10 +13,15 @@ cargo fmt --all
 cargo clippy --all-targets -- -D warnings
 cargo test
 cargo build --release
+cargo deny check   # advisories, bans, licences, sources
 ```
 
 Kill a running instance first (`Get-Process statline | Stop-Process -Force`) or the
 linker cannot replace the exe.
+
+`cargo deny` needs a `version` next to each `path` in `[workspace.dependencies]`; 0.20.x
+cannot resolve a path-only workspace dependency and reports
+`bug[unresolved-workspace-dependency]`.
 
 ## Run modes
 
@@ -35,13 +40,18 @@ Single instance is enforced by a named mutex; a second launch logs and exits.
 
 ## Visual QA — important
 
-**Screen capture cannot see this project on this machine.** `CopyFromScreen` and
-`BitBlt` omit both the taskbar and layered windows here. Do not conclude "invisible"
-from a screenshot.
+**`CopyFromScreen` cannot see this project on this machine.** It omits both the taskbar
+and layered windows, so a naive screenshot looks like the strip is missing. Use
+`scripts/capture-screen.ps1`, which uses `BitBlt` with `CAPTUREBLT` and does capture
+them — verified this session against the live strip.
 
 - Review the design with `--render-snapshots <dir>` and read the PNGs (they render the
   real drawing code, composited over a taskbar colour).
-- Verify live windows logically. The strip is now a **child** of the taskbar, so
+- For a live window, get its rect with `GetWindowRect` and pass it to
+  `capture-screen.ps1 -X -Y -Width -Height`. The screen is at 125 % here (120 DPI), so
+  call `SetProcessDPIAware` before reading rects or they come back in virtualised
+  coordinates and the capture lands in the wrong place.
+- Verify live windows logically too. The strip is now a **child** of the taskbar, so
   `FindWindow` (which skips children) will not find it:
 
   ```powershell
