@@ -164,6 +164,30 @@ pub fn probe(count: u32, interval: Duration) {
                 if let Some(computer) = system.computer.as_ref() {
                     text.push_str(&format!("  @{computer}"));
                 }
+                let modules: Vec<String> = system
+                    .memory_modules
+                    .iter()
+                    .map(|module| {
+                        format!(
+                            "{} {} {}{}",
+                            module.slot,
+                            format_bytes(module.size_bytes, UnitSystem::Binary),
+                            if module.kind.is_empty() {
+                                "RAM".to_string()
+                            } else {
+                                format!("{} {}", module.kind, module.speed_mts)
+                            },
+                            if module.bank.is_empty() {
+                                String::new()
+                            } else {
+                                format!(" ({})", module.bank)
+                            }
+                        )
+                    })
+                    .collect();
+                if !modules.is_empty() {
+                    text.push_str(&format!("  [{}]", modules.join(", ")));
+                }
                 text
             })
             .unwrap_or_default();

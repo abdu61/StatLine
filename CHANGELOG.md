@@ -28,6 +28,10 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- System page lists installed memory modules from SMBIOS: slot, capacity, generation
+  (DDR4/DDR5/LPDDR5…) and configured speed in MT/s, plus the channel locator so two
+  SODIMMs that share a device locator stay distinguishable. Read once on the first
+  system sample, and skipped entirely in `--safe-mode`.
 - `--safe-mode` limits sampling to documented CPU/memory/system counters, and
   `--reset-settings` deletes `settings.json` + `window.json`. Both are diagnostics for a
   machine where a provider misbehaves.

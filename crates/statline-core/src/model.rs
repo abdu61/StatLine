@@ -198,6 +198,22 @@ pub struct SystemSample {
     pub os: Option<String>,
     /// Computer name.
     pub computer: Option<String>,
+    /// Installed memory modules, in firmware slot order.
+    pub memory_modules: Vec<MemoryModuleInfo>,
+}
+
+/// One populated memory slot, as reported by SMBIOS.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MemoryModuleInfo {
+    /// Slot label from the firmware, e.g. `DIMM 0`.
+    pub slot: String,
+    /// Bank locator, used when two slots share a device locator.
+    pub bank: String,
+    pub size_bytes: u64,
+    /// Configured speed in MT/s.
+    pub speed_mts: u32,
+    /// Generation name such as `DDR4`; empty when the firmware omits it.
+    pub kind: String,
 }
 
 /// The per-app breakdown.

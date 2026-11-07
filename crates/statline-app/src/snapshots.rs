@@ -5,8 +5,9 @@
 //! code into a bitmap is the only reliable way to review the design here.
 
 use statline_core::model::{
-    AdapterSample, BatterySample, CpuSample, DiskSample, GpuSample, MemorySample, NetworkSample,
-    ProcessEntry, ProcessSample, Snapshot, SystemSample, ThermalSample, VolumeSample,
+    AdapterSample, BatterySample, CpuSample, DiskSample, GpuSample, MemoryModuleInfo, MemorySample,
+    NetworkSample, ProcessEntry, ProcessSample, Snapshot, SystemSample, ThermalSample,
+    VolumeSample,
 };
 use statline_render::{Color, Palette, Renderer};
 use statline_ui::{render, strip};
@@ -90,6 +91,13 @@ fn synthetic() -> Snapshot {
             handles: 112_908,
             os: Some(String::from("Windows 11 Pro 24H2 (build 26100.2033)")),
             computer: Some(String::from("STATLINE-DEMO")),
+            memory_modules: vec![MemoryModuleInfo {
+                slot: String::from("DIMM 0"),
+                bank: String::from("P0 CHANNEL A"),
+                size_bytes: 16 * 1024 * 1024 * 1024,
+                speed_mts: 5600,
+                kind: String::from("DDR5"),
+            }],
         }),
         thermal: Some(ThermalSample { system_c: 54.0 }),
         battery: Some(BatterySample {

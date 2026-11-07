@@ -15,6 +15,7 @@ pub mod net;
 pub mod os;
 pub mod pdh;
 pub mod process;
+pub mod smbios;
 pub mod thermal;
 
 pub use cpu::{
@@ -28,6 +29,7 @@ pub use memory::{
 };
 pub use net::WifiInfo;
 pub use os::PlatformInfo;
+pub use smbios::MemoryModule;
 
 use windows::Win32::Foundation::FILETIME;
 

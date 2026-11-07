@@ -1,7 +1,7 @@
 //! The sampling engine: turns raw Win32 readings into a `Snapshot`.
 
 use statline_core::model::{
-    CpuSample, MemorySample, ProcessSample, Snapshot, SystemSample, ThermalSample,
+    CpuSample, MemoryModuleInfo, MemorySample, ProcessSample, Snapshot, SystemSample, ThermalSample,
 };
 use statline_win::metrics::net::InterfaceRef;
 use statline_win::metrics::{self, CpuTimes};
@@ -49,6 +49,9 @@ pub struct Sampler {
     /// Static platform identity, read once.
     os: Option<String>,
     computer: Option<String>,
+    /// Installed memory modules, read on the first system sample and cached:
+    /// `None` means "not read yet" (and stays `None` in safe mode).
+    memory_modules: Option<Vec<MemoryModuleInfo>>,
     /// Smoothed CPU percentages for the 1/5/15 minute figures.
     average_1m: f32,
     average_5m: f32,
@@ -86,6 +89,7 @@ impl Sampler {
             cpu_base_mhz: metrics::base_mhz(),
             os: platform.os,
             computer: platform.computer,
+            memory_modules: None,
             average_1m: 0.0,
             average_5m: 0.0,
             average_15m: 0.0,
@@ -283,8 +287,24 @@ impl Sampler {
         sample
     }
 
-    fn sample_system(&self) -> Option<SystemSample> {
+    fn sample_system(&mut self) -> Option<SystemSample> {
         let counters = metrics::performance_counters()?;
+        // SMBIOS is static hardware: read it on the first system sample, not
+        // per tick. Safe mode keeps the optional firmware read switched off.
+        if self.memory_modules.is_none() && !self.safe_mode {
+            self.memory_modules = Some(
+                metrics::smbios::modules()
+                    .into_iter()
+                    .map(|module| MemoryModuleInfo {
+                        slot: module.slot,
+                        bank: module.bank,
+                        size_bytes: module.size_bytes,
+                        speed_mts: module.speed_mts,
+                        kind: module.kind,
+                    })
+                    .collect(),
+            );
+        }
         Some(SystemSample {
             uptime_secs: metrics::uptime_secs(),
             processes: counters.processes,
@@ -292,6 +312,7 @@ impl Sampler {
             handles: counters.handles,
             os: self.os.clone(),
             computer: self.computer.clone(),
+            memory_modules: self.memory_modules.clone().unwrap_or_default(),
         })
     }
 }

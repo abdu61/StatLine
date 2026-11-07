@@ -563,6 +563,29 @@ pub fn model_focused(
                 label: String::from("Processes"),
                 value: system.processes.to_string(),
             });
+            for module in &system.memory_modules {
+                let kind = if module.kind.is_empty() {
+                    String::from("RAM")
+                } else {
+                    module.kind.clone()
+                };
+                // Firmware often repeats the device locator per module, so the
+                // bank/channel is what actually distinguishes two SODIMMs.
+                let mut value = format!(
+                    "{} {}  \u{00b7}  {} MT/s",
+                    format_bytes(module.size_bytes, UnitSystem::Binary),
+                    kind,
+                    module.speed_mts
+                );
+                if !module.bank.is_empty() {
+                    value.push_str("  \u{00b7}  ");
+                    value.push_str(&module.bank);
+                }
+                detail_rows.push(DetailRow {
+                    label: module.slot.clone(),
+                    value,
+                });
+            }
         }
     }
 
