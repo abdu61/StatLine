@@ -1,7 +1,7 @@
 //! The flyout window: opens above the strip, closes on focus loss or Esc.
 
 use statline_core::model::Snapshot;
-use statline_core::units::UnitSystem;
+use statline_core::units::{TemperatureUnit, UnitSystem};
 use statline_render::{Palette, Renderer, Surface};
 use statline_ui::flyout::{self, History, Model};
 use statline_win::{HWND, LPARAM, LRESULT, WPARAM, strip_window};
@@ -24,6 +24,7 @@ pub struct Flyout {
     /// Module the panel was opened from; drives the highlight and sort order.
     focus: Option<flyout::Focus>,
     units: UnitSystem,
+    temperature: TemperatureUnit,
     mica: bool,
     /// Strip rectangle the panel is anchored to, kept for height changes.
     anchor: RECT,
@@ -41,6 +42,7 @@ impl Flyout {
             model: Model::default(),
             focus: None,
             units: UnitSystem::Binary,
+            temperature: TemperatureUnit::Celsius,
             mica: false,
             anchor: RECT::default(),
             scale,
@@ -67,6 +69,11 @@ impl Flyout {
     /// Change the byte units; the next refresh rebuilds the strings.
     pub fn set_units(&mut self, units: UnitSystem) {
         self.units = units;
+    }
+
+    /// Change the temperature scale; the next refresh rebuilds the strings.
+    pub fn set_temperature(&mut self, temperature: TemperatureUnit) {
+        self.temperature = temperature;
     }
 
     /// Match the Mica setting; the next paint makes the panel translucent.
@@ -107,7 +114,8 @@ impl Flyout {
         self.focus = focus;
         self.anchor = anchor;
         self.record(snapshot);
-        self.model = flyout::model_focused(snapshot, &self.history, focus, self.units);
+        self.model =
+            flyout::model_with_units(snapshot, &self.history, focus, self.units, self.temperature);
 
         let (left, top, width, height) = self.placement();
 
@@ -220,7 +228,13 @@ impl Flyout {
     /// Model refresh used by the panel's own timer.
     pub fn refresh(&mut self, renderer: &mut Renderer, snapshot: &Snapshot) {
         self.record(snapshot);
-        self.model = flyout::model_focused(snapshot, &self.history, self.focus, self.units);
+        self.model = flyout::model_with_units(
+            snapshot,
+            &self.history,
+            self.focus,
+            self.units,
+            self.temperature,
+        );
 
         // The process table arrives a tick or two after opening, which makes
         // the panel taller. Re-anchor so it grows upward instead of over the

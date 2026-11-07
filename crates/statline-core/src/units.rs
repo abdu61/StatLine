@@ -73,9 +73,39 @@ pub fn format_percent_precise(percent: f32) -> String {
     }
 }
 
-/// `62.4` → `"62 °C"`.
+/// Temperature scale for display. Samples are always stored in Celsius.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TemperatureUnit {
+    #[default]
+    Celsius,
+    Fahrenheit,
+}
+
+impl TemperatureUnit {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Celsius => "°C",
+            Self::Fahrenheit => "°F",
+        }
+    }
+
+    /// Convert a stored Celsius reading into this scale.
+    pub fn convert(self, celsius: f32) -> f32 {
+        match self {
+            Self::Celsius => celsius,
+            Self::Fahrenheit => celsius * 9.0 / 5.0 + 32.0,
+        }
+    }
+}
+
+/// `62.4` → `"62 °C"`, or `"144 °F"` when the caller asks for Fahrenheit.
 pub fn format_temperature(celsius: f32) -> String {
     format!("{:.0} °C", celsius)
+}
+
+/// Temperature in the chosen scale.
+pub fn format_temperature_in(celsius: f32, unit: TemperatureUnit) -> String {
+    format!("{:.0} {}", unit.convert(celsius), unit.label())
 }
 
 /// `90_061` → `"1d 1h"`, `14_400` → `"4h 0m"`, `45` → `"45s"`.
@@ -240,5 +270,31 @@ mod tests {
     #[test]
     fn temperature_has_one_suffix() {
         assert_eq!(format_temperature(62.4), "62 °C");
+    }
+
+    #[test]
+    fn fahrenheit_converts_from_celsius() {
+        // Freezing, body temperature and boiling, the anchors a user checks.
+        assert_eq!(
+            format_temperature_in(0.0, TemperatureUnit::Fahrenheit),
+            "32 °F"
+        );
+        assert_eq!(
+            format_temperature_in(37.0, TemperatureUnit::Fahrenheit),
+            "99 °F"
+        );
+        assert_eq!(
+            format_temperature_in(100.0, TemperatureUnit::Fahrenheit),
+            "212 °F"
+        );
+        // Celsius stays untouched, including negatives.
+        assert_eq!(
+            format_temperature_in(-5.0, TemperatureUnit::Celsius),
+            "-5 °C"
+        );
+        assert_eq!(
+            format_temperature_in(-5.0, TemperatureUnit::Fahrenheit),
+            "23 °F"
+        );
     }
 }

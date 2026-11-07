@@ -169,6 +169,31 @@ impl Units {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Temperature {
+    /// Readings as Windows reports them.
+    #[default]
+    Celsius,
+    Fahrenheit,
+}
+
+impl Temperature {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Celsius => Self::Fahrenheit,
+            Self::Fahrenheit => Self::Celsius,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Celsius => "Celsius (°C)",
+            Self::Fahrenheit => "Fahrenheit (°F)",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Appearance {
@@ -177,6 +202,9 @@ pub struct Appearance {
     pub accent: Accent,
     /// Windows 11 Mica system backdrop on the framed companion/settings windows.
     pub mica: bool,
+    /// Temperature scale. Samples are always stored in Celsius; this only
+    /// changes what the surfaces print.
+    pub temperature: Temperature,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

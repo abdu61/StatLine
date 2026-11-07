@@ -2,9 +2,9 @@
 
 use statline_core::model::{ProcessEntry, Snapshot};
 use statline_core::units::{
-    UnitSystem, format_bytes, format_duration, format_frequency, format_percent,
+    TemperatureUnit, UnitSystem, format_bytes, format_duration, format_frequency, format_percent,
     format_percent_precise, format_rate, format_rate_compact, format_rate_short,
-    format_temperature,
+    format_temperature_in,
 };
 use statline_render::{Align, Color, Palette, Surface, TextEngine, TextStyle, radius, space};
 
@@ -143,6 +143,18 @@ pub fn model_focused(
     focus: Option<Focus>,
     units: UnitSystem,
 ) -> Model {
+    model_with_units(snapshot, history, focus, units, TemperatureUnit::Celsius)
+}
+
+/// Build the panel with explicit byte and temperature units.
+pub fn model_with_units(
+    snapshot: &Snapshot,
+    history: &History,
+    focus: Option<Focus>,
+    units: UnitSystem,
+    temperature: TemperatureUnit,
+) -> Model {
+    let temp = |celsius: f32| format_temperature_in(celsius, temperature);
     let overview = focus.is_none();
     let mut rows = Vec::new();
     let mut detail_rows = Vec::new();
@@ -290,7 +302,7 @@ pub fn model_focused(
                 detail = format!("{name} \u{00b7} {detail}");
             }
             if let Some(celsius) = gpu.temperature_c {
-                detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
+                detail.push_str(&format!(" \u{00b7} {}", temp(celsius)));
             }
             if let Some(fan) = gpu.fan_percent {
                 detail.push_str(&format!(" \u{00b7} fan {fan:.0}%"));
@@ -340,7 +352,7 @@ pub fn model_focused(
                 Some(volume) => {
                     let temperature = volume
                         .temperature_c
-                        .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
+                        .map(|celsius| format!(" \u{00b7} {}", temp(celsius)))
                         .unwrap_or_default();
                     format!(
                         "{} free of {}{temperature}",
@@ -401,7 +413,7 @@ pub fn model_focused(
                     };
                     let temperature = volume
                         .temperature_c
-                        .map(|celsius| format!(" \u{00b7} {}", format_temperature(celsius)))
+                        .map(|celsius| format!(" \u{00b7} {}", temp(celsius)))
                         .unwrap_or_default();
                     detail_rows.push(DetailRow {
                         label,
@@ -487,7 +499,7 @@ pub fn model_focused(
             detail.push_str(&format!(" \u{00b7} {} health", format_percent(health)));
         }
         if let Some(celsius) = battery.temperature_c {
-            detail.push_str(&format!(" \u{00b7} {}", format_temperature(celsius)));
+            detail.push_str(&format!(" \u{00b7} {}", temp(celsius)));
         }
         if let Some(cycles) = battery.cycle_count {
             detail.push_str(&format!(" \u{00b7} {cycles} cycles"));
@@ -513,7 +525,7 @@ pub fn model_focused(
         };
         Row {
             label: "System",
-            value: format_temperature(thermal.system_c),
+            value: temp(thermal.system_c),
             detail,
             series: Vec::new(),
             ..Row::default()
@@ -1371,6 +1383,51 @@ mod tests {
             "disk detail has no per-app data"
         );
         assert_eq!(model.rows[0].label, "Disk");
+    }
+
+    #[test]
+    fn temperature_setting_changes_every_reading() {
+        let mut snapshot = snapshot();
+        snapshot.thermal = Some(statline_core::model::ThermalSample { system_c: 54.0 });
+        snapshot.battery = Some(statline_core::model::BatterySample {
+            percent: 92.0,
+            on_ac: true,
+            temperature_c: Some(31.0),
+            ..Default::default()
+        });
+
+        let celsius = model_focused(
+            &snapshot,
+            &History::default(),
+            Some(Focus::System),
+            UnitSystem::Binary,
+        );
+        let fahrenheit = model_with_units(
+            &snapshot,
+            &History::default(),
+            Some(Focus::System),
+            UnitSystem::Binary,
+            TemperatureUnit::Fahrenheit,
+        );
+
+        let card = |model: &Model, label: &str| {
+            model
+                .rows
+                .iter()
+                .find(|row| row.label == label)
+                .unwrap_or_else(|| panic!("{label} row"))
+                .clone()
+        };
+
+        // 54 °C is 129 °F and 31 °C is 88 °F.
+        assert_eq!(card(&celsius, "System").value, "54 °C");
+        assert_eq!(card(&fahrenheit, "System").value, "129 °F");
+        assert!(card(&celsius, "Battery").detail.contains("31 °C"));
+        assert!(card(&fahrenheit, "Battery").detail.contains("88 °F"));
+        assert!(
+            !card(&fahrenheit, "Battery").detail.contains("°C"),
+            "no Celsius may leak into the Fahrenheit view"
+        );
     }
 
     #[test]

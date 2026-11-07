@@ -2,7 +2,7 @@
 
 use statline_config::WindowBounds;
 use statline_core::model::Snapshot;
-use statline_core::units::UnitSystem;
+use statline_core::units::{TemperatureUnit, UnitSystem};
 use statline_render::{Palette, Renderer, Surface};
 use statline_ui::dashboard::{self, Page};
 use statline_ui::flyout::{self, Model};
@@ -26,6 +26,7 @@ pub struct Dashboard {
     surface: Option<Surface>,
     model: Model,
     units: UnitSystem,
+    temperature: TemperatureUnit,
     page: Page,
     mica: bool,
     /// Scale used by the last paint, for nav hit-testing.
@@ -41,6 +42,7 @@ impl Dashboard {
             surface: None,
             model: Model::default(),
             units: UnitSystem::Binary,
+            temperature: TemperatureUnit::Celsius,
             page: Page::Dashboard,
             mica: false,
             render_scale: 1.0,
@@ -66,6 +68,11 @@ impl Dashboard {
     /// Change the byte units used by the cards.
     pub fn set_units(&mut self, units: UnitSystem) {
         self.units = units;
+    }
+
+    /// Change the temperature scale; the next refresh rebuilds the strings.
+    pub fn set_temperature(&mut self, temperature: TemperatureUnit) {
+        self.temperature = temperature;
     }
 
     /// Switch page; the caller repaints with the next refresh.
@@ -100,7 +107,13 @@ impl Dashboard {
     }
 
     fn open(&mut self, renderer: &mut Renderer, snapshot: &Snapshot, history: &flyout::History) {
-        self.model = flyout::model_focused(snapshot, history, self.page.focus(), self.units);
+        self.model = flyout::model_with_units(
+            snapshot,
+            history,
+            self.page.focus(),
+            self.units,
+            self.temperature,
+        );
 
         let width = (WINDOW_WIDTH as f32 * self.scale) as i32;
         let height = (WINDOW_HEIGHT as f32 * self.scale) as i32;
@@ -148,7 +161,13 @@ impl Dashboard {
         let Some(hwnd) = self.hwnd else {
             return;
         };
-        self.model = flyout::model_focused(snapshot, history, self.page.focus(), self.units);
+        self.model = flyout::model_with_units(
+            snapshot,
+            history,
+            self.page.focus(),
+            self.units,
+            self.temperature,
+        );
         self.render_surface(_renderer, hwnd);
         // SAFETY: our window; a null rect invalidates the whole client area.
         unsafe {

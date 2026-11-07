@@ -6,9 +6,9 @@
 
 use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
-use statline_config::{Accent, Settings, StripPlacement, Units};
+use statline_config::{Accent, Settings, StripPlacement, Temperature, Units};
 use statline_core::model::Snapshot;
-use statline_core::units::UnitSystem;
+use statline_core::units::{TemperatureUnit, UnitSystem};
 use statline_metrics::thread::SamplerThread;
 use statline_render::{Color, Palette, Renderer, Surface};
 use statline_ui::{flyout, render, strip};
@@ -483,6 +483,14 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
     host.flyout.set_mica(settings.appearance.mica);
     host.dashboard.set_units(host.units);
     host.dashboard.set_mica(settings.appearance.mica);
+
+    let temperature = match settings.appearance.temperature {
+        Temperature::Celsius => TemperatureUnit::Celsius,
+        Temperature::Fahrenheit => TemperatureUnit::Fahrenheit,
+    };
+    host.flyout.set_temperature(temperature);
+    host.dashboard.set_temperature(temperature);
+
     host.sampler.set_interval(Duration::from_millis(
         settings.general.update_interval_ms as u64,
     ));
