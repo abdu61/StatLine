@@ -70,14 +70,25 @@ detail sampling on
 - **Memory detail**: commit/cached plus aggregate page-file (swap) usage from
   `SystemPageFileInformation`, all converted from pages to bytes.
 - **Disk detail**: aggregate read/write and per-volume used/total, temperature, plus
-  per-physical-disk rates and busy percentage from named PDH instances (`Disk 0 C:`).
+  per-physical-disk rates and busy percentage from named PDH instances (`Disk 0 C:`),
+  and each drive's bus type and model (`NVMe SAMSUNG MZVLQ512HALU-00000`) from
+  `StorageDeviceProperty` on a zero-access handle. Raw capacity and
+  `IOCTL_STORAGE_PREDICT_FAILURE` need administrator access, so capacity is summed from
+  volumes and no health badge is invented.
 - **Network detail**: only real interfaces (NDIS filter miniports are excluded), with
   per-adapter rates, session totals, the negotiated link speed
   (`MIB_IF_ROW2.TransmitLinkSpeed`, e.g. "Wi-Fi · 866 Mbps") and, on WLAN, the SSID and
   signal quality from `wlanapi` (queried only while a detail surface is open).
 - **System detail**: Windows edition/build (corrected to "Windows 11" from the build
-  number, since ProductName still says Windows 10 on many builds) and computer name,
-  read once from the registry, plus process count.
+  number, since ProductName still says Windows 10 on many builds), computer name, process
+  count, and every populated memory slot with capacity, DDR generation and configured
+  speed from SMBIOS type 17 (`GetSystemFirmwareTable('RSMB')`), read once at the first
+  system sample and skipped in safe mode. The bank locator rides the value because laptop
+  firmware repeats the device locator for both SODIMMs.
+- **GPU detail**: whole-GPU utilization and VRAM, plus per-app GPU share parsed from the
+  PID in each `\GPU Engine(*)` instance name — no vendor SDK, works on an APU. The GPU
+  page's process table answers "which app is using the GPU"; the top-N cut ranks by the
+  larger of CPU and GPU share so a GPU-heavy app is not dropped on an idle CPU.
 - **DPI**: process is per-monitor-v2 aware. The strip re-reads the taskbar DPI each tick
   and rebuilds its surface when the scale changes; the companion handles
   `WM_DPICHANGED` with the suggested rectangle and re-renders at the new scale.
