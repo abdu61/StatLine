@@ -375,6 +375,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn settings_without_the_temperature_key_load_with_the_default() {
+        // Every shipped 0.1.0 settings.json predates this field; adding it must
+        // not invalidate an existing file.
+        let json = r#"{
+            "schema_version": 1,
+            "general": {"update_interval_ms": 1000, "run_at_startup": false,
+                        "strip_placement": "right", "units": "binary"},
+            "appearance": {"theme": "system", "accent": "system", "mica": false},
+            "modules": {"cpu": true, "memory": true, "gpu": true,
+                        "disk": true, "network": true}
+        }"#;
+        let settings: Settings = serde_json::from_str(json).expect("old file must load");
+        assert_eq!(settings.schema_version, 1);
+        assert_eq!(settings.appearance.temperature, Temperature::Celsius);
+        assert_eq!(settings.appearance.theme, Theme::System);
+        assert!(settings.modules.cpu && settings.modules.network);
+    }
+
+    #[test]
     fn defaults_round_trip() {
         let json = serde_json::to_string(&Settings::default()).expect("serialize");
         let back: Settings = serde_json::from_str(&json).expect("deserialize");
