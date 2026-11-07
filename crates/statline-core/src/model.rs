@@ -218,6 +218,10 @@ pub struct ProcessEntry {
     pub pid: u32,
     /// Executable name, e.g. `chrome.exe`.
     pub name: String,
+    /// Live threads across grouped instances.
+    pub threads: u32,
+    /// How many processes share this executable name.
+    pub instances: u32,
     /// Share of total CPU capacity (sum of all cores), 0..=100.
     ///
     /// This is the Task Manager scale: one saturated core on an eight-core

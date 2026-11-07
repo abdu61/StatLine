@@ -25,6 +25,8 @@ pub struct RawProcess {
     /// User + kernel time consumed since the process started.
     pub cpu_time_100ns: u64,
     pub working_set_bytes: u64,
+    /// Live thread count from the kernel entry.
+    pub threads: u32,
 }
 
 /// The documented prefix of `SYSTEM_PROCESS_INFORMATION`.
@@ -141,6 +143,7 @@ fn parse(buffer: &[u64], out: &mut Vec<RawProcess>) {
                 name,
                 cpu_time_100ns,
                 working_set_bytes: entry.working_set_size as u64,
+                threads: entry.number_of_threads,
             });
         }
 
@@ -186,6 +189,10 @@ mod tests {
         );
         assert!(out.iter().all(|entry| !entry.name.is_empty()));
         assert!(out.iter().any(|entry| entry.working_set_bytes > 0));
+        assert!(
+            out.iter().any(|entry| entry.threads > 1),
+            "some process must report more than one thread"
+        );
     }
 
     #[test]

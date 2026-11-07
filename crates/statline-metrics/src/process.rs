@@ -78,6 +78,8 @@ impl ProcessState {
             entries.push(ProcessEntry {
                 pid: entry.pid,
                 name: entry.name.clone(),
+                threads: entry.threads,
+                instances: 1,
                 cpu_percent,
                 working_set_bytes: entry.working_set_bytes,
             });
@@ -122,6 +124,8 @@ pub fn group_by_name(entries: Vec<ProcessEntry>) -> Vec<ProcessEntry> {
             target.working_set_bytes = target
                 .working_set_bytes
                 .saturating_add(entry.working_set_bytes);
+            target.threads = target.threads.saturating_add(entry.threads);
+            target.instances = target.instances.saturating_add(1);
             target.cpu_percent = match (target.cpu_percent, entry.cpu_percent) {
                 (Some(left), Some(right)) => Some((left + right).clamp(0.0, 100.0)),
                 (Some(left), None) => Some(left),
@@ -210,18 +214,24 @@ mod tests {
             ProcessEntry {
                 pid: 1,
                 name: String::from("chrome.exe"),
+                threads: 1,
+                instances: 1,
                 cpu_percent: Some(4.0),
                 working_set_bytes: 100,
             },
             ProcessEntry {
                 pid: 2,
                 name: String::from("CHROME.EXE"),
+                threads: 1,
+                instances: 1,
                 cpu_percent: Some(2.5),
                 working_set_bytes: 50,
             },
             ProcessEntry {
                 pid: 3,
                 name: String::from("explorer.exe"),
+                threads: 1,
+                instances: 1,
                 cpu_percent: None,
                 working_set_bytes: 80,
             },

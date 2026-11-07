@@ -24,6 +24,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Process rows show their live thread count and, for grouped executables, how many
+  processes the row covers (`chrome.exe (14)`), so a summed percentage is not mistaken
+  for one runaway process.
 - Companion keyboard navigation: `Ctrl+Tab`/`Ctrl+Shift+Tab` cycle pages,
   `Ctrl+1`–`Ctrl+9` jump to a nav item, `Ctrl+S` opens settings. Clicking the tray icon
   now toggles the dashboard instead of a folder.

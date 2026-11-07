@@ -588,7 +588,13 @@ pub fn model_focused(
                 entries
                     .into_iter()
                     .map(|entry| ProcessRow {
-                        name: entry.name.clone(),
+                        // Grouped rows say how many processes they cover, so a
+                        // summed 12 % is not mistaken for one runaway process.
+                        name: if entry.instances > 1 {
+                            format!("{} ({})", entry.name, entry.instances)
+                        } else {
+                            entry.name.clone()
+                        },
                         cpu: entry
                             .cpu_percent
                             .map(format_percent_precise)
@@ -1087,6 +1093,8 @@ mod tests {
             top: vec![ProcessEntry {
                 pid: 42,
                 name: String::from("code.exe"),
+                threads: 4,
+                instances: 1,
                 cpu_percent: Some(4.2),
                 working_set_bytes: 640 * 1024 * 1024,
             }],
@@ -1107,6 +1115,8 @@ mod tests {
             top: vec![ProcessEntry {
                 pid: 7,
                 name: String::from("new.exe"),
+                threads: 4,
+                instances: 1,
                 cpu_percent: None,
                 working_set_bytes: 1024,
             }],
@@ -1125,12 +1135,16 @@ mod tests {
                 ProcessEntry {
                     pid: 1,
                     name: String::from("cpu.exe"),
+                    threads: 4,
+                    instances: 1,
                     cpu_percent: Some(50.0),
                     working_set_bytes: 10,
                 },
                 ProcessEntry {
                     pid: 2,
                     name: String::from("memory.exe"),
+                    threads: 4,
+                    instances: 1,
                     cpu_percent: Some(1.0),
                     working_set_bytes: 1_000,
                 },
@@ -1218,6 +1232,8 @@ mod tests {
             top: vec![ProcessEntry {
                 pid: 9,
                 name: String::from("busy.exe"),
+                threads: 4,
+                instances: 1,
                 cpu_percent: Some(12.0),
                 working_set_bytes: 1_000,
             }],
@@ -1270,6 +1286,8 @@ mod tests {
             top: vec![ProcessEntry {
                 pid: 9,
                 name: String::from("busy.exe"),
+                threads: 4,
+                instances: 1,
                 cpu_percent: Some(12.0),
                 working_set_bytes: 1_000,
             }],

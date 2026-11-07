@@ -55,8 +55,9 @@ detail sampling on
   `scripts/make-icon.ps1`.
 - **Per-app breakdown**: `NtQuerySystemInformation(SystemProcessInformation)` with CPU-time
   deltas; Task Manager scale (share of all cores); instances of the same executable are
-  grouped into one row (Chrome, svchost); `—` until a baseline exists; sampled at 2 s
-  only while the flyout or companion is open (~4.75 ms per query).
+  grouped into one row with the instance count in the label, plus live thread counts;
+  `—` until a baseline exists; sampled at 2 s only while the flyout or companion is open
+  (~4.75 ms per query).
 - **Sensors**: ACPI "System" temperature via PDH (5 s), drive temperatures via
   `IOCTL_STORAGE_QUERY_PROPERTY` (5 min cache, volume → disk mapping), battery health,
   temperature and cycle count via `IOCTL_BATTERY_QUERY_INFORMATION` (30 s). GPU vendor
