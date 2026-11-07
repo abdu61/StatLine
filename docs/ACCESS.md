@@ -94,6 +94,12 @@ startup task that is **disabled by default**. It does not request `internetClien
 # live readings (CPU, memory, disk, GPU, network, sensors)
 .\statline.exe --probe
 
+# remove everything this app stored (settings + window position)
+.\statline.exe --reset-settings
+
+# run with only documented CPU/memory/system counters
+.\statline.exe --safe-mode
+
 # who am I / integrity level: ordinary user, medium integrity
 whoami /groups | findstr /i "Mandatory"
 ```

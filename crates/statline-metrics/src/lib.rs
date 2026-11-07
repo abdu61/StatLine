@@ -56,6 +56,8 @@ pub struct Sampler {
     averages_initialized: bool,
     /// Set by the UI while a surface that shows processes or sensors is open.
     details_visible: bool,
+    /// `--safe-mode`: only the documented CPU/memory/system counters.
+    safe_mode: bool,
 }
 
 impl Default for Sampler {
@@ -89,6 +91,7 @@ impl Sampler {
             average_15m: 0.0,
             averages_initialized: false,
             details_visible: false,
+            safe_mode: false,
         }
     }
 
@@ -116,6 +119,30 @@ impl Sampler {
         }
     }
 
+    /// Drop every optional provider.
+    ///
+    /// Safe mode keeps the CPU, memory and system cards (which need only
+    /// documented Win32 counters) and skips processes, sensors, vendor GPU,
+    /// WLAN and disk temperatures. Used when a provider misbehaves on a machine
+    /// we cannot reproduce it on.
+    pub fn set_safe_mode(&mut self, enabled: bool) {
+        self.safe_mode = enabled;
+        if enabled {
+            self.details_visible = false;
+            self.process.reset();
+            self.disk.set_details_visible(false);
+            self.battery.set_details_visible(false);
+            self.thermal.invalidate();
+            self.gpu = GpuState::new();
+            self.wifi = None;
+            self.interfaces_at = None;
+        }
+    }
+
+    pub fn safe_mode(&self) -> bool {
+        self.safe_mode
+    }
+
     /// Take one reading of everything v1 measures.
     ///
     /// Every provider is optional: a machine without a battery, GPU counters or
@@ -124,6 +151,16 @@ impl Sampler {
         let now = Instant::now();
         let elapsed = self.last_tick.map(|previous| now - previous);
         self.last_tick = Some(now);
+
+        if self.safe_mode {
+            return Snapshot {
+                taken_at: Some(SystemTime::now()),
+                cpu: self.sample_cpu(elapsed),
+                memory: sample_memory(),
+                system: self.sample_system(),
+                ..Snapshot::default()
+            };
+        }
 
         Snapshot {
             taken_at: Some(SystemTime::now()),

@@ -98,8 +98,9 @@ detail sampling on
    needed to exercise that path.
 3. **Packaging, remaining**: a 1-hour soak and `--bench 300`, then the local `v0.1.0`
    tag. Signing and the final Store identity are human steps.
-4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
-   `WM_DPICHANGED`, per-pixel blur behind the flyout (needs a composition swapchain).
+4. **Polish**: tooltips, empty states, multi-monitor, `WM_DPICHANGED`, per-pixel blur
+   behind the flyout (needs a composition swapchain). `--safe-mode` and
+   `--reset-settings` exist as diagnostics.
 
 ## Measured
 

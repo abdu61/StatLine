@@ -174,9 +174,9 @@ table: **~4.75 ms per query** (~250 processes). With a detail surface open the a
    RPM need a kernel driver and stay out of scope.
 3. **Packaging, remaining**: the one-hour soak and `--bench 300`, then the local
    annotated `v0.1.0` tag. Signing, Store identity and trademark checks are human tasks.
-4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
-   `WM_DPICHANGED`, Mica/acrylic on the companion (needs a non-layered window + DWM
-   backdrop; today it paints an opaque background).
+4. **Polish**: tooltips, empty states, multi-monitor, `WM_DPICHANGED`. `--safe-mode`
+   drops every optional provider (processes, sensors, vendor GPU, WLAN); `--reset-settings`
+   deletes `settings.json` and `window.json`.
 
 ## Gotchas that cost hours — do not relearn these
 

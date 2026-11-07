@@ -24,6 +24,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- `--safe-mode` limits sampling to documented CPU/memory/system counters, and
+  `--reset-settings` deletes `settings.json` + `window.json`. Both are diagnostics for a
+  machine where a provider misbehaves.
 - Process rows show their live thread count and, for grouped executables, how many
   processes the row covers (`chrome.exe (14)`), so a summed percentage is not mistaken
   for one runaway process.

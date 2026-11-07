@@ -31,6 +31,8 @@ pub fn print_help() {
         "  --install-startup     Add the per-user Run entry (release build)",
         "  --remove-startup      Remove the Run entry",
         "  --startup-status      Show the startup command and whether it matches",
+        "  --safe-mode           Only documented CPU/memory/system counters",
+        "  --reset-settings      Delete settings and window state, then exit",
         "",
         "Access: performance counters and sensors only. No admin, no network,",
         "no telemetry. See docs/ACCESS.md and PRIVACY.md.",

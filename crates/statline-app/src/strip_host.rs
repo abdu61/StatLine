@@ -385,6 +385,13 @@ pub fn select_dashboard_item(index: usize) {
     log::info!("companion page: {}", page.label());
 }
 
+/// Switch the sampler to documented counters only (`--safe-mode`).
+pub fn set_safe_mode(enabled: bool) {
+    if let Some(host) = host() {
+        host.sampler.set_safe_mode(enabled);
+    }
+}
+
 /// Next/previous nav index, wrapping around the item list.
 pub fn cycle_index(current: usize, count: usize, backwards: bool) -> usize {
     if count == 0 {

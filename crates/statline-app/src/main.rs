@@ -110,6 +110,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if args.iter().any(|a| a == "--reset-settings") {
+        let path = paths::settings_file();
+        let window = paths::window_state_file();
+        for file in [&path, &window] {
+            match std::fs::remove_file(file) {
+                Ok(()) => cli::print_line(&format!("removed {}", file.display())),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => cli::print_line(&format!("could not remove {}: {err}", file.display())),
+            }
+        }
+        cli::print_line("settings reset to defaults");
+        return Ok(());
+    }
+
     dpi::enable_per_monitor_v2();
 
     let log_dir = paths::log_dir();
@@ -173,8 +187,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         info!("first run: access summary shown");
     }
 
-    // The strip is the product; `--tray-only` is the escape hatch when a shell
-    // build will not cooperate.
+    // The strip is the product; `--tray-only` and `--safe-mode` are escape
+    // hatches for a shell build or a provider that misbehaves.
+    let safe_mode = args.iter().any(|a| a == "--safe-mode");
     let mut _strip = None;
     if !args.iter().any(|a| a == "--tray-only") {
         match strip_host::Host::start(strip_host::palette(dark, settings.appearance.accent)) {
@@ -182,6 +197,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 info!("taskbar strip attached");
                 _strip = Some(host);
                 strip_host::apply_settings(&settings, dark);
+                if safe_mode {
+                    strip_host::set_safe_mode(true);
+                    info!("safe mode: documented counters only");
+                }
             }
             Err(err) => error!("taskbar strip unavailable: {err}"),
         }

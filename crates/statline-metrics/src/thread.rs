@@ -15,6 +15,7 @@ struct Control {
     interval: Duration,
     stopping: bool,
     paused: bool,
+    safe_mode: bool,
 }
 
 /// Handle to the running sampler. Dropping it stops the thread.
@@ -33,6 +34,7 @@ impl SamplerThread {
                 interval: interval.max(Duration::from_millis(100)),
                 stopping: false,
                 paused: false,
+                safe_mode: false,
             }),
             Condvar::new(),
         ));
@@ -77,6 +79,14 @@ impl SamplerThread {
         cvar.notify_all();
     }
 
+    /// Restrict sampling to the documented CPU/memory/system counters.
+    pub fn set_safe_mode(&self, enabled: bool) {
+        let (lock, cvar) = &*self.control;
+        let mut control = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        control.safe_mode = enabled;
+        cvar.notify_all();
+    }
+
     /// Pause or resume sampling. The last snapshot stays readable.
     ///
     /// While paused the thread waits on the same condition variable, so a paused
@@ -117,6 +127,18 @@ fn run(
 
     loop {
         let started = Instant::now();
+        {
+            let (lock, _) = &*control;
+            let state = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if state.safe_mode != sampler.safe_mode() {
+                let enabled = state.safe_mode;
+                drop(state);
+                sampler.set_safe_mode(enabled);
+                if enabled {
+                    log::info!("sampler in safe mode");
+                }
+            }
+        }
         sampler.set_detail_surfaces(details_visible.load(Ordering::Relaxed));
         snapshot.store(Arc::new(sampler.sample()));
 
