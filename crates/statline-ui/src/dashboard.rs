@@ -632,7 +632,7 @@ fn render_about(
     let entries = [
         (
             "Access",
-            "Performance counters, DXGI, PDH, device IOCTLs, WLAN and registry reads. No admin.",
+            "Performance counters, DXGI, PDH, storage/device IOCTLs, SMBIOS, WLAN and registry reads. No admin.",
         ),
         (
             "Writes",
@@ -654,7 +654,7 @@ fn render_about(
         ),
         (
             "Sensors",
-            "ACPI, drive and battery readings where Windows exposes them; missing values hide.",
+            "ACPI, drive, battery and SMBIOS readings where Windows exposes them; missing values hide.",
         ),
         (
             "GPU sensors",

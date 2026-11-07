@@ -15,7 +15,24 @@ Append one line per measured run. Machine: see `environment.md`.
 | 2026-10-24 | M6c | bench, process table off | 1000 ms | 0.78 ms/sample | 15.1 | 6.3 | — | per-sample CPU sum; total mean 1.04 ms (scheduler-quantized) |
 | 2026-10-24 | M7 | sensors, details off | 1000 ms | 0.46 ms/sample tight loop | 15.3 | 6.6 | — | bench total 1.74 ms is a quantized upper bound |
 | 2026-10-24 | M7 | sensors, details on | 2000 ms (process) / 5 s (thermal) | ~2.3 ms/sample average | — | — | — | 4.75 ms process / 1.16 ms thermal while a detail surface is open |
-| 2026-11-07 | 0.1.0 | `--bench 300` | 1000 ms | median 1.27 ms, mean 1.87 ms | 13.3 | 6.8 | — | with vendor GPU, Wi-Fi, per-disk and process providers; within budget |
+| 2026-11-07 | 0.1.0 | `--bench 120` | 1000 ms | median 1.26 ms, mean 2.15 ms | 17.7 | 6.8 | — | SMBIOS, per-process GPU and drive identity added; still within budget |
+
+### 0.1.0 sampling detail (`--bench 120`, 2026-11-07)
+
+```
+mean         2.149 ms
+median       1.258 ms
+p95          4.736 ms
+max          17.043 ms
+cpu mean     2.214 ms  (0.221% of one core)
+working set  17.7 MB
+private       6.8 MB
+result: within budget
+```
+
+The new providers cost nothing on the tick: SMBIOS memory modules, drive identity and
+per-process GPU are all static or ride the existing 3 s GPU collection. The GPU
+per-PID map reuses the `GPU Engine(*)` array the card sum already reads.
 
 ## 90-second soak (M3b, parented strip)
 
