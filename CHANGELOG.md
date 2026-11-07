@@ -28,6 +28,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Temperature scale setting (Celsius or Fahrenheit). Samples stay in Celsius and only
+  the printed values convert, so the cards, detail rows and settings warning all follow
+  one switch. Applies live.
 - Disk page names the physical drive: bus type and model (`NVMe SAMSUNG
   MZVLQ512HALU-00000`) plus the capacity of the volumes on it. Read once from
   `IOCTL_STORAGE_QUERY_PROPERTY` on a zero-access handle, so no elevation. Raw
