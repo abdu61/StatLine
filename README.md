@@ -29,9 +29,9 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
   ![Companion window](docs/images/dashboard.jpg)
 
 - **Settings**: theme (system/light/dark), seven accent presets, sampler interval, byte
-  units, strip placement, start-with-Windows, per-module strip visibility and an optional
-  Mica window effect (with a GPU/battery caution). Changes apply live and are written
-  atomically.
+  units, Celsius/Fahrenheit, strip placement, start-with-Windows, per-module strip
+  visibility and an optional Mica window effect (with a GPU/battery caution). Changes
+  apply live and are written atomically.
 
   ![Settings](docs/images/settings.jpg)
 
@@ -40,10 +40,15 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
   (AMD), and Wi-Fi SSID/signal, when the installed driver exposes them. Anything
   unavailable is hidden, never faked.
 - **Per-app detail**: process CPU is a share of total capacity (the Task Manager scale),
-  with working set; instances of the same executable are grouped. Sampling only runs
-  while a surface showing processes is open.
-- **Disk and network**: per-volume capacity/temperature, per-physical-disk activity,
-  adapter rates and link speed, and the Wi-Fi SSID/signal when connected.
+  with working set; instances of the same executable are grouped. The GPU page lists the
+  apps using the GPU with their share of engine time, read from the PID inside each
+  `\GPU Engine(*)` instance — no vendor SDK and it works on an integrated GPU. Sampling
+  only runs while a surface showing processes is open.
+- **Disk and network**: per-volume capacity/temperature, per-physical-disk activity and
+  each drive's model and bus (`NVMe SAMSUNG MZVLQ512HALU-00000`), adapter rates and link
+  speed, and the Wi-Fi SSID/signal when connected.
+- **System**: Windows build, computer name, and each memory slot's capacity, DDR
+  generation and speed from SMBIOS.
 
 ## Access and permissions
 
