@@ -52,5 +52,6 @@ Signing:
 
 ## winget
 
-`packaging/winget/` holds a draft manifest pointing at the GitHub release asset.
-Submission is a separate, later step and requires a stable release URL.
+Not started. A winget manifest needs a stable, public release URL first, so it is a
+post-1.0 step: publish a GitHub release, then add `packaging/winget/` pointing at that
+asset. Nothing in the repository references a manifest yet.

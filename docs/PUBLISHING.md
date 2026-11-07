@@ -7,7 +7,7 @@ account, certificate, or decision that cannot be automated locally.
 
 - `statline.exe` — native x64 Windows GUI binary, no runtime, no installer
 - Portable zip: exe + README + CHANGELOG + LICENSE + THIRD_PARTY_NOTICES
-- Optional MSIX: `AppxManifest.xml` + generated tile assets + the same exe
+- Optional MSIX: `packaging/msix/AppxManifest.xml` + generated tile assets + the same exe
 
 Licence: MIT. No GPL/AGPL/LGPL/SSPL code; `deny.toml` enforces the allow-list.
 
@@ -17,6 +17,10 @@ Licence: MIT. No GPL/AGPL/LGPL/SSPL code; `deny.toml` enforces the allow-list.
 - [ ] README access section current; first-run notification reviewed
 - [ ] Version in `Cargo.toml`, `CHANGELOG.md`, and MSIX `Identity Version` agree
 - [ ] `cargo fmt --all -- --check`, `clippy -D warnings`, `cargo test --all`, `cargo deny check`
+      (`cargo-deny` 0.20.x cannot resolve a workspace-inherited *path-only* dependency and
+      reports `bug[unresolved-workspace-dependency]`; the workspace pins a `version` on each
+      `statline-*` path dependency to keep the check green, which publishing would need
+      anyway)
 - [ ] `cargo build --release`
 - [ ] Release PE subsystem is **Windows GUI** (no console flash):
       `$b=[IO.File]::ReadAllBytes('target\release\statline.exe'); $pe=[BitConverter]::ToInt32($b,0x3c); [BitConverter]::ToUInt16($b,$pe+24+68)` → `2`

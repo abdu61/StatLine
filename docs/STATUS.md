@@ -85,6 +85,8 @@ detail sampling on
   speed from SMBIOS type 17 (`GetSystemFirmwareTable('RSMB')`), read once at the first
   system sample and skipped in safe mode. The bank locator rides the value because laptop
   firmware repeats the device locator for both SODIMMs.
+- **Tray tooltip**: one line mirroring the strip (`CPU 23% · MEM 57% · …`), rebuilt from
+  the same segments, so the values stay readable while a fullscreen app hides the strip.
 - **GPU detail**: whole-GPU utilization and VRAM, plus per-app GPU share parsed from the
   PID in each `\GPU Engine(*)` instance name — no vendor SDK, works on an APU. The GPU
   page's process table answers "which app is using the GPU"; the top-N cut ranks by the
@@ -118,7 +120,9 @@ detail sampling on
    composition swapchain). `--safe-mode` and `--reset-settings` exist as diagnostics.
    Verified: a native `tooltips_class32` will not pop for a stacked/child layered window
    of `explorer.exe`, even with `TTF_TRACK` + `TTM_TRACKACTIVATE`, so the strip has no
-   hover tooltip; the flyout carries the same information on click.
+   hover tooltip; the flyout carries the same information on click. The **tray icon's**
+   tooltip does mirror the strip, which is what stays reachable while a fullscreen app
+   hides the strip itself.
 
 ## Measured
 
