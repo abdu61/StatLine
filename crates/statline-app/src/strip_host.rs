@@ -60,6 +60,10 @@ pub struct Host {
     units: UnitSystem,
     /// Strip module visibility.
     modules: strip::VisibleModules,
+    /// Tooltip window, when the shell allowed one.
+    tooltip: Option<statline_win::HWND>,
+    /// Last tooltip text, so the tool is only updated when it changes.
+    tooltip_text: String,
 }
 
 impl Host {
@@ -77,6 +81,12 @@ impl Host {
         let renderer = Renderer::new()?;
         let sampler = SamplerThread::start(Duration::from_millis(1000));
         let (hwnd, parented) = create_window(height)?;
+        // A tooltip makes the compact strip self-explanatory: it restates each
+        // segment in words plus the numbers the strip has no room for.
+        let tooltip = statline_win::window::create_tooltip(hwnd);
+        if tooltip.is_none() {
+            log::debug!("tooltip unavailable; strip stays self-describing only");
+        }
 
         let mut host = Box::new(Self {
             renderer,
@@ -101,6 +111,8 @@ impl Host {
             placement: taskbar::Placement::Right,
             units: UnitSystem::Binary,
             modules: strip::VisibleModules::default(),
+            tooltip,
+            tooltip_text: String::new(),
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -181,6 +193,7 @@ impl Host {
         }
         self.dashboard
             .refresh(&mut self.renderer, &snapshot, self.flyout.history());
+        self.update_tooltip(&snapshot, &segments);
 
         let padding = (4.0 * self.scale) as i32;
         let screen_left = geometry.strip_left_for(width as i32, padding, self.placement);
@@ -299,6 +312,56 @@ impl Host {
         self.set_visible(visible);
         if visible {
             self.tick();
+        }
+    }
+
+    /// Update the tooltip when the summarized text changes.
+    ///
+    /// The strip shows raw numbers only; the tooltip spells out what they mean
+    /// (full byte counts, per-core peak, uptime) without widening the strip.
+    fn update_tooltip(&mut self, snapshot: &Snapshot, segments: &[strip::Segment]) {
+        let Some(tooltip) = self.tooltip else {
+            return;
+        };
+        let mut lines = Vec::with_capacity(segments.len());
+        for segment in segments {
+            let label = if segment.label.is_empty() {
+                "NET"
+            } else {
+                segment.label
+            };
+            match segment.extra.as_ref() {
+                Some(extra) => lines.push(format!("{label}: {} / {extra}", segment.value)),
+                None => lines.push(format!("{label}: {}", segment.value)),
+            }
+        }
+
+        if let Some(cpu) = snapshot.cpu.as_ref() {
+            lines.push(format!(
+                "Averages 1m {}  5m {}  15m {}",
+                statline_core::units::format_percent(cpu.average_1m_percent),
+                statline_core::units::format_percent(cpu.average_5m_percent),
+                statline_core::units::format_percent(cpu.average_15m_percent)
+            ));
+        }
+        if let Some(memory) = snapshot.memory.as_ref() {
+            lines.push(format!(
+                "Memory {} of {} used",
+                statline_core::units::format_bytes(memory.used_bytes, self.units),
+                statline_core::units::format_bytes(memory.total_bytes, self.units)
+            ));
+        }
+        if let Some(name) = snapshot.cpu.as_ref().and_then(|cpu| cpu.name.as_ref()) {
+            lines.push(name.clone());
+        }
+        lines.push(String::from("Click a segment for details"));
+
+        let text = lines.join("\n");
+        if text == self.tooltip_text {
+            return;
+        }
+        if statline_win::window::set_tooltip_text(tooltip, self.hwnd, &text) {
+            self.tooltip_text = text;
         }
     }
 

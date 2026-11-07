@@ -24,6 +24,8 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- The strip has a tooltip: each segment spelled out, plus CPU 1/5/15-minute averages,
+  absolute memory usage and the processor name. It updates only when the text changes.
 - `--safe-mode` limits sampling to documented CPU/memory/system counters, and
   `--reset-settings` deletes `settings.json` + `window.json`. Both are diagnostics for a
   machine where a provider misbehaves.
