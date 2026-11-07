@@ -516,6 +516,10 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     value: String::from("Celsius (°C)"),
                 },
                 settings_ui::Row {
+                    label: "Strip density",
+                    value: String::from("Comfortable"),
+                },
+                settings_ui::Row {
                     label: "Accent",
                     value: String::from("System"),
                 },

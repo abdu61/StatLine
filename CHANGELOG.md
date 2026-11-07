@@ -31,6 +31,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Strip density setting: Comfortable (default, 14 px inset from the taskbar) or Compact
+  (6 px, a taller strip for a short taskbar or a denser readout). The window height and
+  surface rebuild on the next tick, so it applies live.
 - Temperature scale setting (Celsius or Fahrenheit). Samples stay in Celsius and only
   the printed values convert, so the cards, detail rows and settings warning all follow
   one switch. Applies live.

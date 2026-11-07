@@ -133,6 +133,10 @@ fn build_model(settings: &Settings) -> settings::Model {
                 value: String::from(settings.appearance.temperature.label()),
             },
             settings::Row {
+                label: "Strip density",
+                value: String::from(settings.appearance.density.label()),
+            },
+            settings::Row {
                 label: "Accent",
                 value: String::from(settings.appearance.accent.label()),
             },
@@ -215,12 +219,13 @@ impl SettingsWindow {
             }
             2 => self.settings.general.units = self.settings.general.units.next(),
             3 => self.settings.appearance.temperature = self.settings.appearance.temperature.next(),
-            4 => self.settings.appearance.accent = self.settings.appearance.accent.next(),
-            5 => self.settings.appearance.mica = !self.settings.appearance.mica,
-            6 => {
+            4 => self.settings.appearance.density = self.settings.appearance.density.next(),
+            5 => self.settings.appearance.accent = self.settings.appearance.accent.next(),
+            6 => self.settings.appearance.mica = !self.settings.appearance.mica,
+            7 => {
                 self.settings.general.strip_placement = self.settings.general.strip_placement.next()
             }
-            7 => {
+            8 => {
                 let enabled = !self.settings.general.run_at_startup;
                 match autostart::set_enabled(enabled) {
                     Ok(()) => self.settings.general.run_at_startup = enabled,
@@ -230,11 +235,11 @@ impl SettingsWindow {
                     }
                 }
             }
-            8 => self.settings.modules.cpu = !self.settings.modules.cpu,
-            9 => self.settings.modules.memory = !self.settings.modules.memory,
-            10 => self.settings.modules.gpu = !self.settings.modules.gpu,
-            11 => self.settings.modules.disk = !self.settings.modules.disk,
-            12 => self.settings.modules.network = !self.settings.modules.network,
+            9 => self.settings.modules.cpu = !self.settings.modules.cpu,
+            10 => self.settings.modules.memory = !self.settings.modules.memory,
+            11 => self.settings.modules.gpu = !self.settings.modules.gpu,
+            12 => self.settings.modules.disk = !self.settings.modules.disk,
+            13 => self.settings.modules.network = !self.settings.modules.network,
             _ => return false,
         }
         true

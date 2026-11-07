@@ -106,7 +106,8 @@ detail sampling on
 
 ## Next, in order
 
-1. **Settings, remaining**: module reorder, density. `--safe-mode` exists as a flag.
+1. **Settings, remaining**: module reorder. `--safe-mode` exists as a flag, and density,
+   temperature and per-module visibility are in the Settings page.
 2. **Sensors out of reach**: CPU package/per-core temperature and fan RPM need a kernel
    driver; GPU vendor telemetry is implemented (NVML/ADL), so an NVIDIA machine is only
    needed to exercise that path.

@@ -6,7 +6,7 @@
 
 use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
-use statline_config::{Accent, Settings, StripPlacement, Temperature, Units};
+use statline_config::{Accent, Density, Settings, StripPlacement, Temperature, Units};
 use statline_core::model::Snapshot;
 use statline_core::units::{TemperatureUnit, UnitSystem};
 use statline_metrics::thread::SamplerThread;
@@ -40,6 +40,9 @@ pub struct Host {
     palette: Palette,
     scale: f32,
     height: f32,
+    /// Vertical inset from the taskbar, in device-independent pixels. Smaller
+    /// means a taller strip; the density setting chooses it.
+    inset: f32,
     logged_first_frame: bool,
     visible: bool,
     user_hidden: bool,
@@ -71,8 +74,9 @@ impl Host {
     pub fn start(palette: Palette) -> windows::core::Result<Box<Self>> {
         let geometry = taskbar::primary().ok_or_else(windows::core::Error::from_thread)?;
         let scale = geometry.dpi as f32 / 96.0;
+        let inset = Density::default().inset();
         // Leave a small margin so the strip does not touch the taskbar edges.
-        let height = ((geometry.height() as f32) - 14.0 * scale).max(14.0);
+        let height = strip_height(geometry.height() as f32, scale, inset);
 
         let renderer = Renderer::new()?;
         let sampler = SamplerThread::start(Duration::from_millis(1000));
@@ -86,6 +90,7 @@ impl Host {
             palette,
             scale,
             height,
+            inset,
             logged_first_frame: false,
             visible: true,
             user_hidden: false,
@@ -121,7 +126,7 @@ impl Host {
         if (scale - self.scale).abs() > 0.001 {
             log::info!("strip scale {:.2} -> {:.2}", self.scale, scale);
             self.scale = scale;
-            self.height = ((geometry.height() as f32) - 14.0 * scale).max(14.0);
+            self.height = strip_height(geometry.height() as f32, scale, self.inset);
             self.surface = None;
             self.flyout.set_scale(scale);
             self.dashboard.set_scale(scale);
@@ -491,6 +496,17 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
     host.flyout.set_temperature(temperature);
     host.dashboard.set_temperature(temperature);
 
+    // A different density changes the strip height, so the surface must be
+    // rebuilt and the window resized on the next tick.
+    let inset = settings.appearance.density.inset();
+    if (inset - host.inset).abs() > f32::EPSILON {
+        host.inset = inset;
+        if let Some(geometry) = taskbar::primary() {
+            host.height = strip_height(geometry.height() as f32, host.scale, inset);
+        }
+        host.surface = None;
+    }
+
     host.sampler.set_interval(Duration::from_millis(
         settings.general.update_interval_ms as u64,
     ));
@@ -518,6 +534,12 @@ fn focus_for_label(label: &str) -> Option<flyout::Focus> {
         "" => Some(flyout::Focus::Network),
         _ => None,
     }
+}
+
+/// Strip height for a taskbar of `taskbar_height`, leaving `inset` on each
+/// vertical edge. Never collapses below one readable line.
+fn strip_height(taskbar_height: f32, scale: f32, inset: f32) -> f32 {
+    (taskbar_height - inset * scale).max(14.0)
 }
 
 fn create_window(height: f32) -> windows::core::Result<(HWND, bool)> {

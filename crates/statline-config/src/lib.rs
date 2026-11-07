@@ -194,6 +194,43 @@ impl Temperature {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Density {
+    /// Extra margin above and below the readout; the default.
+    #[default]
+    Comfortable,
+    /// Uses more of the taskbar height, for a shorter taskbar or a dense strip.
+    Compact,
+}
+
+impl Density {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Comfortable => Self::Compact,
+            Self::Compact => Self::Comfortable,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Comfortable => "Comfortable",
+            Self::Compact => "Compact",
+        }
+    }
+
+    /// Vertical inset from the taskbar, in device-independent pixels.
+    ///
+    /// The strip is sized `taskbar_height - inset * scale`, so a smaller inset
+    /// makes it taller.
+    pub fn inset(self) -> f32 {
+        match self {
+            Self::Comfortable => 14.0,
+            Self::Compact => 6.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Appearance {
@@ -205,6 +242,8 @@ pub struct Appearance {
     /// Temperature scale. Samples are always stored in Celsius; this only
     /// changes what the surfaces print.
     pub temperature: Temperature,
+    /// How much of the taskbar height the strip uses.
+    pub density: Density,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -375,6 +414,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn density_changes_the_strip_inset() {
+        // A smaller inset leaves the strip taller.
+        assert!(Density::Compact.inset() < Density::Comfortable.inset());
+        assert_eq!(Density::default(), Density::Comfortable);
+        assert_eq!(Density::Comfortable.next(), Density::Compact);
+        assert_eq!(Density::Compact.next(), Density::Comfortable);
+    }
+
+    #[test]
     fn settings_without_the_temperature_key_load_with_the_default() {
         // Every shipped 0.1.0 settings.json predates this field; adding it must
         // not invalidate an existing file.
@@ -389,6 +437,7 @@ mod tests {
         let settings: Settings = serde_json::from_str(json).expect("old file must load");
         assert_eq!(settings.schema_version, 1);
         assert_eq!(settings.appearance.temperature, Temperature::Celsius);
+        assert_eq!(settings.appearance.density, Density::Comfortable);
         assert_eq!(settings.appearance.theme, Theme::System);
         assert!(settings.modules.cpu && settings.modules.network);
     }
