@@ -8,6 +8,11 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Fixed
 
+- Startup no longer launches a console test binary. The `Run` value was written by an
+  autostart unit test (`target\debug\deps\statline_win-*.exe`) because it used
+  `current_exe()`; the tests now only read/refuse, a release-only `statline.exe` guard
+  protects the key, and a stale value is repaired on launch. `--startup-status` reports
+  the exact command and whether it matches.
 - Network ignores NDIS filter miniports (`Native WiFi Filter Driver`, NPCAP, QoS
   Packet Scheduler, WFP…). They duplicated the physical adapter's counters, flooding
   the page with rows and multiplying the aggregate rate.
@@ -19,6 +24,11 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- A real application icon: multi-size ICO embedded in `statline.exe`, used by the
+  tray and framed windows, with refreshed MSIX tiles. `scripts/make-icon.ps1` is the
+  reproducible generator; the build embeds it when the Windows SDK `rc.exe` exists.
+- First-run access notification and an Access/Writes/Startup block in About, plus
+  `docs/ACCESS.md`, `PRIVACY.md` and a publishing checklist.
 - Visual refresh: a LIVE chip in the nav, a short accent rule under page titles,
   outlined cards and an accent marker on the active nav item.
 - Disk page shows per-physical-disk read/write and busy percentage from named PDH

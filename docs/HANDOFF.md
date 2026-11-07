@@ -138,6 +138,13 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **Companion look**: nav LIVE chip, accent rule under page titles, card outlines,
   active-item accent marker. Keep new spacing inside `draw_header`'s 88 dip return so
   pages do not drift.
+- **Startup**: a per-user `Run` value. Only a release build named exactly
+  `statline.exe` may write it; debug/test binaries are refused, so `cargo test` cannot
+  install a console harness. A stale value is repaired on launch when the setting is on.
+  `--startup-status` prints the command and match state. The old failure (terminal
+  flash, no app) was a test harness path in `Run`; see `docs/ACCESS.md`.
+- **First run**: no settings file → a tray balloon states the access posture. Focus
+  Assist may suppress it; About and `docs/ACCESS.md` carry the same facts.
 - **Window state**: the companion remembers its outer rectangle in
   `%APPDATA%\Statline\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
   when it still intersects a monitor. A separate file avoids racing the settings
@@ -162,9 +169,8 @@ table: **~4.75 ms per query** (~250 processes). With a detail surface open the a
 2. **GPU sensors**: implemented for NVML/ADL. An NVIDIA machine is still needed to
    exercise the NVML path; AMD is verified on this APU. CPU package temperature and fan
    RPM need a kernel driver and stay out of scope.
-3. **Packaging, remaining**: a multi-size `.ico` for the executable/tray, the one-hour
-   soak and `--bench 300`, then the local annotated `v0.1.0` tag. Store/trademark checks
-   are human tasks.
+3. **Packaging, remaining**: the one-hour soak and `--bench 300`, then the local
+   annotated `v0.1.0` tag. Signing, Store identity and trademark checks are human tasks.
 4. **Polish**: tooltips, keyboard path, empty states, `--safe-mode`, multi-monitor,
    `WM_DPICHANGED`, Mica/acrylic on the companion (needs a non-layered window + DWM
    backdrop; today it paints an opaque background).

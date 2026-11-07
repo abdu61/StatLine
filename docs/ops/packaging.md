@@ -8,8 +8,10 @@ Two channels, one binary.
 dist/Statline-<version>-x64/
   statline.exe
   LICENSE
+  PRIVACY.md
   THIRD_PARTY_NOTICES.md
   README.md
+  docs/ACCESS.md
 ```
 
 Zip as `Statline-<version>-x64.zip`. No installer, no registry writes except the
@@ -19,10 +21,13 @@ optional `HKCU\...\Run` autostart value toggled by the user.
 
 `packaging/msix/AppxManifest.xml`:
 
-- `runFullTrust` desktop capability
-- `windows.startupTask` extension (user-toggleable in Task Manager → Startup)
+- `runFullTrust` desktop capability; **no** `internetClient`, `broadFileSystemAccess`,
+  or device capabilities
+- `windows.startupTask` extension (user-toggleable in Task Manager → Startup), disabled
+  by default
 - tile + logo assets at every required scale
 - identity: `Publisher="CN=Statline"`, `Name="Statline"`, `Version` from `Cargo.toml`
+- `PRIVACY.md` and `docs/ACCESS.md` staged next to the binary
 
 Build with the SDK's `makeappx.exe`:
 

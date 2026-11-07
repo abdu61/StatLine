@@ -157,6 +157,7 @@ pub fn create_frame_window(
         hInstance: instance.into(),
         lpszClassName: PCWSTR(class_wide.as_ptr()),
         hbrBackground: hbr_background,
+        hIcon: crate::tray::app_icon().unwrap_or_default(),
         ..Default::default()
     };
     unsafe {

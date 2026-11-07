@@ -13,7 +13,8 @@ Read in this order. Stop as soon as you have what you need.
 | adding a dependency | [`adr/0005-dependency-policy.md`](adr/0005-dependency-policy.md) |
 | measuring performance | [`ops/perf-budget.md`](ops/perf-budget.md) → [`ops/testing.md`](ops/testing.md) |
 | building or packaging | [`ops/build.md`](ops/build.md) → [`ops/packaging.md`](ops/packaging.md) |
-| cutting a release | [`ops/release-checklist.md`](ops/release-checklist.md) |
+| cutting a release | [`ops/release-checklist.md`](ops/release-checklist.md) → [`PUBLISHING.md`](PUBLISHING.md) |
+| access, permissions or privacy | [`ACCESS.md`](ACCESS.md) → [`../PRIVACY.md`](../PRIVACY.md) |
 | wondering about this machine | [`ops/environment.md`](ops/environment.md) |
 
 ## Status files

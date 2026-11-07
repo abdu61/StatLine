@@ -630,6 +630,18 @@ fn render_about(
 
     let entries = [
         (
+            "Access",
+            "Performance counters, DXGI, PDH, device IOCTLs, WLAN and registry reads. No admin.",
+        ),
+        (
+            "Writes",
+            "settings.json, window.json, logs, plus an optional HKCU Run value for startup.",
+        ),
+        (
+            "Startup",
+            "Optional, per-user, no elevation; disable here or with --remove-startup.",
+        ),
+        (
             "Privacy",
             "No network access, no telemetry, no driver, no elevated helper.",
         ),

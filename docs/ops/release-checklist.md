@@ -24,9 +24,18 @@ Run top to bottom. Do not skip the parts that need eyes.
 
 - [ ] Compatibility matrix in `testing.md` completed
 - [ ] Explorer restart while running
-- [ ] Clean profile: no settings file → defaults → first run works
+- [ ] Clean profile: no settings file → defaults → first run works, access notification shown
 - [ ] Uninstall path (portable: delete folder; MSIX: uninstall) leaves no residue
 - [ ] Second instance focuses the first
+
+## Startup and access
+
+- [ ] Release `statline.exe --install-startup` writes `...\statline.exe` (never `target\debug`)
+- [ ] `--startup-status` says `(matches this build)`
+- [ ] Sign out/in: app appears, **no console window flashes**
+- [ ] `cargo test` leaves `HKCU\...\Run\Statline` untouched
+- [ ] `docs/ACCESS.md` / `PRIVACY.md` match the build (no network, no admin, write paths)
+- [ ] MSIX capabilities: `runFullTrust` + disabled startup task only
 
 ## Performance
 
@@ -45,7 +54,8 @@ Run top to bottom. Do not skip the parts that need eyes.
 
 - [ ] `docs/STATUS.md` and the milestone status file updated
 - [ ] README screenshots current
-- [ ] Privacy statement still true: no network, no telemetry, no admin
+- [ ] `docs/ACCESS.md` + `PRIVACY.md` current; publishing checklist reviewed
+- [ ] Privacy statement still true: no network, no telemetry, no admin, no driver
 
 ## Tag (local only)
 

@@ -59,6 +59,7 @@
   </Applications>
 
   <Capabilities>
+    <!-- Desktop app only: no internetClient, no broadFileSystemAccess, no devices. -->
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
 </Package>

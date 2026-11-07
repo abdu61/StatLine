@@ -1,5 +1,7 @@
 # Statline
 
+<img src="docs/images/icon.png" alt="Statline icon" width="64" align="right">
+
 A live system monitor that lives in the Windows 11 taskbar. Native Rust + Win32 +
 Direct2D — no Electron, no WebView, no driver, no telemetry, no network access.
 
@@ -42,6 +44,28 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
   while a surface showing processes is open.
 - **Disk and network**: per-volume capacity/temperature, per-physical-disk activity,
   adapter rates and link speed, and the Wi-Fi SSID/signal when connected.
+
+## Access and permissions
+
+Statline runs as a standard user. It never requests elevation, installs a driver or
+service, or opens a network connection.
+
+| | |
+|---|---|
+| **Reads** | CPU/memory/disk/network/GPU performance counters, PDH, DXGI, storage/battery IOCTLs, WLAN SSID, and read-only registry (theme, CPU name, Windows build) |
+| **Writes** | `%APPDATA%\Statline\settings.json`, `window.json`, `%LOCALAPPDATA%\Statline\logs`, and an optional per-user `Run` value |
+| **Never** | Admin/UAC, network, telemetry, drivers/services, clipboard, input, screen, or document access |
+
+Startup is optional and per-user, with no elevation:
+
+```powershell
+statline.exe --startup-status   # exact command + whether it matches this build
+statline.exe --remove-startup  # delete the Run value
+```
+
+The first launch shows a one-time access notification. The full read/write table is in
+[`docs/ACCESS.md`](docs/ACCESS.md), the policy in [`PRIVACY.md`](PRIVACY.md), and the
+release process in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
 
 ## Privacy and footprint
 

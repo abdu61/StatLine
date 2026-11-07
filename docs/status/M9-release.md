@@ -1,6 +1,6 @@
 # M9 — packaging & release
 
-**Status:** in progress · portable zip and MSIX build; release soak and tag pending
+**Status:** in progress · portable zip, MSIX, access/privacy docs and icon; release soak and tag pending
 
 ## Goal
 
@@ -9,13 +9,17 @@ Something a stranger can install, trust, and uninstall cleanly.
 ## Checklist
 
 - [ ] Store + trademark availability check for "Statline"; reserve the name (human)
-- [x] MSIX tile assets (44/50/150/310x150/620x300 PNGs, generated from the bar glyph)
-- [ ] Multi-size `.ico` embedded in the executable (window/tray icon)
+- [x] MSIX tile assets (44/50/150/310x150/620x300 PNGs) regenerated from the icon mark
+- [x] Multi-size `.ico` embedded in the executable by `build.rs` (window/tray icon)
+- [x] First-run access notification; `docs/ACCESS.md` + `PRIVACY.md`; About Access block
+- [x] Startup entry guarded to release `statline.exe`, stale values repaired, tests
+      cannot write the `Run` key; `--startup-status` reports the exact command
 - [x] `packaging/msix/AppxManifest.xml` with `runFullTrust` + `windows.startupTask`
 - [x] `scripts/build-msix.ps1` (makeappx + optional self-signed cert); verified locally,
       unsigned package produced
-- [x] Portable zip script with LICENSE + THIRD_PARTY_NOTICES + README + CHANGELOG +
-      licence texts; verified (`dist/Statline-0.1.0-x64.zip`, SHA-256 recorded)
+- [x] Portable zip script with LICENSE + PRIVACY + ACCESS + THIRD_PARTY_NOTICES +
+      README + CHANGELOG + licence texts; verified
+      (`dist/Statline-0.1.0-x64.zip`, SHA-256 recorded)
 - [x] CI: fmt, clippy, test, deny, release build, snapshot artifact; tag job produces
       zip + MSIX + SHA-256 and uploads them
 - [x] README with screenshots, install steps, privacy statement

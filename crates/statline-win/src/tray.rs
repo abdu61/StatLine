@@ -6,14 +6,15 @@
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use windows::Win32::Foundation::{HWND, LPARAM};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_SETVERSION,
-    NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE,
+    NIM_MODIFY, NIM_SETVERSION, NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     HICON, IDI_APPLICATION, LoadIconW, WM_APP, WM_CONTEXTMENU, WM_LBUTTONUP, WM_RBUTTONUP,
 };
-use windows::core::Result;
+use windows::core::{PCWSTR, Result};
 
 /// Message posted to the owner window when the user interacts with the icon.
 pub const WM_TRAY: u32 = WM_APP + 1;
@@ -55,12 +56,19 @@ fn icon_data(hwnd: HWND, id: u32) -> NOTIFYICONDATAW {
     data
 }
 
-/// Add the tray icon. Uses the stock application icon until artwork lands.
+/// Add the tray icon. Uses the embedded app icon when the build included one,
+/// otherwise the stock application icon.
 pub fn add(hwnd: HWND, id: u32, tooltip: &str) -> Result<()> {
-    // SAFETY: `IDI_APPLICATION` is a predefined resource identifier, so no
-    // module handle is required. The returned HICON is owned by the system and
-    // must not be destroyed.
-    let icon: HICON = unsafe { LoadIconW(None, IDI_APPLICATION)? };
+    // Resource id 1 is the icon the build script embeds. The call fails when a
+    // build skipped the SDK, so fall back to the system icon.
+    let icon: HICON = app_icon()
+        .or_else(|| {
+            // SAFETY: `IDI_APPLICATION` is a predefined resource identifier, so no
+            // module handle is required. The returned HICON is owned by the system
+            // and must not be destroyed.
+            unsafe { LoadIconW(None, IDI_APPLICATION) }.ok()
+        })
+        .ok_or_else(windows::core::Error::from_thread)?;
 
     let mut data = icon_data(hwnd, id);
     data.hIcon = icon;
@@ -87,6 +95,35 @@ pub fn remove(hwnd: HWND, id: u32) {
     // SAFETY: `data` is a valid, correctly sized NOTIFYICONDATAW.
     unsafe {
         let _ = Shell_NotifyIconW(NIM_DELETE, &data);
+    }
+}
+
+/// The embedded resource icon, if this build had one.
+pub fn app_icon() -> Option<HICON> {
+    // SAFETY: `GetModuleHandleW(None)` is the current executable. The pointer is
+    // MAKEINTRESOURCE(1), the integer id used by the build script, not a string.
+    let module = unsafe { GetModuleHandleW(None) }.ok()?;
+    unsafe { LoadIconW(Some(module.into()), PCWSTR(std::ptr::without_provenance(1))) }.ok()
+}
+
+/// Show a balloon notification from the existing tray icon.
+///
+/// Used once on first run to state the access posture; Focus Assist may suppress
+/// it, which is why the same facts live in About and `docs/ACCESS.md`.
+pub fn notify(hwnd: HWND, id: u32, title: &str, message: &str) -> Result<()> {
+    let mut data = icon_data(hwnd, id);
+    data.uFlags = NIF_INFO;
+    data.dwInfoFlags = NIIF_INFO;
+    copy_wide(title, &mut data.szInfoTitle);
+    copy_wide(message, &mut data.szInfo);
+
+    // SAFETY: `data` is fully initialized and sized via `cbSize`; the icon
+    // already exists, so NIM_MODIFY only adds the balloon fields.
+    let shown = unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
+    if shown.as_bool() {
+        Ok(())
+    } else {
+        Err(windows::core::Error::from_thread())
     }
 }
 

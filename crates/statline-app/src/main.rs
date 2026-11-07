@@ -89,11 +89,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     if args.iter().any(|a| a == "--startup-status") {
-        cli::print_line(if statline_win::autostart::is_enabled() {
-            "startup: enabled"
-        } else {
-            "startup: disabled"
-        });
+        match statline_win::autostart::stored_command() {
+            Some(command) => {
+                let expected = std::env::current_exe().ok();
+                let matches = expected
+                    .as_deref()
+                    .map(statline_win::autostart::points_at)
+                    .unwrap_or(false);
+                cli::print_line(&format!(
+                    "startup: enabled {} — {command}",
+                    if matches {
+                        "(matches this build)"
+                    } else {
+                        "(stale)"
+                    }
+                ));
+            }
+            None => cli::print_line("startup: disabled"),
+        }
         return Ok(());
     }
 
@@ -115,6 +128,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let settings_path = paths::settings_file();
+    let first_run = !settings_path.exists();
     let mut settings = match Settings::load_or_default(&settings_path) {
         Ok(settings) => settings,
         Err(err) => {
@@ -128,12 +142,33 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .theme
         .resolve_dark(theme::is_dark_mode());
 
+    // Heal a stale Run value (older build, moved folder, or a debug/test path).
+    // This keeps login from launching a console test binary.
+    if settings.general.run_at_startup {
+        match statline_win::autostart::repair(&std::env::current_exe()?) {
+            Ok(true) => info!("repaired the startup entry"),
+            Ok(false) => {}
+            Err(err) => error!("could not repair the startup entry: {err}"),
+        }
+    }
+
     let window = MessageWindow::create(WINDOW_CLASS, APP_NAME, Some(wndproc))?;
     if let Err(err) = tray::add(window.hwnd(), TRAY_ICON_ID, APP_NAME) {
         error!("failed to add tray icon: {err}");
         return Err(err.into());
     }
     info!("tray icon ready");
+    if first_run {
+        // One-time, unobtrusive statement of what the app touches. Focus Assist
+        // can suppress it; the same facts live in the About page and docs/ACCESS.md.
+        let _ = tray::notify(
+            window.hwnd(),
+            TRAY_ICON_ID,
+            "Statline is running",
+            "Reads performance counters and sensors. No admin, no network, no telemetry. See About > Access.",
+        );
+        info!("first run: access summary shown");
+    }
 
     // The strip is the product; `--tray-only` is the escape hatch when a shell
     // build will not cooperate.

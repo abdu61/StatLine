@@ -23,9 +23,11 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 
 Copy-Item $exe $stage
-foreach ($file in @('LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')) {
+foreach ($file in @('LICENSE', 'README.md', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')) {
     Copy-Item (Join-Path $root $file) $stage
 }
+New-Item -ItemType Directory -Force (Join-Path $stage 'docs') | Out-Null
+Copy-Item (Join-Path $root 'docs\ACCESS.md') (Join-Path $stage 'docs')
 Copy-Item (Join-Path $root 'licenses') $stage -Recurse
 
 $zip = Join-Path $root "dist\Statline-$Version-x64.zip"

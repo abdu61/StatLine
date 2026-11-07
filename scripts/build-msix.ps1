@@ -37,9 +37,11 @@ New-Item -ItemType Directory -Force $layout | Out-Null
 Copy-Item (Join-Path $root 'target\release\statline.exe') $layout
 Copy-Item (Join-Path $root 'packaging\msix\AppxManifest.xml') $layout
 Copy-Item (Join-Path $root 'packaging\msix\Assets') $layout -Recurse
-foreach ($file in @('LICENSE', 'THIRD_PARTY_NOTICES.md')) {
+foreach ($file in @('LICENSE', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md')) {
     Copy-Item (Join-Path $root $file) $layout
 }
+New-Item -ItemType Directory -Force (Join-Path $layout 'docs') | Out-Null
+Copy-Item (Join-Path $root 'docs\ACCESS.md') (Join-Path $layout 'docs')
 Copy-Item (Join-Path $root 'licenses') $layout -Recurse
 
 # The manifest version must be four parts; keep it in sync with -Version.

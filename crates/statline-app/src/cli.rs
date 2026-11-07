@@ -28,6 +28,12 @@ pub fn print_help() {
         "  --profile [iters]     Time each provider in isolation (default 20)",
         "  --tray-only           Do not attach the taskbar strip",
         "  --render-snapshots D  Write PNGs of every surface to directory D",
+        "  --install-startup     Add the per-user Run entry (release build)",
+        "  --remove-startup      Remove the Run entry",
+        "  --startup-status      Show the startup command and whether it matches",
+        "",
+        "Access: performance counters and sensors only. No admin, no network,",
+        "no telemetry. See docs/ACCESS.md and PRIVACY.md.",
         "",
         "With no options, Statline starts in the notification area.",
     ];
