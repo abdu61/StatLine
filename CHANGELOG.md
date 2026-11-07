@@ -8,6 +8,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Fixed
 
+- The strip used one threshold pair (85/95 %) for every module while the flyout used
+  85/95 for CPU and memory and 90/98 for GPU and disk, so the same reading could be
+  yellow in the strip and normal in the panel. Both now share the per-module table.
 - Per-monitor DPI: the strip re-reads the taskbar DPI every tick and rebuilds its
   surface at the new scale, and the companion handles `WM_DPICHANGED` by adopting the
   suggested rectangle and re-rendering. Moving between monitors no longer leaves

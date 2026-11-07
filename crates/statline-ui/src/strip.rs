@@ -32,8 +32,13 @@ pub struct Segment {
 
 impl Segment {
     fn new(label: &'static str, value: String, percent: Option<f32>) -> Self {
+        // Same thresholds as the flyout: CPU and memory saturate around 95 %,
+        // while a GPU or disk can sit at 97 % and still be healthy, so those two
+        // only turn red at 98 %. Diverging here made the strip and the panel
+        // disagree about the same number.
         let (warn, critical, width_sample) = match label {
-            "CPU" | "MEM" | "GPU" | "DISK" => (85.0, 95.0, "100%"),
+            "CPU" | "MEM" => (85.0, 95.0, "100%"),
+            "GPU" | "DISK" => (90.0, 98.0, "100%"),
             _ => (0.0, 0.0, ""),
         };
         Self {
@@ -202,6 +207,45 @@ mod tests {
         assert_eq!(segments[0].value, "\u{2193} 1.18 MiB/s");
         assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 82.0 KiB/s"));
         assert_eq!(segments[0].width_sample, RATE_SAMPLE_BINARY);
+    }
+
+    #[test]
+    fn thresholds_match_the_flyout_per_module() {
+        let snapshot = Snapshot {
+            cpu: Some(CpuSample {
+                total_percent: 50.0,
+                ..Default::default()
+            }),
+            memory: Some(MemorySample {
+                used_bytes: 8,
+                total_bytes: 16,
+                ..Default::default()
+            }),
+            gpu: Some(statline_core::model::GpuSample::default()),
+            disk: Some(statline_core::model::DiskSample::default()),
+            ..Default::default()
+        };
+        let segments = segments(&snapshot);
+        let find = |label: &str| {
+            segments
+                .iter()
+                .find(|segment| segment.label == label)
+                .unwrap_or_else(|| panic!("{label} segment"))
+        };
+        for label in ["CPU", "MEM"] {
+            assert_eq!(
+                (find(label).warn, find(label).critical),
+                (85.0, 95.0),
+                "{label}"
+            );
+        }
+        for label in ["GPU", "DISK"] {
+            assert_eq!(
+                (find(label).warn, find(label).critical),
+                (90.0, 98.0),
+                "{label}"
+            );
+        }
     }
 
     #[test]
