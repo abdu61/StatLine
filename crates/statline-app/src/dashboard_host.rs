@@ -10,8 +10,8 @@ use statline_win::{HWND, LPARAM, LRESULT, WPARAM, paths, window};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetClientRect, GetWindowRect, IsIconic, WM_CLOSE, WM_EXITSIZEMOVE, WM_KEYDOWN,
-    WM_LBUTTONUP, WM_PAINT, WM_SIZE,
+    DefWindowProcW, GetClientRect, GetWindowRect, IsIconic, WM_CLOSE, WM_DPICHANGED,
+    WM_EXITSIZEMOVE, WM_KEYDOWN, WM_LBUTTONUP, WM_PAINT, WM_SIZE,
 };
 
 const CLASS: &str = "StatlineCompanionWindow";
@@ -56,6 +56,11 @@ impl Dashboard {
     /// Recolour the companion; the next tick repaints with the new palette.
     pub fn set_palette(&mut self, palette: Palette) {
         self.palette = palette;
+    }
+
+    /// Follow a DPI change; the next paint renders at the new scale.
+    pub fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
     }
 
     /// Change the byte units used by the cards.
@@ -307,6 +312,32 @@ unsafe extern "system" fn companion_proc(
                 unsafe {
                     (*pointer).save_bounds(hwnd);
                 }
+            }
+            LRESULT(0)
+        }
+        WM_DPICHANGED => {
+            // The window moved to a monitor with a different scale. Windows hands
+            // us the suggested rectangle; adopt it and re-render at the new scale.
+            let pointer = COMPANION.load(std::sync::atomic::Ordering::Acquire);
+            if !pointer.is_null() {
+                let dpi = (wparam.0 & 0xFFFF) as u32;
+                // SAFETY: `lparam` is a valid RECT pointer for this message.
+                let suggested = unsafe { *(lparam.0 as *const RECT) };
+                unsafe {
+                    let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                        hwnd,
+                        None,
+                        suggested.left,
+                        suggested.top,
+                        suggested.right - suggested.left,
+                        suggested.bottom - suggested.top,
+                        windows::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                            | windows::Win32::UI::WindowsAndMessaging::SWP_NOACTIVATE,
+                    );
+                    (*pointer).scale = (dpi.max(96) as f32) / 96.0;
+                    (*pointer).render_scale = (*pointer).scale;
+                }
+                log::info!("companion DPI changed: {} dpi", dpi);
             }
             LRESULT(0)
         }

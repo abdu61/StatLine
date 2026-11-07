@@ -8,6 +8,10 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Fixed
 
+- Per-monitor DPI: the strip re-reads the taskbar DPI every tick and rebuilds its
+  surface at the new scale, and the companion handles `WM_DPICHANGED` by adopting the
+  suggested rectangle and re-rendering. Moving between monitors no longer leaves
+  blurry or clipped text.
 - Startup no longer launches a console test binary. The `Run` value was written by an
   autostart unit test (`target\debug\deps\statline_win-*.exe`) because it used
   `current_exe()`; the tests now only read/refuse, a release-only `statline.exe` guard

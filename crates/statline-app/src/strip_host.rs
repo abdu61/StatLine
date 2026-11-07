@@ -126,6 +126,19 @@ impl Host {
             return;
         };
 
+        // Follow a DPI change (moving to another monitor, or changing the
+        // scale). Without this the strip keeps the scale it started with and
+        // renders blurry or too small on the new display.
+        let scale = (geometry.dpi as f32 / 96.0).max(0.5);
+        if (scale - self.scale).abs() > 0.001 {
+            log::info!("strip scale {:.2} -> {:.2}", self.scale, scale);
+            self.scale = scale;
+            self.height = ((geometry.height() as f32) - 14.0 * scale).max(14.0);
+            self.surface = None;
+            self.flyout.set_scale(scale);
+            self.dashboard.set_scale(scale);
+        }
+
         // Hide for anything that owns the screen: fullscreen games, video,
         // presentation mode, or an auto-hidden taskbar.
         let should_hide = taskbar::is_hidden(geometry.taskbar) || taskbar::fullscreen_active();

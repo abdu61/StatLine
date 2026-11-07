@@ -59,6 +59,11 @@ impl Flyout {
         self.palette = palette;
     }
 
+    /// Follow a DPI change; the next refresh rebuilds the model at the new scale.
+    pub fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
     /// Change the byte units; the next refresh rebuilds the strings.
     pub fn set_units(&mut self, units: UnitSystem) {
         self.units = units;

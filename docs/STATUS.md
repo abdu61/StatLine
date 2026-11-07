@@ -78,6 +78,9 @@ detail sampling on
 - **System detail**: Windows edition/build (corrected to "Windows 11" from the build
   number, since ProductName still says Windows 10 on many builds) and computer name,
   read once from the registry, plus process count.
+- **DPI**: process is per-monitor-v2 aware. The strip re-reads the taskbar DPI each tick
+  and rebuilds its surface when the scale changes; the companion handles
+  `WM_DPICHANGED` with the suggested rectangle and re-renders at the new scale.
 - **Sampling**: 0.415 ms per sample in a tight loop with detail providers off; WS ~30 MB,
   private ~14.5 MB, handles flat. `--bench` uses the median wall sample time (mean/p95
   include scheduler preemption); idle median is ~1.7 ms at a 1 s cadence. The WLAN query
