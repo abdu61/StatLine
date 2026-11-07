@@ -6,6 +6,13 @@ All notable changes to Statline are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The per-row settings handler moved into a free function with a test that walks every
+  row the Settings page draws and fails if an index has no handler or changes nothing.
+  The row list and the `match index` are written separately, so inserting a row without
+  shifting the arms silently makes a click change the wrong setting.
+
 ### Fixed
 
 - A `settings.json` saved with a UTF-8 byte-order mark (which is what Notepad writes by

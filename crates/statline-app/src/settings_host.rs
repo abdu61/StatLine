@@ -109,6 +109,39 @@ fn open() -> windows::core::Result<()> {
     Ok(())
 }
 
+/// Apply the change for one settings row.
+///
+/// Rows are addressed by their position in [`build_model`], so the two must be
+/// kept in the same order. A test walks every row and fails if its index has no
+/// handler or changes nothing. Index 8 ("Start with Windows") is handled by the
+/// caller because it can fail; it still reports success here so the test sees it
+/// as present.
+fn cycle_setting(settings: &mut Settings, index: usize) -> bool {
+    match index {
+        0 => settings.appearance.theme = settings.appearance.theme.next(),
+        1 => {
+            settings.general.update_interval_ms = next_interval(settings.general.update_interval_ms)
+        }
+        2 => settings.general.units = settings.general.units.next(),
+        3 => settings.appearance.temperature = settings.appearance.temperature.next(),
+        4 => settings.appearance.density = settings.appearance.density.next(),
+        5 => settings.appearance.accent = settings.appearance.accent.next(),
+        6 => settings.appearance.mica = !settings.appearance.mica,
+        7 => settings.general.strip_placement = settings.general.strip_placement.next(),
+        // Owned by the caller; toggling the flag here would claim success before
+        // the registry write happened.
+        8 => settings.general.run_at_startup = !settings.general.run_at_startup,
+        9 => settings.modules.order.rotate(),
+        10 => settings.modules.cpu = !settings.modules.cpu,
+        11 => settings.modules.memory = !settings.modules.memory,
+        12 => settings.modules.gpu = !settings.modules.gpu,
+        13 => settings.modules.disk = !settings.modules.disk,
+        14 => settings.modules.network = !settings.modules.network,
+        _ => return false,
+    }
+    true
+}
+
 fn on_off(value: bool) -> String {
     String::from(if value { "On" } else { "Off" })
 }
@@ -215,39 +248,22 @@ impl SettingsWindow {
     }
 
     fn cycle(&mut self, index: usize) -> bool {
-        match index {
-            0 => self.settings.appearance.theme = self.settings.appearance.theme.next(),
-            1 => {
-                self.settings.general.update_interval_ms =
-                    next_interval(self.settings.general.update_interval_ms)
-            }
-            2 => self.settings.general.units = self.settings.general.units.next(),
-            3 => self.settings.appearance.temperature = self.settings.appearance.temperature.next(),
-            4 => self.settings.appearance.density = self.settings.appearance.density.next(),
-            5 => self.settings.appearance.accent = self.settings.appearance.accent.next(),
-            6 => self.settings.appearance.mica = !self.settings.appearance.mica,
-            7 => {
-                self.settings.general.strip_placement = self.settings.general.strip_placement.next()
-            }
-            8 => {
-                let enabled = !self.settings.general.run_at_startup;
-                match autostart::set_enabled(enabled) {
-                    Ok(()) => self.settings.general.run_at_startup = enabled,
-                    Err(error) => {
-                        log::warn!("could not change the startup entry: {error}");
-                        return false;
-                    }
+        // The startup entry is the one setting that can fail (a denied registry
+        // write), so it stays here; every other row lives in `cycle_setting`.
+        if index == 8 {
+            let enabled = !self.settings.general.run_at_startup;
+            return match autostart::set_enabled(enabled) {
+                Ok(()) => {
+                    self.settings.general.run_at_startup = enabled;
+                    true
                 }
-            }
-            9 => self.settings.modules.order.rotate(),
-            10 => self.settings.modules.cpu = !self.settings.modules.cpu,
-            11 => self.settings.modules.memory = !self.settings.modules.memory,
-            12 => self.settings.modules.gpu = !self.settings.modules.gpu,
-            13 => self.settings.modules.disk = !self.settings.modules.disk,
-            14 => self.settings.modules.network = !self.settings.modules.network,
-            _ => return false,
+                Err(error) => {
+                    log::warn!("could not change the startup entry: {error}");
+                    false
+                }
+            };
         }
-        true
+        cycle_setting(&mut self.settings, index)
     }
 
     fn apply(&mut self) {
@@ -414,5 +430,38 @@ mod tests {
     #[test]
     fn unknown_interval_restarts_the_cycle() {
         assert_eq!(next_interval(137), INTERVALS_MS[1]);
+    }
+
+    /// Every row the settings page draws must have a handler at its own index.
+    ///
+    /// The list and the `match index` are written separately, so inserting a row
+    /// without shifting the arms makes a click change the wrong setting — silent,
+    /// and easy to miss in a screenshot.
+    #[test]
+    fn every_settings_row_has_a_handler() {
+        let model = build_model(&Settings::default());
+        assert!(
+            !model.rows.is_empty(),
+            "the settings page must draw its rows"
+        );
+
+        for index in 0..model.rows.len() {
+            let mut settings = Settings::default();
+            assert!(
+                cycle_setting(&mut settings, index),
+                "row {index} ({}) has no handler",
+                model.rows[index].label
+            );
+            assert_ne!(
+                settings,
+                Settings::default(),
+                "row {index} ({}) returned success but changed nothing",
+                model.rows[index].label
+            );
+        }
+
+        // One past the end must be rejected rather than clamping to the last row.
+        let mut settings = Settings::default();
+        assert!(!cycle_setting(&mut settings, model.rows.len()));
     }
 }
