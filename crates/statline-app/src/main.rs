@@ -20,7 +20,9 @@ use statline_win::{
 use std::time::Duration;
 
 const WINDOW_CLASS: &str = "StatlineMessageWindow";
-const TRAY_ICON_ID: u32 = 1;
+/// The single notification-area icon. Shared with the strip host, which mirrors
+/// its readout into the icon's tooltip.
+pub const TRAY_ICON_ID: u32 = 1;
 const DEFAULT_INTERVAL_MS: u64 = 1000;
 
 fn main() {

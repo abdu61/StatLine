@@ -106,6 +106,26 @@ pub fn app_icon() -> Option<HICON> {
     unsafe { LoadIconW(Some(module.into()), PCWSTR(std::ptr::without_provenance(1))) }.ok()
 }
 
+/// Update the icon's hover tooltip.
+///
+/// `NOTIFYICONDATAW.szTip` is 128 characters; longer text is truncated rather
+/// than rejected. Callers should only call this when the text changed, since it
+/// crosses into the shell on every update.
+pub fn set_tooltip(hwnd: HWND, id: u32, tooltip: &str) -> Result<()> {
+    let mut data = icon_data(hwnd, id);
+    data.uFlags = NIF_TIP;
+    copy_wide(tooltip, &mut data.szTip);
+
+    // SAFETY: `data` is fully initialized and sized via `cbSize`; the icon
+    // already exists, so NIM_MODIFY only updates the tooltip.
+    let updated = unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
+    if updated.as_bool() {
+        Ok(())
+    } else {
+        Err(windows::core::Error::from_thread())
+    }
+}
+
 /// Show a balloon notification from the existing tray icon.
 ///
 /// Used once on first run to state the access posture; Focus Assist may suppress

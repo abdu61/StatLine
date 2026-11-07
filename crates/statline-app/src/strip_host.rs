@@ -7,6 +7,7 @@
 use crate::dashboard_host::Dashboard;
 use crate::flyout_host::Flyout;
 use statline_config::{Accent, Density, Settings, StripPlacement, Temperature, Units};
+use statline_core::APP_NAME;
 use statline_core::model::Snapshot;
 use statline_core::units::{TemperatureUnit, UnitSystem};
 use statline_metrics::thread::SamplerThread;
@@ -65,6 +66,10 @@ pub struct Host {
     modules: strip::VisibleModules,
     /// Left-to-right module order, as settings labels ("Network", "CPU", …).
     order: Vec<&'static str>,
+    /// Last text pushed to the tray tooltip, so it is only updated on change.
+    tray_tooltip: String,
+    /// Whether the one-time "mirror is live" line has been logged.
+    tray_tooltip_logged: bool,
 }
 
 impl Host {
@@ -109,6 +114,8 @@ impl Host {
             units: UnitSystem::Binary,
             modules: strip::VisibleModules::default(),
             order: strip::DEFAULT_ORDER.to_vec(),
+            tray_tooltip: String::new(),
+            tray_tooltip_logged: false,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -203,6 +210,7 @@ impl Host {
         }
         self.dashboard
             .refresh(&mut self.renderer, &snapshot, self.flyout.history());
+        self.update_tray_tooltip(&segments);
 
         let padding = (4.0 * self.scale) as i32;
         let screen_left = geometry.strip_left_for(width as i32, padding, self.placement);
@@ -335,6 +343,33 @@ impl Host {
         if self.hovered.is_some() {
             self.hovered = None;
             self.tick();
+        }
+    }
+
+    /// Mirror the readout into the tray tooltip.
+    ///
+    /// The strip hides itself while a fullscreen app owns the screen, which is
+    /// exactly when a glanceable number is most wanted. Hovering the tray icon
+    /// gives the same figures without leaving the fullscreen app. Updated only
+    /// when the text changes, because each call crosses into the shell.
+    fn update_tray_tooltip(&mut self, segments: &[strip::Segment]) {
+        let text = tooltip_text(segments);
+        if text == self.tray_tooltip {
+            return;
+        }
+        self.tray_tooltip = text.clone();
+        let Some(message) = message_window() else {
+            return;
+        };
+        match statline_win::tray::set_tooltip(message, crate::TRAY_ICON_ID, &text) {
+            Ok(()) if !self.tray_tooltip_logged => {
+                // One line per session: confirms the mirror is live without
+                // logging on every tick.
+                self.tray_tooltip_logged = true;
+                log::info!("tray tooltip mirrored from the strip");
+            }
+            Ok(()) => {}
+            Err(error) => log::debug!("could not update the tray tooltip: {error}"),
         }
     }
 
@@ -556,6 +591,37 @@ fn strip_height(taskbar_height: f32, scale: f32, inset: f32) -> f32 {
     (taskbar_height - inset * scale).max(14.0)
 }
 
+/// The message window that owns the tray icon, if it exists yet.
+fn message_window() -> Option<HWND> {
+    // SAFETY: plain window lookup by class name; no pointers escape.
+    unsafe { FindWindowW(w!("StatlineMessageWindow"), None) }.ok()
+}
+
+/// One-line summary for the tray tooltip, e.g.
+/// `Statline — CPU 23% · MEM 57% · GPU 8% · DISK 4% · ↓1.18 MiB/s ↑82.0 KiB/s`.
+///
+/// Kept to one line because `NOTIFYICONDATAW.szTip` is 127 characters, and the
+/// shell shows a tooltip, not a paragraph.
+pub fn tooltip_text(segments: &[strip::Segment]) -> String {
+    let mut parts = Vec::with_capacity(segments.len() + 1);
+    for segment in segments {
+        let name = if segment.label.is_empty() {
+            "NET"
+        } else {
+            segment.label
+        };
+        match segment.extra.as_ref() {
+            Some(extra) => parts.push(format!("{name} {} {extra}", segment.value)),
+            None => parts.push(format!("{name} {}", segment.value)),
+        }
+    }
+    if parts.is_empty() {
+        // Nothing sampled yet, or every module is hidden.
+        return String::from(APP_NAME);
+    }
+    format!("{APP_NAME} \u{2014} {}", parts.join(" \u{00b7} "))
+}
+
 fn create_window(height: f32) -> windows::core::Result<(HWND, bool)> {
     let rect = RECT {
         left: 0,
@@ -737,6 +803,43 @@ pub fn palette(dark: bool, accent: Accent) -> Palette {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tooltip_mirrors_the_strip_segments() {
+        let snapshot = Snapshot {
+            cpu: Some(statline_core::model::CpuSample {
+                total_percent: 23.0,
+                ..Default::default()
+            }),
+            memory: Some(statline_core::model::MemorySample {
+                used_bytes: 8,
+                total_bytes: 16,
+                ..Default::default()
+            }),
+            network: Some(statline_core::model::NetworkSample {
+                rx_bytes_per_sec: 1024.0 * 1024.0,
+                tx_bytes_per_sec: 1024.0 * 82.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let segments = strip::segments_with(
+            &snapshot,
+            UnitSystem::Binary,
+            strip::VisibleModules::default(),
+        );
+        let text = tooltip_text(&segments);
+        assert!(text.starts_with(APP_NAME), "the app name leads: {text}");
+        assert!(text.contains("CPU 23%"), "{text}");
+        assert!(text.contains("MEM 50%"), "{text}");
+        assert!(text.contains("NET"), "network is named in the tooltip");
+        assert!(!text.contains(char::from(10)), "one line only");
+    }
+
+    #[test]
+    fn tooltip_degrades_to_the_app_name() {
+        assert_eq!(tooltip_text(&[]), APP_NAME);
+    }
 
     #[test]
     fn cycling_wraps_in_both_directions() {

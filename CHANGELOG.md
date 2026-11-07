@@ -34,6 +34,11 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- The tray icon's tooltip mirrors the strip: `Statline — CPU 23% · MEM 57% · GPU 8% ·
+  DISK 4% · NET ↓1.18 MiB/s ↑82.0 KiB/s`. The strip hides itself while a fullscreen app
+  owns the screen, which is exactly when a glanceable number is wanted, so the values
+  stay reachable from the notification area. Updated only when the text changes, and the
+  text is built from the same segments the strip draws.
 - Strip order setting. A row in Settings cycles the left-to-right order of the enabled
   modules; the strip is rebuilt on the next tick. Order is stored as slot names, so a
   hand-edited or partial list is normalized (missing slots appended, duplicates dropped)
