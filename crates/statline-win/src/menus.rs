@@ -19,6 +19,8 @@ pub const MENU_TOGGLE_STRIP: u32 = 4;
 pub const MENU_DASHBOARD: u32 = 5;
 /// Open the settings window.
 pub const MENU_SETTINGS: u32 = 6;
+/// Show the access/privacy summary.
+pub const MENU_ACCESS: u32 = 7;
 
 /// State the menu labels and check marks reflect.
 #[derive(Debug, Clone, Copy, Default)]
@@ -56,6 +58,12 @@ pub fn show_tray_menu(hwnd: HWND, state: MenuState) -> Result<()> {
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         let _ = AppendMenuW(menu, MF_STRING, MENU_DASHBOARD as usize, w!("Dashboard..."));
         let _ = AppendMenuW(menu, MF_STRING, MENU_SETTINGS as usize, w!("Settings..."));
+        let _ = AppendMenuW(
+            menu,
+            MF_STRING,
+            MENU_ACCESS as usize,
+            w!("Access & privacy..."),
+        );
         let _ = AppendMenuW(
             menu,
             MF_STRING,

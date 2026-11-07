@@ -24,7 +24,8 @@ Something a stranger can install, trust, and uninstall cleanly.
       zip + MSIX + SHA-256 and uploads them
 - [x] README with screenshots, install steps, privacy statement
 - [x] `CHANGELOG.md`, `LICENSE` (MIT), `THIRD_PARTY_NOTICES.md`, `licenses/`
-- [ ] Final `--bench 300` + 1-hour soak recorded
+- [x] Final `--bench 300` recorded (median 1.27 ms, WS 13.3 MB, within budget)
+- [ ] 1-hour soak recorded
 - [ ] Local annotated tag `v0.1.0` (never pushed)
 
 ## Evidence

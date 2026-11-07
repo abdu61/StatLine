@@ -15,6 +15,7 @@ Append one line per measured run. Machine: see `environment.md`.
 | 2026-10-24 | M6c | bench, process table off | 1000 ms | 0.78 ms/sample | 15.1 | 6.3 | — | per-sample CPU sum; total mean 1.04 ms (scheduler-quantized) |
 | 2026-10-24 | M7 | sensors, details off | 1000 ms | 0.46 ms/sample tight loop | 15.3 | 6.6 | — | bench total 1.74 ms is a quantized upper bound |
 | 2026-10-24 | M7 | sensors, details on | 2000 ms (process) / 5 s (thermal) | ~2.3 ms/sample average | — | — | — | 4.75 ms process / 1.16 ms thermal while a detail surface is open |
+| 2026-11-07 | 0.1.0 | `--bench 300` | 1000 ms | median 1.27 ms, mean 1.87 ms | 13.3 | 6.8 | — | with vendor GPU, Wi-Fi, per-disk and process providers; within budget |
 
 ## 90-second soak (M3b, parented strip)
 
@@ -86,6 +87,6 @@ cargo run -p statline-app -- --probe                   # live values
 
 ## Note on measurement
 
-`--bench` now reports process CPU time alongside wall time. Wall-clock per-sample
-numbers on a loaded desktop are dominated by scheduler jitter (measured up to 3x the
-real work), so the CPU figure is the gate.
+`--bench` reports wall time (median is the gate), process CPU time, and memory.
+Wall-clock numbers on a loaded desktop are dominated by scheduler jitter, so the median
+plus `--profile`'s tight loop are the real measures.

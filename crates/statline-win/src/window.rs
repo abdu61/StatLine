@@ -10,8 +10,9 @@ use std::sync::OnceLock;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MSG, RegisterClassW,
-    RegisterWindowMessageW, TranslateMessage, WINDOW_EX_STYLE, WNDCLASSW, WNDPROC, WS_OVERLAPPED,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MB_ICONINFORMATION, MB_OK, MSG,
+    MessageBoxW, RegisterClassW, RegisterWindowMessageW, TranslateMessage, WINDOW_EX_STYLE,
+    WNDCLASSW, WNDPROC, WS_OVERLAPPED,
 };
 use windows::core::{PCWSTR, Result, w};
 
@@ -99,6 +100,21 @@ impl MessageWindow {
 pub fn default_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // SAFETY: forwarding the exact arguments received by the window procedure.
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+/// Show a simple informational message box owned by no window.
+pub fn message_box(title: &str, text: &str) {
+    let title = to_wide(OsStr::new(title));
+    let text = to_wide(OsStr::new(text));
+    // SAFETY: both strings are NUL-terminated and outlive the call.
+    unsafe {
+        let _ = MessageBoxW(
+            None,
+            PCWSTR(text.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
 }
 
 static TASKBAR_CREATED: OnceLock<u32> = OnceLock::new();

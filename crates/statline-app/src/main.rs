@@ -231,6 +231,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 strip_host::toggle_dashboard();
             }
             menus::MENU_SETTINGS => settings_host::toggle(),
+            menus::MENU_ACCESS => show_access_summary(),
             _ => {}
         }
         return LRESULT(0);
@@ -243,6 +244,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 
     window::default_proc(hwnd, msg, wparam, lparam)
+}
+
+fn show_access_summary() {
+    window::message_box(
+        "Statline \u{2014} access & privacy",
+        "Reads performance counters and sensors only.\n\n\
+         No administrator/UAC. No network. No telemetry. No driver.\n\n\
+         Writes:\n\
+           %APPDATA%\\Statline (settings, window)\n\
+           %LOCALAPPDATA%\\Statline (logs)\n\
+           HKCU\\...\\Run (only when Start with Windows is on)\n\n\
+         Full details: docs\\ACCESS.md and PRIVACY.md.",
+    );
 }
 
 fn open_data_dir() {
