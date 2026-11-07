@@ -51,7 +51,11 @@ private bytes past 25 MB.
 | ACPI thermal zone (PDH wildcard) | ~1.16 ms |
 | Drive temperatures (2 IOCTLs per volume) | **~11.2 ms** |
 | Battery details (SetupAPI + IOCTL) | ~0.14 ms |
-| Full `Sampler::sample` | ~0.46 ms (tight loop, detail providers off) |
+| Page file (`SystemPageFileInformation`) | ~0.8 us |
+| ADL PMLog / NVML (GPU vendor) | ~0.1–0.5 ms |
+| WLAN SSID/signal (`wlanapi`) | **~12 ms** |
+| Per-disk PDH (wildcard arrays) | ~36 us |
+| Full `Sampler::sample` | ~0.38–0.46 ms (tight loop, detail providers off) |
 
 ## Design consequences baked in
 
@@ -64,9 +68,11 @@ private bytes past 25 MB.
   flyout or companion is open**; with every process surface closed it costs zero. That
   is ~0.24 % of one core while a process view is visible, and none at idle.
 - Detail sensors share that visibility gate: ACPI zones (5 s, ~1.16 ms), battery health
-  (30 s, ~0.14 ms) and drive temperatures (5 min, ~11 ms) do not run while only the
-  strip is visible. This keeps the idle tight-loop sample at ~0.46 ms; opening the
-  flyout raises the average to ~2.3 ms/sample because of the process table.
+  (30 s, ~0.14 ms), drive temperatures (5 min, ~11 ms) and WLAN (15 s, ~12 ms) do not run
+  while only the strip is visible. This keeps the idle tight-loop sample at ~0.4 ms;
+  opening the flyout raises the average to ~2.3 ms/sample because of the process table.
+- GPU vendor telemetry rides the 3 s GPU refresh (NVML/ADL), not the tick.
+- Page-file usage is a single `NtQuerySystemInformation` and runs with the memory sample.
 - Drive temperatures are cached for five minutes because the volume and disk IOCTLs
   cost ~11 ms together; capacity alone stays on the 30 s refresh.
 
