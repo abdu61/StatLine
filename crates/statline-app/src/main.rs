@@ -137,6 +137,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     settings.normalize();
+    // The Run key is the truth for startup; a settings file can outlive a manual
+    // change in Task Manager or a moved executable.
+    settings.general.run_at_startup = statline_win::autostart::is_enabled();
     let dark = settings
         .appearance
         .theme
