@@ -105,6 +105,8 @@ pub struct Modules {
     pub gpu: bool,
     pub disk: bool,
     pub network: bool,
+    /// Left-to-right order of the enabled modules.
+    pub order: Order,
 }
 
 impl Default for Modules {
@@ -115,6 +117,7 @@ impl Default for Modules {
             gpu: true,
             disk: true,
             network: true,
+            order: Order::default(),
         }
     }
 }
@@ -228,6 +231,89 @@ impl Density {
             Self::Comfortable => 14.0,
             Self::Compact => 6.0,
         }
+    }
+}
+
+/// One module slot in the strip, in the order the user chose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Slot {
+    Network,
+    Cpu,
+    Memory,
+    Gpu,
+    Disk,
+}
+
+impl Slot {
+    pub const ALL: [Slot; 5] = [
+        Slot::Network,
+        Slot::Cpu,
+        Slot::Memory,
+        Slot::Gpu,
+        Slot::Disk,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Network => "Network",
+            Self::Cpu => "CPU",
+            Self::Memory => "Memory",
+            Self::Gpu => "GPU",
+            Self::Disk => "Disk",
+        }
+    }
+}
+
+/// Strip order. Network leads by default: it is the only segment whose text
+/// changes unit, so keeping it left of the fixed-width percentages means the
+/// numbers the eye tracks never move.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Order {
+    pub slots: Vec<Slot>,
+}
+
+impl Default for Order {
+    fn default() -> Self {
+        Self {
+            slots: Slot::ALL.to_vec(),
+        }
+    }
+}
+
+impl Order {
+    /// Rotate the order by one place (last module becomes first).
+    pub fn rotate(&mut self) {
+        if self.slots.len() > 1 {
+            self.slots.rotate_right(1);
+        }
+    }
+
+    /// The order as a human-readable list, e.g. `"Network · CPU · …"`.
+    pub fn describe(&self) -> String {
+        self.slots
+            .iter()
+            .map(|slot| slot.label())
+            .collect::<Vec<_>>()
+            .join(" \u{00b7} ")
+    }
+
+    /// Fill in any slot missing from a settings file written by an older build,
+    /// and drop duplicates, so a hand-edited or partial list still renders.
+    pub fn normalized(&self) -> Self {
+        let mut slots: Vec<Slot> = Vec::with_capacity(Slot::ALL.len());
+        for slot in &self.slots {
+            if !slots.contains(slot) {
+                slots.push(*slot);
+            }
+        }
+        for slot in Slot::ALL {
+            if !slots.contains(&slot) {
+                slots.push(slot);
+            }
+        }
+        Self { slots }
     }
 }
 
@@ -420,6 +506,31 @@ mod tests {
         assert_eq!(Density::default(), Density::Comfortable);
         assert_eq!(Density::Comfortable.next(), Density::Compact);
         assert_eq!(Density::Compact.next(), Density::Comfortable);
+    }
+
+    #[test]
+    fn order_rotates_and_normalizes() {
+        let mut order = Order::default();
+        assert_eq!(order.slots[0], Slot::Network);
+        order.rotate();
+        assert_eq!(
+            order.slots[0],
+            Slot::Disk,
+            "rotate moves the last slot first"
+        );
+        assert_eq!(order.slots.len(), Slot::ALL.len());
+
+        // A partial or duplicated list gains back every slot exactly once.
+        let partial = Order {
+            slots: vec![Slot::Gpu, Slot::Gpu, Slot::Cpu],
+        };
+        let fixed = partial.normalized();
+        assert_eq!(fixed.slots.len(), Slot::ALL.len());
+        assert_eq!(fixed.slots[0], Slot::Gpu);
+        assert_eq!(fixed.slots[1], Slot::Cpu);
+        assert!(fixed.slots.contains(&Slot::Network));
+        assert!(fixed.slots.contains(&Slot::Disk));
+        assert!(fixed.describe().contains("GPU \u{00b7} CPU"));
     }
 
     #[test]

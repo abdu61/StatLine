@@ -63,6 +63,8 @@ pub struct Host {
     units: UnitSystem,
     /// Strip module visibility.
     modules: strip::VisibleModules,
+    /// Left-to-right module order, as settings labels ("Network", "CPU", …).
+    order: Vec<&'static str>,
 }
 
 impl Host {
@@ -106,6 +108,7 @@ impl Host {
             placement: taskbar::Placement::Right,
             units: UnitSystem::Binary,
             modules: strip::VisibleModules::default(),
+            order: strip::DEFAULT_ORDER.to_vec(),
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -159,7 +162,8 @@ impl Host {
             return;
         }
 
-        let segments = strip::segments_with(&snapshot, self.units, self.modules);
+        let segments =
+            strip::segments_ordered(&snapshot, self.units, self.modules, Some(&self.order));
         let measured = render::measure(&mut self.renderer.text, &segments, self.scale);
         let width = measured.width.ceil().max(1.0);
 
@@ -489,6 +493,16 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
     host.dashboard.set_units(host.units);
     host.dashboard.set_mica(settings.appearance.mica);
 
+    // Order is stored as slot names; the strip walks them left to right.
+    host.order = settings
+        .modules
+        .order
+        .normalized()
+        .slots
+        .iter()
+        .map(|slot| slot.label())
+        .collect();
+
     let temperature = match settings.appearance.temperature {
         Temperature::Celsius => TemperatureUnit::Celsius,
         Temperature::Fahrenheit => TemperatureUnit::Fahrenheit,
@@ -650,7 +664,12 @@ pub unsafe extern "system" fn strip_proc(
                     let anchor = strip_window::window_rect(hwnd);
                     let snapshot = host.sampler.snapshot();
                     // Which segment was clicked decides what the panel focuses.
-                    let segments = strip::segments_with(&snapshot, host.units, host.modules);
+                    let segments = strip::segments_ordered(
+                        &snapshot,
+                        host.units,
+                        host.modules,
+                        Some(&host.order),
+                    );
                     let focus = render::hit_test(&host.segment_rects, x)
                         .and_then(|index| segments.get(index))
                         .and_then(|segment| focus_for_label(segment.label));

@@ -31,6 +31,10 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Strip order setting. A row in Settings cycles the left-to-right order of the enabled
+  modules; the strip is rebuilt on the next tick. Order is stored as slot names, so a
+  hand-edited or partial list is normalized (missing slots appended, duplicates dropped)
+  rather than losing a module.
 - Strip density setting: Comfortable (default, 14 px inset from the taskbar) or Compact
   (6 px, a taller strip for a short taskbar or a denser readout). The window height and
   surface rebuild on the next tick, so it applies live.

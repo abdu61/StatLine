@@ -106,8 +106,9 @@ detail sampling on
 
 ## Next, in order
 
-1. **Settings, remaining**: module reorder. `--safe-mode` exists as a flag, and density,
-   temperature and per-module visibility are in the Settings page.
+1. **Settings complete**: theme, interval, units, temperature, density, strip order,
+   per-module visibility, Mica and start-with-Windows all apply live. `--safe-mode`
+   remains a CLI flag rather than a Settings row.
 2. **Sensors out of reach**: CPU package/per-core temperature and fan RPM need a kernel
    driver; GPU vendor telemetry is implemented (NVML/ADL), so an NVIDIA machine is only
    needed to exercise that path.

@@ -161,6 +161,10 @@ fn build_model(settings: &Settings) -> settings::Model {
                 }),
             },
             settings::Row {
+                label: "Strip order",
+                value: settings.modules.order.normalized().describe(),
+            },
+            settings::Row {
                 label: "Strip CPU",
                 value: on_off(settings.modules.cpu),
             },
@@ -235,11 +239,12 @@ impl SettingsWindow {
                     }
                 }
             }
-            9 => self.settings.modules.cpu = !self.settings.modules.cpu,
-            10 => self.settings.modules.memory = !self.settings.modules.memory,
-            11 => self.settings.modules.gpu = !self.settings.modules.gpu,
-            12 => self.settings.modules.disk = !self.settings.modules.disk,
-            13 => self.settings.modules.network = !self.settings.modules.network,
+            9 => self.settings.modules.order.rotate(),
+            10 => self.settings.modules.cpu = !self.settings.modules.cpu,
+            11 => self.settings.modules.memory = !self.settings.modules.memory,
+            12 => self.settings.modules.gpu = !self.settings.modules.gpu,
+            13 => self.settings.modules.disk = !self.settings.modules.disk,
+            14 => self.settings.modules.network = !self.settings.modules.network,
             _ => return false,
         }
         true

@@ -88,74 +88,104 @@ pub fn segments_with(
     units: UnitSystem,
     visible: VisibleModules,
 ) -> Vec<Segment> {
+    segments_ordered(snapshot, units, visible, None)
+}
+
+/// Build the strip contents in an explicit left-to-right order.
+///
+/// `order` lists module labels as the settings page names them ("CPU",
+/// "Memory", …). Slots not mentioned keep their default relative order after
+/// the listed ones, so a partial list still renders something sane.
+pub fn segments_ordered(
+    snapshot: &Snapshot,
+    units: UnitSystem,
+    visible: VisibleModules,
+    order: Option<&[&str]>,
+) -> Vec<Segment> {
     let mut segments = Vec::new();
+    let sequence: Vec<&str> = match order {
+        Some(list) if !list.is_empty() => list.to_vec(),
+        _ => DEFAULT_ORDER.to_vec(),
+    };
 
-    // Network goes first on purpose: the strip is right-anchored to the tray,
-    // so the only variable-width segment changes the strip's left edge. Every
-    // other segment keeps its screen position instead of shifting.
-    if visible.network {
-        if let Some(network) = snapshot.network.as_ref() {
-            // Two stacked lines, no label: the arrows say which direction is
-            // which, and dropping the label keeps the segment narrow.
-            segments.push(Segment {
-                label: "",
-                value: format!(
-                    "\u{2193} {}",
-                    format_rate_short(network.rx_bytes_per_sec, units)
-                ),
-                extra: Some(format!(
-                    "\u{2191} {}",
-                    format_rate_short(network.tx_bytes_per_sec, units)
-                )),
-                percent: None,
-                warn: 0.0,
-                critical: 0.0,
-                width_sample: match units {
-                    UnitSystem::Binary => RATE_SAMPLE_BINARY,
-                    UnitSystem::Decimal => RATE_SAMPLE_DECIMAL,
-                },
-            });
-        }
-    }
-
-    if visible.cpu {
-        if let Some(cpu) = snapshot.cpu.as_ref() {
-            segments.push(Segment::new(
-                "CPU",
-                format_percent(cpu.total_percent),
-                Some(cpu.total_percent),
-            ));
-        }
-    }
-
-    if visible.memory {
-        if let Some(memory) = snapshot.memory.as_ref() {
-            let percent = memory.percent();
-            segments.push(Segment::new("MEM", format_percent(percent), Some(percent)));
-        }
-    }
-
-    if visible.gpu {
-        if let Some(gpu) = snapshot.gpu.as_ref() {
-            segments.push(Segment::new(
-                "GPU",
-                format_percent(gpu.utilization_percent),
-                Some(gpu.utilization_percent),
-            ));
-        }
-    }
-
-    if visible.disk {
-        if let Some(disk) = snapshot.disk.as_ref() {
-            segments.push(Segment::new(
-                "DISK",
-                format_percent(disk.busy_percent),
-                Some(disk.busy_percent),
-            ));
+    for name in sequence {
+        match name {
+            "Network" if visible.network => push_network(&mut segments, snapshot, units),
+            "CPU" if visible.cpu => push_cpu(&mut segments, snapshot),
+            "Memory" if visible.memory => push_memory(&mut segments, snapshot),
+            "GPU" if visible.gpu => push_gpu(&mut segments, snapshot),
+            "Disk" if visible.disk => push_disk(&mut segments, snapshot),
+            _ => {}
         }
     }
 
     segments
+}
+
+/// Order used when settings say nothing: network first, for the reason above.
+pub const DEFAULT_ORDER: [&str; 5] = ["Network", "CPU", "Memory", "GPU", "Disk"];
+
+fn push_network(segments: &mut Vec<Segment>, snapshot: &Snapshot, units: UnitSystem) {
+    let Some(network) = snapshot.network.as_ref() else {
+        return;
+    };
+    // Two stacked lines, no label: the arrows say which direction is which, and
+    // dropping the label keeps the segment narrow.
+    segments.push(Segment {
+        label: "",
+        value: format!(
+            "\u{2193} {}",
+            format_rate_short(network.rx_bytes_per_sec, units)
+        ),
+        extra: Some(format!(
+            "\u{2191} {}",
+            format_rate_short(network.tx_bytes_per_sec, units)
+        )),
+        percent: None,
+        warn: 0.0,
+        critical: 0.0,
+        width_sample: match units {
+            UnitSystem::Binary => RATE_SAMPLE_BINARY,
+            UnitSystem::Decimal => RATE_SAMPLE_DECIMAL,
+        },
+    });
+}
+
+fn push_cpu(segments: &mut Vec<Segment>, snapshot: &Snapshot) {
+    if let Some(cpu) = snapshot.cpu.as_ref() {
+        segments.push(Segment::new(
+            "CPU",
+            format_percent(cpu.total_percent),
+            Some(cpu.total_percent),
+        ));
+    }
+}
+
+fn push_memory(segments: &mut Vec<Segment>, snapshot: &Snapshot) {
+    if let Some(memory) = snapshot.memory.as_ref() {
+        let percent = memory.percent();
+        segments.push(Segment::new("MEM", format_percent(percent), Some(percent)));
+    }
+}
+
+fn push_gpu(segments: &mut Vec<Segment>, snapshot: &Snapshot) {
+    if let Some(gpu) = snapshot.gpu.as_ref() {
+        segments.push(Segment::new(
+            "GPU",
+            format_percent(gpu.utilization_percent),
+            Some(gpu.utilization_percent),
+        ));
+    }
+}
+
+fn push_disk(segments: &mut Vec<Segment>, snapshot: &Snapshot) {
+    if let Some(disk) = snapshot.disk.as_ref() {
+        segments.push(Segment::new(
+            "DISK",
+            format_percent(disk.busy_percent),
+            Some(disk.busy_percent),
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -207,6 +237,71 @@ mod tests {
         assert_eq!(segments[0].value, "\u{2193} 1.18 MiB/s");
         assert_eq!(segments[0].extra.as_deref(), Some("\u{2191} 82.0 KiB/s"));
         assert_eq!(segments[0].width_sample, RATE_SAMPLE_BINARY);
+    }
+
+    #[test]
+    fn explicit_order_moves_segments_without_losing_any() {
+        let snapshot = Snapshot {
+            cpu: Some(CpuSample {
+                total_percent: 10.0,
+                ..Default::default()
+            }),
+            memory: Some(MemorySample {
+                used_bytes: 8,
+                total_bytes: 16,
+                ..Default::default()
+            }),
+            gpu: Some(statline_core::model::GpuSample::default()),
+            disk: Some(statline_core::model::DiskSample::default()),
+            network: Some(NetworkSample {
+                rx_bytes_per_sec: 1024.0,
+                tx_bytes_per_sec: 512.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let default = segments(&snapshot);
+        assert_eq!(default[0].label, "", "network leads by default");
+        assert_eq!(default.len(), 5);
+
+        // Network last: every percentage keeps its identity, only the order moves.
+        let reordered = segments_ordered(
+            &snapshot,
+            UnitSystem::Binary,
+            VisibleModules::default(),
+            Some(&["CPU", "Memory", "GPU", "Disk", "Network"]),
+        );
+        let labels: Vec<&str> = reordered.iter().map(|segment| segment.label).collect();
+        assert_eq!(labels, vec!["CPU", "MEM", "GPU", "DISK", ""]);
+        assert_eq!(reordered.len(), default.len());
+    }
+
+    #[test]
+    fn order_skips_hidden_modules() {
+        let snapshot = Snapshot {
+            cpu: Some(CpuSample {
+                total_percent: 10.0,
+                ..Default::default()
+            }),
+            gpu: Some(statline_core::model::GpuSample::default()),
+            ..Default::default()
+        };
+        let visible = VisibleModules {
+            cpu: true,
+            memory: false,
+            gpu: true,
+            disk: false,
+            network: false,
+        };
+        let segments = segments_ordered(
+            &snapshot,
+            UnitSystem::Binary,
+            visible,
+            Some(&["Disk", "GPU", "Memory", "Network", "CPU"]),
+        );
+        let labels: Vec<&str> = segments.iter().map(|segment| segment.label).collect();
+        assert_eq!(labels, vec!["GPU", "CPU"]);
     }
 
     #[test]
