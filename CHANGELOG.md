@@ -24,6 +24,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Companion keyboard navigation: `Ctrl+Tab`/`Ctrl+Shift+Tab` cycle pages,
+  `Ctrl+1`–`Ctrl+9` jump to a nav item, `Ctrl+S` opens settings. Clicking the tray icon
+  now toggles the dashboard instead of a folder.
 - A real application icon: multi-size ICO embedded in `statline.exe`, used by the
   tray and framed windows, with refreshed MSIX tiles. `scripts/make-icon.ps1` is the
   reproducible generator; the build embeds it when the Windows SDK `rc.exe` exists.

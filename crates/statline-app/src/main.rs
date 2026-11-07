@@ -202,7 +202,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
     if msg == tray::WM_TRAY {
         match tray::TrayEvent::from_callback(lparam) {
-            Some(tray::TrayEvent::Activate) => open_data_dir(),
+            Some(tray::TrayEvent::Activate) => {
+                // Primary click opens the dashboard; the data folder moved to
+                // the context menu because clicking the icon should do the
+                // obvious thing.
+                strip_host::toggle_dashboard();
+            }
             Some(tray::TrayEvent::ContextMenu) => {
                 if let Err(err) = menus::show_tray_menu(hwnd, strip_host::menu_state()) {
                     error!("context menu failed: {err}");

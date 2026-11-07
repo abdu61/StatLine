@@ -10,7 +10,7 @@ use statline_win::{HWND, LPARAM, LRESULT, WPARAM, paths, window};
 use windows::Win32::Foundation::RECT;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, InvalidateRect, PAINTSTRUCT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetClientRect, GetWindowRect, IsIconic, WM_CLOSE, WM_EXITSIZEMOVE,
+    DefWindowProcW, GetClientRect, GetWindowRect, IsIconic, WM_CLOSE, WM_EXITSIZEMOVE, WM_KEYDOWN,
     WM_LBUTTONUP, WM_PAINT, WM_SIZE,
 };
 
@@ -66,6 +66,11 @@ impl Dashboard {
     /// Switch page; the caller repaints with the next refresh.
     pub fn set_page(&mut self, page: Page) {
         self.page = page;
+    }
+
+    /// Current page, for keyboard handling.
+    pub fn page(&self) -> Page {
+        self.page
     }
 
     /// Enable or disable the Mica frame; applies immediately when open.
@@ -242,6 +247,18 @@ unsafe extern "system" fn companion_proc(
                 if let Some(index) = dashboard::nav_at(x, y, scale) {
                     crate::strip_host::select_dashboard_item(index);
                 }
+            }
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            let key = wparam.0 as u32;
+            let pointer = COMPANION.load(std::sync::atomic::Ordering::Acquire);
+            if !pointer.is_null() {
+                // SAFETY: the pointer is a live companion owned by this thread.
+                let ctrl =
+                    unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(0x11) < 0 };
+                let page = unsafe { (*pointer).page() };
+                crate::strip_host::handle_companion_key(key, ctrl, page.index());
             }
             LRESULT(0)
         }

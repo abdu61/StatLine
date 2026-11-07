@@ -385,6 +385,46 @@ pub fn select_dashboard_item(index: usize) {
     log::info!("companion page: {}", page.label());
 }
 
+/// Next/previous nav index, wrapping around the item list.
+pub fn cycle_index(current: usize, count: usize, backwards: bool) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    if backwards {
+        (current + count - 1) % count
+    } else {
+        (current + 1) % count
+    }
+}
+
+/// Keyboard handling for the companion window.
+///
+/// `Ctrl+Tab`/`Ctrl+Shift+Tab` cycle pages, `Ctrl+1..9` jump to a nav item, and
+/// `Ctrl+S` opens settings. `Esc` is handled by the window itself.
+pub fn handle_companion_key(key: u32, ctrl: bool, current: usize) {
+    const VK_TAB: u32 = 0x09;
+    const VK_S: u32 = 0x53;
+    const VK_1: u32 = 0x31;
+    const VK_9: u32 = 0x39;
+
+    if !ctrl {
+        return;
+    }
+    if key == VK_S {
+        crate::settings_host::toggle();
+        return;
+    }
+    if key == VK_TAB {
+        let shift = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(0x10) < 0 };
+        let count = statline_ui::dashboard::NAV_ITEMS.len();
+        select_dashboard_item(cycle_index(current, count, shift));
+        return;
+    }
+    if (VK_1..=VK_9).contains(&key) {
+        select_dashboard_item((key - VK_1) as usize);
+    }
+}
+
 /// Show or hide the strip on user request.
 pub fn toggle_strip() -> Option<bool> {
     let host = host()?;
@@ -624,4 +664,35 @@ pub fn accent_color(accent: Accent) -> Color {
 /// Palette for a theme and accent choice.
 pub fn palette(dark: bool, accent: Accent) -> Palette {
     Palette::for_theme(dark, accent_color(accent))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cycling_wraps_in_both_directions() {
+        assert_eq!(cycle_index(0, 10, false), 1);
+        assert_eq!(cycle_index(9, 10, false), 0);
+        assert_eq!(cycle_index(0, 10, true), 9);
+        assert_eq!(cycle_index(5, 10, true), 4);
+        assert_eq!(cycle_index(3, 0, false), 0);
+    }
+
+    #[test]
+    fn accent_presets_are_distinct() {
+        let colors = [
+            accent_color(Accent::Blue),
+            accent_color(Accent::Green),
+            accent_color(Accent::Purple),
+            accent_color(Accent::Orange),
+            accent_color(Accent::Teal),
+            accent_color(Accent::Pink),
+        ];
+        for (index, color) in colors.iter().enumerate() {
+            for other in colors.iter().skip(index + 1) {
+                assert_ne!(color, other, "accent presets must differ");
+            }
+        }
+    }
 }

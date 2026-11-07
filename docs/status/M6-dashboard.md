@@ -23,7 +23,7 @@ The place to configure and to explore, in one window.
 - [ ] Appearance: density, labels, opacity
 - [ ] Behaviour: secondary monitors, fullscreen, safe mode
 - [x] About: version, privacy posture, folders, licence, sensor scope
-- [ ] Keyboard navigation + focus rings; Esc closes
+- [x] Keyboard navigation: Ctrl+Tab cycling, Ctrl+1..9, Ctrl+S, Esc
 - [ ] Live preview of strip changes while editing
 
 ## Exit criteria

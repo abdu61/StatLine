@@ -456,7 +456,7 @@ fn draw_footer(
 ) {
     let _ = text.draw(
         surface,
-        "Esc closes this window \u{00b7} settings are saved as you change them",
+        "Esc closes \u{00b7} Ctrl+Tab pages \u{00b7} Ctrl+1-9 jumps to a page",
         (x, height - 28.0 * scale, width, 14.0 * scale),
         footer_style(scale),
         palette.text_muted.scaled_alpha(0.8),

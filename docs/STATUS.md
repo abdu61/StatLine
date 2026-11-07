@@ -38,10 +38,11 @@ detail sampling on
 - **Companion**: framed resizable window with a left nav (Dashboard, CPU, Memory, GPU,
   Disk, Network, Battery, System, Settings, About). Module pages show a labelled
   per-core grid (percentage and clock) plus 1/5/15-minute averages and processes;
-  memory cache and top memory apps; per-volume and per-adapter rows. Its position and
-  size are remembered in `window.json` and restored only when still on a monitor.
-  Optional Mica DWM backdrop on the framed windows. The shell has a LIVE chip, an accent
-  rule under page titles, outlined cards and an accent marker on the active nav item.
+  memory cache and top memory apps; per-volume and per-adapter rows. `Ctrl+Tab` cycles
+  pages, `Ctrl+1..9` jumps, `Ctrl+S` opens settings. Its position and size are
+  remembered in `window.json` and restored only when still on a monitor. Optional Mica
+  DWM backdrop on the framed windows. The shell has a LIVE chip, an accent rule under
+  page titles, outlined cards and an accent marker on the active nav item.
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
   with theme, accent presets, sampler interval, byte units, Mica, strip placement,
   start-with-Windows and per-module strip visibility. Mica shows a GPU/battery caution.

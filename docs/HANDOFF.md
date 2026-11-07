@@ -135,6 +135,9 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
   multiplies the total. Rates use `format_rate_short` (three significant digits,
   promote before 1000) and the strip reserves `99.9 MiB/s` plus `100%` samples so the
   segment cannot resize as digits or units change.
+- **Companion keys**: `Ctrl+Tab`/`Ctrl+Shift+Tab` cycle nav items, `Ctrl+1..9` jump,
+  `Ctrl+S` opens settings, `Esc` closes. Handled in `companion_proc` → `handle_companion_key`;
+  `cycle_index` is unit-tested. The tray left-click toggles the dashboard.
 - **Companion look**: nav LIVE chip, accent rule under page titles, card outlines,
   active-item accent marker. Keep new spacing inside `draw_header`'s 88 dip return so
   pages do not drift.
