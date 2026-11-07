@@ -91,6 +91,20 @@ pub struct DiskSample {
     pub volumes: Vec<VolumeSample>,
     /// Per-physical-disk activity, when PDH exposes named instances.
     pub disks: Vec<DiskActivitySample>,
+    /// Static identity of each physical disk, read once.
+    pub physical: Vec<PhysicalDiskSample>,
+}
+
+/// Model, bus and size of one physical drive.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PhysicalDiskSample {
+    pub number: u32,
+    /// Device model, e.g. `SAMSUNG MZVLQ512HALU-00000`.
+    pub model: String,
+    /// Bus type: `NVMe`, `SATA`, `USB`…
+    pub bus: String,
+    /// Size derived from the volumes on the disk (raw capacity needs admin).
+    pub size_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

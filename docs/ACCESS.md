@@ -18,6 +18,7 @@ driver or service, or opens a network connection.
 | Disk throughput, per-disk | Disk card | PDH `\PhysicalDisk(*)` |
 | Thermal zone | System card | PDH `\Thermal Zone Information(*)` |
 | Drive temperature | Disk volume rows | `IOCTL_STORAGE_QUERY_PROPERTY` on the volume/disk |
+| Drive model and bus type | Disk page | `IOCTL_STORAGE_QUERY_PROPERTY` (`StorageDeviceProperty`) on `\\.\PhysicalDriveN`, zero-access handle |
 | Battery charge, health, temperature, cycles | Battery card | `GetSystemPowerStatus`, `CallNtPowerInformation`, `IOCTL_BATTERY_QUERY_INFORMATION` |
 | Wi-Fi SSID and signal | Network page | `wlanapi` (only while a detail surface is open) |
 | GPU temperature/fan/power/clocks | GPU page | `nvml.dll` (NVIDIA) or `atiadlxx.dll` (AMD), loaded at runtime if present |

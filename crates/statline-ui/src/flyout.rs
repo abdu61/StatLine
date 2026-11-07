@@ -380,6 +380,19 @@ pub fn model_focused(
                         ),
                     });
                 }
+                for drive in &disk.physical {
+                    let mut value = format!("{} {}", drive.bus, drive.model);
+                    if drive.size_bytes > 0 {
+                        value.push_str(&format!(
+                            "  \u{00b7}  {}",
+                            format_bytes(drive.size_bytes, UnitSystem::Binary)
+                        ));
+                    }
+                    detail_rows.push(DetailRow {
+                        label: format!("Drive {}", drive.number),
+                        value: value.trim().to_string(),
+                    });
+                }
                 for volume in &disk.volumes {
                     let label = if volume.label.is_empty() {
                         volume.mount.clone()
@@ -1328,6 +1341,7 @@ mod tests {
                 },
             ],
             disks: Vec::new(),
+            physical: Vec::new(),
         });
         snapshot.processes = Some(ProcessSample {
             total: 1,

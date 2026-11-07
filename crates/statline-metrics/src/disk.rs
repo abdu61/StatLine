@@ -1,7 +1,7 @@
 //! Disk sampling: PDH rates plus cached volume capacity and temperatures.
 
-use statline_core::model::{DiskActivitySample, DiskSample, VolumeSample};
-use statline_win::metrics::disk::{DiskCounters, volume_temperatures, volumes};
+use statline_core::model::{DiskActivitySample, DiskSample, PhysicalDiskSample, VolumeSample};
+use statline_win::metrics::disk::{DiskCounters, disk_health, volume_temperatures, volumes};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -17,6 +17,8 @@ pub struct DiskState {
     volumes_at: Option<Instant>,
     temperatures: HashMap<String, Option<f32>>,
     temperatures_at: Option<Instant>,
+    /// Static drive identity; `None` until the first read.
+    physical: Option<Vec<PhysicalDiskSample>>,
 }
 
 impl Default for DiskState {
@@ -33,6 +35,7 @@ impl DiskState {
             volumes_at: None,
             temperatures: HashMap::new(),
             temperatures_at: None,
+            physical: None,
         }
     }
 
@@ -87,11 +90,28 @@ impl DiskState {
             self.volumes_at = Some(now);
         }
 
+        // Drive identity is static hardware: read it once, and only when a
+        // surface that shows it is open.
+        if with_temperatures && self.physical.is_none() {
+            self.physical = Some(
+                disk_health()
+                    .into_iter()
+                    .map(|(number, health)| PhysicalDiskSample {
+                        number,
+                        model: health.model,
+                        bus: health.bus,
+                        size_bytes: health.size_bytes,
+                    })
+                    .collect(),
+            );
+        }
+
         Some(DiskSample {
             read_bytes_per_sec: rates.read_bytes_per_sec,
             write_bytes_per_sec: rates.write_bytes_per_sec,
             busy_percent: rates.busy_percent,
             volumes: self.volumes.clone(),
+            physical: self.physical.clone().unwrap_or_default(),
             disks: rates
                 .disks
                 .iter()

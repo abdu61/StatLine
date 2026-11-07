@@ -13,8 +13,9 @@ use windows::Win32::Storage::FileSystem::{
 };
 use windows::Win32::System::IO::DeviceIoControl;
 use windows::Win32::System::Ioctl::{
-    IOCTL_STORAGE_QUERY_PROPERTY, PropertyStandardQuery, STORAGE_PROPERTY_QUERY,
-    STORAGE_TEMPERATURE_DATA_DESCRIPTOR, STORAGE_TEMPERATURE_VALUE_NOT_REPORTED,
+    IOCTL_STORAGE_PREDICT_FAILURE, IOCTL_STORAGE_QUERY_PROPERTY, PropertyStandardQuery,
+    STORAGE_PROPERTY_QUERY, STORAGE_TEMPERATURE_DATA_DESCRIPTOR,
+    STORAGE_TEMPERATURE_VALUE_NOT_REPORTED, StorageDeviceProperty,
     StorageDeviceTemperatureProperty, VOLUME_DISK_EXTENTS,
 };
 use windows::core::PCWSTR;
@@ -126,6 +127,206 @@ impl DiskCounters {
     }
 }
 
+/// Static identity and health of one physical disk.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DiskHealth {
+    /// Model string from the device descriptor, e.g. `Samsung SSD 980`.
+    pub model: String,
+    /// Bus type name (`NVMe`, `SATA`, `USB`, …).
+    pub bus: String,
+    /// Disk size in bytes.
+    pub size_bytes: u64,
+    /// `true`/`false` from the device's predictive-failure bit; `None` when the
+    /// drive does not implement `IOCTL_STORAGE_PREDICT_FAILURE`.
+    pub healthy: Option<bool>,
+}
+
+/// Identity and predictive-failure state per physical disk number.
+///
+/// The descriptor query works on a zero-access handle, so the model and bus
+/// need no elevation. Two things deliberately do **not** come from the raw
+/// device:
+///
+/// - **Capacity** is summed from the volumes on that disk. `IOCTL_DISK_GET_
+///   LENGTH_INFO` and `IOCTL_STORAGE_PREDICT_FAILURE` both require
+///   administrator access to `\\.\PhysicalDriveN`, and this app never asks for
+///   elevation.
+/// - **Health** is therefore `None` unless the drive reports it without
+///   elevation. A missing value is honest; a fabricated "OK" is not.
+///
+/// The data is static, so callers should read it once.
+pub fn disk_health() -> Vec<(u32, DiskHealth)> {
+    let capacities = capacity_by_disk();
+    let mut result = Vec::new();
+    for disk in 0..16u32 {
+        let Some(device) = open_device(&format!("\\\\.\\PhysicalDrive{disk}")) else {
+            continue;
+        };
+        let Some((model, bus)) = storage_identity(device.0) else {
+            continue;
+        };
+        let health = DiskHealth {
+            model,
+            bus,
+            size_bytes: capacities.get(&disk).copied().unwrap_or(0),
+            healthy: predictive_failure(device.0),
+        };
+        result.push((disk, health));
+    }
+    result
+}
+
+/// Total size of the mounted volumes on each physical disk.
+///
+/// Volumes are visible without elevation, so this is the one capacity path a
+/// standard user process can take.
+fn capacity_by_disk() -> HashMap<u32, u64> {
+    let mut buffer = vec![0u16; 512];
+    // SAFETY: valid writable buffer; the return is the character count.
+    let written = unsafe { GetLogicalDriveStringsW(Some(&mut buffer)) };
+    if written == 0 || written as usize > buffer.len() {
+        return HashMap::new();
+    }
+
+    let mut totals: HashMap<u32, u64> = HashMap::new();
+    for root in split_drive_strings(&buffer[..written as usize]) {
+        let wide = to_wide(OsStr::new(&root));
+        // SAFETY: `path` is NUL-terminated and outlives the call.
+        if unsafe { GetDriveTypeW(PCWSTR(wide.as_ptr())) } != DRIVE_FIXED {
+            continue;
+        }
+        let mut total = 0u64;
+        // SAFETY: valid out-parameters; the last is optional and ignored.
+        let ok =
+            unsafe { GetDiskFreeSpaceExW(PCWSTR(wide.as_ptr()), None, Some(&mut total), None) };
+        if ok.is_err() || total == 0 {
+            continue;
+        }
+        if let Some(disk) = volume_disk_number(&root) {
+            *totals.entry(disk).or_default() += total;
+        }
+    }
+    totals
+}
+
+/// Model string and bus name from the device descriptor.
+///
+/// `STORAGE_DEVICE_DESCRIPTOR` stores strings as byte offsets into the same
+/// buffer, not inline arrays.
+fn storage_identity(device: HANDLE) -> Option<(String, String)> {
+    use windows::Win32::System::Ioctl::STORAGE_DEVICE_DESCRIPTOR;
+
+    let query = STORAGE_PROPERTY_QUERY {
+        PropertyId: StorageDeviceProperty,
+        QueryType: PropertyStandardQuery,
+        AdditionalParameters: [0],
+    };
+    let mut buffer = [0u64; 128];
+    let mut returned = 0u32;
+    // SAFETY: `query` is a valid descriptor; the output buffer is 1 KiB and
+    // aligned, and the IOCTL writes a variable-length descriptor into it.
+    let result = unsafe {
+        DeviceIoControl(
+            device,
+            IOCTL_STORAGE_QUERY_PROPERTY,
+            Some((&query as *const STORAGE_PROPERTY_QUERY).cast()),
+            size_of::<STORAGE_PROPERTY_QUERY>() as u32,
+            Some(buffer.as_mut_ptr().cast()),
+            (buffer.len() * size_of::<u64>()) as u32,
+            Some(&mut returned),
+            None,
+        )
+    };
+    if result.is_err() || returned < size_of::<STORAGE_DEVICE_DESCRIPTOR>() as u32 {
+        return None;
+    }
+
+    // SAFETY: the header fits in `returned`; its offset fields point inside the
+    // same buffer, which is `returned` bytes long.
+    let descriptor = unsafe { &*(buffer.as_ptr().cast::<STORAGE_DEVICE_DESCRIPTOR>()) };
+    let bytes =
+        unsafe { std::slice::from_raw_parts(buffer.as_ptr().cast::<u8>(), returned as usize) };
+    let field = |offset: u32| {
+        if offset == 0 {
+            String::new()
+        } else {
+            c_string_at(bytes, offset as usize)
+        }
+    };
+    let model = field(descriptor.ProductIdOffset);
+    let vendor = field(descriptor.VendorIdOffset);
+
+    // Firmware often stores the model alone; a vendor prefix only helps when
+    // the model does not already name it.
+    let model = if model.is_empty() {
+        vendor
+    } else if !vendor.is_empty() && !model.to_lowercase().contains(&vendor.to_lowercase()) {
+        format!("{vendor} {model}")
+    } else {
+        model
+    };
+
+    Some((model.trim().to_string(), bus_type_name(descriptor.BusType)))
+}
+
+/// NUL-terminated ASCII string at `offset`.
+fn c_string_at(bytes: &[u8], offset: usize) -> String {
+    let tail = match bytes.get(offset..) {
+        Some(tail) => tail,
+        None => return String::new(),
+    };
+    let end = tail
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(tail.len());
+    String::from_utf8_lossy(&tail[..end]).trim().to_string()
+}
+
+/// `IOCTL_STORAGE_PREDICT_FAILURE`: the drive's own "about to fail" bit.
+fn predictive_failure(device: HANDLE) -> Option<bool> {
+    let mut buffer = [0u64; 16];
+    let mut returned = 0u32;
+    // SAFETY: no input buffer; a 128-byte aligned output buffer, and the IOCTL
+    // reports how much it wrote.
+    let result = unsafe {
+        DeviceIoControl(
+            device,
+            IOCTL_STORAGE_PREDICT_FAILURE,
+            None,
+            0,
+            Some(buffer.as_mut_ptr().cast()),
+            (buffer.len() * size_of::<u64>()) as u32,
+            Some(&mut returned),
+            None,
+        )
+    };
+    result.as_ref().ok()?;
+    let _ = returned;
+    // SAFETY: STORAGE_PREDICT_FAILURE starts with a DWORD PredictFailure flag;
+    // the buffer is aligned for it.
+    let flags = unsafe { *buffer.as_ptr().cast::<u32>() };
+    Some(flags & 1 == 0)
+}
+
+/// Human name for `STORAGE_BUS_TYPE`.
+fn bus_type_name(bus: windows::Win32::Storage::FileSystem::STORAGE_BUS_TYPE) -> String {
+    use windows::Win32::Storage::FileSystem::STORAGE_BUS_TYPE;
+    let name = match bus {
+        STORAGE_BUS_TYPE(0x03) => "ATA",
+        STORAGE_BUS_TYPE(0x07) => "USB",
+        STORAGE_BUS_TYPE(0x08) => "RAID",
+        STORAGE_BUS_TYPE(0x09) => "iSCSI",
+        STORAGE_BUS_TYPE(0x0A) => "SAS",
+        STORAGE_BUS_TYPE(0x0B) => "SATA",
+        STORAGE_BUS_TYPE(0x0C) => "SD",
+        STORAGE_BUS_TYPE(0x0D) => "MMC",
+        STORAGE_BUS_TYPE(0x11) => "NVMe",
+        STORAGE_BUS_TYPE(0x12) => "SCM",
+        _ => "",
+    };
+    String::from(name)
+}
+
 /// Capacity for one mounted fixed volume.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VolumeInfo {
@@ -227,13 +428,18 @@ impl Drop for OwnedHandle {
 /// Open a device path with no access requested; attributes are enough for
 /// these IOCTLs, which avoids requiring read access to raw disks.
 fn open_device(path: &str) -> Option<OwnedHandle> {
+    open_device_with(path, 0)
+}
+
+/// Open a device path requesting `access`.
+fn open_device_with(path: &str, access: u32) -> Option<OwnedHandle> {
     let wide = to_wide(OsStr::new(path));
     // SAFETY: the path is NUL-terminated and outlives the call; no security
     // descriptor or template is needed.
     let handle = unsafe {
         CreateFileW(
             PCWSTR(wide.as_ptr()),
-            0,
+            access,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             None,
             OPEN_EXISTING,
@@ -366,6 +572,16 @@ mod tests {
             assert!(volume.total_bytes > 0);
             assert!(volume.free_bytes <= volume.total_bytes);
             assert!(volume.mount.ends_with(':'));
+        }
+    }
+
+    #[test]
+    fn disk_health_reports_identity_for_system_disk() {
+        let disks = disk_health();
+        assert!(!disks.is_empty(), "expected at least one physical disk");
+        for (_, health) in &disks {
+            assert!(!health.model.is_empty(), "model comes from the descriptor");
+            assert!(!health.bus.is_empty(), "bus type is one of the known names");
         }
     }
 

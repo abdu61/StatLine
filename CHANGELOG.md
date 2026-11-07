@@ -28,6 +28,12 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Disk page names the physical drive: bus type and model (`NVMe SAMSUNG
+  MZVLQ512HALU-00000`) plus the capacity of the volumes on it. Read once from
+  `IOCTL_STORAGE_QUERY_PROPERTY` on a zero-access handle, so no elevation. Raw
+  capacity and `IOCTL_STORAGE_PREDICT_FAILURE` both need administrator access to
+  `\\.\PhysicalDriveN`, so capacity is summed from volumes and no fabricated
+  health badge is shown.
 - Per-process GPU usage. The GPU page lists the apps actually using the GPU, with
   their share of engine time, from the same `\GPU Engine(*)\Utilization Percentage`
   counter Task Manager reads. Works on integrated GPUs and needs no vendor SDK; the

@@ -6,8 +6,8 @@
 
 use statline_core::model::{
     AdapterSample, BatterySample, CpuSample, DiskSample, GpuSample, MemoryModuleInfo, MemorySample,
-    NetworkSample, ProcessEntry, ProcessSample, Snapshot, SystemSample, ThermalSample,
-    VolumeSample,
+    NetworkSample, PhysicalDiskSample, ProcessEntry, ProcessSample, Snapshot, SystemSample,
+    ThermalSample, VolumeSample,
 };
 use statline_render::{Color, Palette, Renderer};
 use statline_ui::{render, strip};
@@ -65,6 +65,12 @@ fn synthetic() -> Snapshot {
                 read_bytes_per_sec: 12_400_000.0,
                 write_bytes_per_sec: 3_100_000.0,
                 busy_percent: 4.0,
+            }],
+            physical: vec![PhysicalDiskSample {
+                number: 0,
+                model: String::from("SAMSUNG MZVLQ512HALU-00000"),
+                bus: String::from("NVMe"),
+                size_bytes: 512_000_000_000,
             }],
         }),
         network: Some(NetworkSample {
