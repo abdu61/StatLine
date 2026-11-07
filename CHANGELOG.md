@@ -28,6 +28,11 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
+- Per-process GPU usage. The GPU page lists the apps actually using the GPU, with
+  their share of engine time, from the same `\GPU Engine(*)\Utilization Percentage`
+  counter Task Manager reads. Works on integrated GPUs and needs no vendor SDK; the
+  process table's top-N cut now ranks by the larger of CPU and GPU share so a GPU-heavy
+  app is not dropped on an idle CPU.
 - System page lists installed memory modules from SMBIOS: slot, capacity, generation
   (DDR4/DDR5/LPDDR5…) and configured speed in MT/s, plus the channel locator so two
   SODIMMs that share a device locator stay distinguishable. Read once on the first

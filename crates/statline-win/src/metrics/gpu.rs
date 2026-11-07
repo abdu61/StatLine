@@ -78,9 +78,55 @@ fn sum_positive(counter: &PdhCounter) -> u64 {
         .sum()
 }
 
+/// Extract the PID from a `\GPU Engine(...)` instance name.
+///
+/// The instance looks like
+/// `pid_1234_luid_0x00000000_0x0000A1B2_phys_0_eng_0_engtype_3D`. Only the
+/// `pid_` field is needed, and the rest of the name is irrelevant.
+pub fn pid_from_instance(name: &str) -> Option<u32> {
+    let rest = name.split("pid_").nth(1)?;
+    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
+}
+
+impl GpuCounters {
+    /// GPU utilization per process, in percent of total GPU capacity.
+    ///
+    /// Each engine instance belongs to one process, so summing an engine's
+    /// values per PID gives that process's share. Uses the query already
+    /// collected by [`Self::sample`], so this adds no PDH cost.
+    pub fn utilization_by_process(&self) -> Vec<(u32, f32)> {
+        let mut per_pid: std::collections::HashMap<u32, f32> = std::collections::HashMap::new();
+        for (name, value) in self.engines.named_values().unwrap_or_default() {
+            if value <= 0.0 {
+                continue;
+            }
+            if let Some(pid) = pid_from_instance(&name) {
+                *per_pid.entry(pid).or_default() += value as f32;
+            }
+        }
+        let mut rows: Vec<(u32, f32)> = per_pid
+            .into_iter()
+            .map(|(pid, percent)| (pid, percent.clamp(0.0, 100.0)))
+            .collect();
+        rows.sort_by(|a, b| b.1.total_cmp(&a.1));
+        rows
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn instance_names_yield_pids() {
+        assert_eq!(
+            pid_from_instance("pid_4321_luid_0x00000000_0x0000A1B2_phys_0_eng_0_engtype_3D"),
+            Some(4321)
+        );
+        assert_eq!(pid_from_instance("gpuengine_weird"), None);
+        assert_eq!(pid_from_instance("pid__x"), None);
+    }
 
     #[test]
     fn opens_only_when_gpu_counters_exist() {

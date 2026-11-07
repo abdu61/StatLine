@@ -245,6 +245,12 @@ pub struct ProcessEntry {
     /// until a second sample provides a delta, so the UI can show "—" rather
     /// than claim a busy process is idle.
     pub cpu_percent: Option<f32>,
+    /// Share of GPU engine time across all engines, 0..=100.
+    ///
+    /// Summed from `\GPU Engine(*)\Utilization Percentage` per PID, the same
+    /// counter Task Manager's GPU column reads. `None` when the machine has no
+    /// GPU counters or the process used none this interval.
+    pub gpu_percent: Option<f32>,
     pub working_set_bytes: u64,
 }
 

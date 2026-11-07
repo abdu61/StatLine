@@ -600,6 +600,7 @@ fn render_module(
     let heading = match page {
         Page::Cpu => "Top processes \u{00b7} CPU",
         Page::Memory => "Top processes \u{00b7} memory",
+        Page::Gpu => "Top processes \u{00b7} GPU",
         _ => "Top processes",
     };
     let _ = draw_processes(

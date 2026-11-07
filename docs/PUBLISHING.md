@@ -35,7 +35,7 @@ Licence: MIT. No GPL/AGPL/LGPL/SSPL code; `deny.toml` enforces the allow-list.
 
 ## Packaging
 
-- [ ] `scripts/package-portable.ps1` produces the zip and SHA-256; unzip on a clean path
+- [ ] `scripts/package.ps1` produces the zip and SHA-256; unzip on a clean path
 - [ ] `makeappx` builds the MSIX; `Add-AppxPackage` works with a dev cert
 - [ ] MSIX identity publisher matches the signing certificate (**human**)
 - [ ] Capabilities are exactly `runFullTrust` + the startup task; no network/device caps

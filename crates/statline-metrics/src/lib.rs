@@ -190,7 +190,8 @@ impl Sampler {
         if !self.details_visible {
             return None;
         }
-        self.process.sample(now, metrics::logical_core_count())
+        self.process
+            .sample(now, metrics::logical_core_count(), self.gpu.per_process())
     }
 
     fn sample_cpu(&mut self, elapsed: Option<Duration>) -> Option<CpuSample> {

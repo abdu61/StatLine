@@ -25,6 +25,7 @@ pub struct GpuState {
     vendor_unavailable: bool,
     cached: Option<GpuSample>,
     cached_at: Option<Instant>,
+    per_process: Vec<(u32, f32)>,
 }
 
 impl Default for GpuState {
@@ -44,7 +45,13 @@ impl GpuState {
             vendor_unavailable: false,
             cached: None,
             cached_at: None,
+            per_process: Vec::new(),
         }
+    }
+
+    /// Per-PID GPU utilization from the last collection, refreshed with it.
+    pub fn per_process(&self) -> &[(u32, f32)] {
+        &self.per_process
     }
 
     pub fn sample(&mut self, now: Instant) -> Option<GpuSample> {
@@ -84,6 +91,11 @@ impl GpuState {
             .counters
             .as_ref()
             .and_then(|counters| counters.sample());
+        self.per_process = self
+            .counters
+            .as_ref()
+            .map(|counters| counters.utilization_by_process())
+            .unwrap_or_default();
         let vendor = self.vendor.as_mut().and_then(|vendor| vendor.read());
         if counters.is_none() && vendor.is_none() {
             return None;

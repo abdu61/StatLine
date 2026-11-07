@@ -282,10 +282,15 @@ pub fn probe(count: u32, interval: Duration) {
                 .cpu_percent
                 .map(format_percent_precise)
                 .unwrap_or_else(|| String::from("--"));
+            let gpu = entry
+                .gpu_percent
+                .map(format_percent_precise)
+                .unwrap_or_else(|| String::from("--"));
             console::write_line(&format!(
-                "  {:<28} {:>5}  {}",
+                "  {:<28} cpu {:>5}  gpu {:>5}  {}",
                 entry.name,
                 cpu,
+                gpu,
                 format_bytes(entry.working_set_bytes, UnitSystem::Binary)
             ));
         }

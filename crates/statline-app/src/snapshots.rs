@@ -118,6 +118,7 @@ fn synthetic() -> Snapshot {
                     threads: 12,
                     instances: 1,
                     cpu_percent: Some(4.2),
+                    gpu_percent: Some(7.6),
                     working_set_bytes: 640_000_000,
                 },
                 ProcessEntry {
@@ -126,6 +127,7 @@ fn synthetic() -> Snapshot {
                     threads: 12,
                     instances: 1,
                     cpu_percent: Some(1.8),
+                    gpu_percent: Some(2.1),
                     working_set_bytes: 388_000_000,
                 },
                 ProcessEntry {
@@ -134,6 +136,7 @@ fn synthetic() -> Snapshot {
                     threads: 12,
                     instances: 1,
                     cpu_percent: Some(0.9),
+                    gpu_percent: None,
                     working_set_bytes: 142_000_000,
                 },
                 ProcessEntry {
@@ -142,6 +145,7 @@ fn synthetic() -> Snapshot {
                     threads: 12,
                     instances: 1,
                     cpu_percent: Some(0.4),
+                    gpu_percent: None,
                     working_set_bytes: 30_000_000,
                 },
                 ProcessEntry {
@@ -150,6 +154,7 @@ fn synthetic() -> Snapshot {
                     threads: 12,
                     instances: 1,
                     cpu_percent: Some(0.3),
+                    gpu_percent: None,
                     working_set_bytes: 96_000_000,
                 },
                 ProcessEntry {
@@ -158,6 +163,7 @@ fn synthetic() -> Snapshot {
                     threads: 12,
                     instances: 1,
                     cpu_percent: Some(0.2),
+                    gpu_percent: None,
                     working_set_bytes: 512_000_000,
                 },
             ],

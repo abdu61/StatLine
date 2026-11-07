@@ -589,24 +589,35 @@ pub fn model_focused(
         }
     }
 
-    // Only CPU and Memory ask "which app is responsible"; the other modules
-    // have no per-app data, so their focused view has no process table.
+    // CPU and Memory ask "which app is responsible"; GPU asks the same question
+    // of its own counter. Disk, Network, Battery and System have no per-app
+    // data, so their focused view has no process table.
     let processes = match focus {
-        Some(Focus::Gpu) | Some(Focus::Disk) | Some(Focus::Network) | Some(Focus::Battery)
-        | Some(Focus::System) => Vec::new(),
+        Some(Focus::Disk) | Some(Focus::Network) | Some(Focus::Battery) | Some(Focus::System) => {
+            Vec::new()
+        }
         _ => snapshot
             .processes
             .as_ref()
             .map(|sample| {
                 let mut entries: Vec<&ProcessEntry> = sample.top.iter().collect();
-                if focus == Some(Focus::Memory) {
-                    entries.sort_by(|a, b| {
+                match focus {
+                    Some(Focus::Memory) => entries.sort_by(|a, b| {
                         b.working_set_bytes.cmp(&a.working_set_bytes).then_with(|| {
                             b.cpu_percent
                                 .unwrap_or(0.0)
                                 .total_cmp(&a.cpu_percent.unwrap_or(0.0))
                         })
-                    });
+                    }),
+                    Some(Focus::Gpu) => {
+                        entries.retain(|entry| entry.gpu_percent.unwrap_or(0.0) > 0.0);
+                        entries.sort_by(|a, b| {
+                            b.gpu_percent
+                                .unwrap_or(0.0)
+                                .total_cmp(&a.gpu_percent.unwrap_or(0.0))
+                        });
+                    }
+                    _ => {}
                 }
                 entries
                     .into_iter()
@@ -618,10 +629,19 @@ pub fn model_focused(
                         } else {
                             entry.name.clone()
                         },
-                        cpu: entry
-                            .cpu_percent
-                            .map(format_percent_precise)
-                            .unwrap_or_else(|| String::from("\u{2014}")),
+                        // On the GPU page the first column is GPU share, the
+                        // number the user came for; CPU lives on its own page.
+                        cpu: if focus == Some(Focus::Gpu) {
+                            entry
+                                .gpu_percent
+                                .map(format_percent)
+                                .unwrap_or_else(|| String::from("\u{2014}"))
+                        } else {
+                            entry
+                                .cpu_percent
+                                .map(format_percent_precise)
+                                .unwrap_or_else(|| String::from("\u{2014}"))
+                        },
                         memory: format_bytes(entry.working_set_bytes, units),
                     })
                     .collect()
@@ -1119,6 +1139,7 @@ mod tests {
                 threads: 4,
                 instances: 1,
                 cpu_percent: Some(4.2),
+                gpu_percent: None,
                 working_set_bytes: 640 * 1024 * 1024,
             }],
         });
@@ -1141,6 +1162,7 @@ mod tests {
                 threads: 4,
                 instances: 1,
                 cpu_percent: None,
+                gpu_percent: None,
                 working_set_bytes: 1024,
             }],
         });
@@ -1161,6 +1183,7 @@ mod tests {
                     threads: 4,
                     instances: 1,
                     cpu_percent: Some(50.0),
+                    gpu_percent: None,
                     working_set_bytes: 10,
                 },
                 ProcessEntry {
@@ -1169,6 +1192,7 @@ mod tests {
                     threads: 4,
                     instances: 1,
                     cpu_percent: Some(1.0),
+                    gpu_percent: None,
                     working_set_bytes: 1_000,
                 },
             ],
@@ -1258,6 +1282,7 @@ mod tests {
                 threads: 4,
                 instances: 1,
                 cpu_percent: Some(12.0),
+                gpu_percent: None,
                 working_set_bytes: 1_000,
             }],
         });
@@ -1312,6 +1337,7 @@ mod tests {
                 threads: 4,
                 instances: 1,
                 cpu_percent: Some(12.0),
+                gpu_percent: None,
                 working_set_bytes: 1_000,
             }],
         });

@@ -41,20 +41,30 @@ impl ProcessState {
     }
 
     /// Refresh when due, otherwise return the cached sample.
-    pub fn sample(&mut self, now: Instant, cores: u32) -> Option<ProcessSample> {
+    pub fn sample(
+        &mut self,
+        now: Instant,
+        cores: u32,
+        gpu_by_pid: &[(u32, f32)],
+    ) -> Option<ProcessSample> {
         let due = self
             .last_at
             .map(|last| now.duration_since(last) >= SAMPLE_INTERVAL)
             .unwrap_or(true);
         if due {
-            self.take(now, cores)
+            self.take(now, cores, gpu_by_pid)
         } else {
             self.last.clone()
         }
     }
 
     /// Sample unconditionally. Split out so tests do not have to wait 2 s.
-    fn take(&mut self, now: Instant, cores: u32) -> Option<ProcessSample> {
+    fn take(
+        &mut self,
+        now: Instant,
+        cores: u32,
+        gpu_by_pid: &[(u32, f32)],
+    ) -> Option<ProcessSample> {
         let elapsed = self
             .last_at
             .map(|last| now.duration_since(last))
@@ -69,6 +79,7 @@ impl ProcessState {
         let total = self.raw.len() as u32;
         let mut previous = HashMap::with_capacity(self.raw.len());
         let mut entries = Vec::with_capacity(self.raw.len().min(TOP_COUNT));
+        let gpu: HashMap<u32, f32> = gpu_by_pid.iter().copied().collect();
 
         for entry in &self.raw {
             let cpu_percent = self.previous.get(&entry.pid).map(|before| {
@@ -81,6 +92,7 @@ impl ProcessState {
                 threads: entry.threads,
                 instances: 1,
                 cpu_percent,
+                gpu_percent: gpu.get(&entry.pid).copied(),
                 working_set_bytes: entry.working_set_bytes,
             });
         }
@@ -90,12 +102,19 @@ impl ProcessState {
         // do: Chrome's twenty renderers become one row whose CPU and memory sum.
         let mut entries = group_by_name(entries);
 
-        // Busiest first; memory breaks ties, which also gives the first sample
-        // (no CPU history yet) a useful order instead of an arbitrary one.
+        // Busiest first. The key is the larger of CPU and GPU share, so a
+        // GPU-heavy process survives the top-N cut on a machine whose CPU is
+        // mostly idle (and vice versa). Memory breaks ties, which also gives
+        // the first sample (no CPU history yet) a useful order.
         entries.sort_by(|a, b| {
-            b.cpu_percent
-                .unwrap_or(0.0)
-                .total_cmp(&a.cpu_percent.unwrap_or(0.0))
+            let key = |entry: &ProcessEntry| {
+                entry
+                    .cpu_percent
+                    .unwrap_or(0.0)
+                    .max(entry.gpu_percent.unwrap_or(0.0))
+            };
+            key(b)
+                .total_cmp(&key(a))
                 .then_with(|| b.working_set_bytes.cmp(&a.working_set_bytes))
         });
         entries.truncate(TOP_COUNT);
@@ -127,6 +146,12 @@ pub fn group_by_name(entries: Vec<ProcessEntry>) -> Vec<ProcessEntry> {
             target.threads = target.threads.saturating_add(entry.threads);
             target.instances = target.instances.saturating_add(1);
             target.cpu_percent = match (target.cpu_percent, entry.cpu_percent) {
+                (Some(left), Some(right)) => Some((left + right).clamp(0.0, 100.0)),
+                (Some(left), None) => Some(left),
+                (None, Some(right)) => Some(right),
+                (None, None) => None,
+            };
+            target.gpu_percent = match (target.gpu_percent, entry.gpu_percent) {
                 (Some(left), Some(right)) => Some((left + right).clamp(0.0, 100.0)),
                 (Some(left), None) => Some(left),
                 (None, Some(right)) => Some(right),
@@ -171,7 +196,7 @@ mod tests {
     #[test]
     fn first_sample_has_no_cpu_history() {
         let mut state = ProcessState::new();
-        let sample = state.take(Instant::now(), 8).expect("process table");
+        let sample = state.take(Instant::now(), 8, &[]).expect("process table");
         assert!(sample.total > 0);
         assert!(!sample.top.is_empty());
         assert!(sample.top.len() <= TOP_COUNT);
@@ -185,9 +210,9 @@ mod tests {
     fn second_sample_reports_bounded_sorted_cpu() {
         let mut state = ProcessState::new();
         let now = Instant::now();
-        assert!(state.take(now, 8).is_some());
+        assert!(state.take(now, 8, &[]).is_some());
         std::thread::sleep(Duration::from_millis(80));
-        let sample = state.take(Instant::now(), 8).expect("process table");
+        let sample = state.take(Instant::now(), 8, &[]).expect("process table");
 
         assert!(!sample.top.is_empty());
         assert!(
@@ -217,6 +242,7 @@ mod tests {
                 threads: 1,
                 instances: 1,
                 cpu_percent: Some(4.0),
+                gpu_percent: None,
                 working_set_bytes: 100,
             },
             ProcessEntry {
@@ -225,6 +251,7 @@ mod tests {
                 threads: 1,
                 instances: 1,
                 cpu_percent: Some(2.5),
+                gpu_percent: None,
                 working_set_bytes: 50,
             },
             ProcessEntry {
@@ -233,6 +260,7 @@ mod tests {
                 threads: 1,
                 instances: 1,
                 cpu_percent: None,
+                gpu_percent: None,
                 working_set_bytes: 80,
             },
         ];
@@ -247,7 +275,7 @@ mod tests {
     #[test]
     fn reset_drops_the_cached_table() {
         let mut state = ProcessState::new();
-        assert!(state.take(Instant::now(), 4).is_some());
+        assert!(state.take(Instant::now(), 4, &[]).is_some());
         state.reset();
         assert!(state.last.is_none());
         assert!(state.previous.is_empty());

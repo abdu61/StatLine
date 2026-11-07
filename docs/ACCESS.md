@@ -14,6 +14,7 @@ driver or service, or opens a network connection.
 | Physical memory, commit, cache | Memory card | `GlobalMemoryStatusEx`, `GetPerformanceInfo` |
 | Per-process CPU time, working set, names | Top processes | `NtQuerySystemInformation(SystemProcessInformation)` |
 | GPU engines, VRAM | GPU card | PDH `\GPU Engine(*)`, DXGI `QueryVideoMemoryInfo` |
+| Per-process GPU share | GPU page process table | same `\GPU Engine(*)` counter, PID parsed from the instance name |
 | Disk throughput, per-disk | Disk card | PDH `\PhysicalDisk(*)` |
 | Thermal zone | System card | PDH `\Thermal Zone Information(*)` |
 | Drive temperature | Disk volume rows | `IOCTL_STORAGE_QUERY_PROPERTY` on the volume/disk |
@@ -21,6 +22,7 @@ driver or service, or opens a network connection.
 | Wi-Fi SSID and signal | Network page | `wlanapi` (only while a detail surface is open) |
 | GPU temperature/fan/power/clocks | GPU page | `nvml.dll` (NVIDIA) or `atiadlxx.dll` (AMD), loaded at runtime if present |
 | Theme, accent, CPU name, base clock, Windows build, computer name | Appearance and About | read-only registry (`HKCU`/`HKLM`) |
+| Installed memory modules: slot, size, DDR generation, speed | System page | `GetSystemFirmwareTable('RSMB')` (SMBIOS type 17, read once at first sample) |
 
 Registry keys read:
 
