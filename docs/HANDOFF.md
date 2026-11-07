@@ -189,7 +189,9 @@ table: **~4.75 ms per query** (~250 processes). With a detail surface open the a
   `SHQueryUserNotificationState`, which returns `QUNS_BUSY` (2) whenever a video plays
   fullscreen — including a YouTube tab in Firefox. That legitimately hides the strip.
   Check the foreground window before assuming the placement code broke:
-  `(GetForegroundWindow)` fullscreen at the monitor rect → expected.- **`UPDATELAYEREDWINDOWINFO.pblend` must not be null** with `ULW_ALPHA`. A null pointer
+  `(GetForegroundWindow)` fullscreen at the monitor rect → expected.
+
+- **`UPDATELAYEREDWINDOWINFO.pblend` must not be null** with `ULW_ALPHA`. A null pointer
   makes `UpdateLayeredWindowIndirect` fail with `ERROR_GEN_FAILURE (0x8007001F)`, which
   reads like a broken display driver. It also made tier 1 look impossible for a while —
   the parented child was blamed. Pass `BLENDFUNCTION { AC_SRC_OVER, 0, 255,
