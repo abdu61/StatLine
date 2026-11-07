@@ -8,6 +8,9 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Fixed
 
+- A `settings.json` saved with a UTF-8 byte-order mark (which is what Notepad writes by
+  default) was treated as corrupt: it was quarantined and every setting silently reset to
+  the default. The loader now strips the BOM before parsing.
 - The strip used one threshold pair (85/95 %) for every module while the flyout used
   85/95 for CPU and memory and 90/98 for GPU and disk, so the same reading could be
   yellow in the strip and normal in the panel. Both now share the per-module table.

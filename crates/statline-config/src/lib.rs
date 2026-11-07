@@ -452,7 +452,12 @@ impl Settings {
             }
         };
 
-        match serde_json::from_slice::<Self>(&bytes) {
+        // Windows editors (Notepad in particular) happily save JSON with a
+        // UTF-8 byte-order mark. `serde_json` rejects it, which used to
+        // quarantine an otherwise valid file and silently reset every setting.
+        let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes);
+
+        match serde_json::from_slice::<Self>(bytes) {
             Ok(mut settings) => {
                 settings.normalize();
                 Ok(settings)
@@ -586,6 +591,24 @@ mod tests {
         assert_eq!(loaded.general.strip_placement, StripPlacement::Left);
         assert_eq!(loaded.general.units, Units::Decimal);
         assert_eq!(loaded.appearance.theme, Theme::Light);
+    }
+
+    #[test]
+    fn utf8_bom_is_tolerated() {
+        // Notepad writes this prefix by default; rejecting it lost settings.
+        let dir = std::env::temp_dir().join("statline-config-test-bom");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("settings.json");
+
+        let json = r#"{"schema_version":1,"general":{"update_interval_ms":2000}}"#;
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(json.as_bytes());
+        std::fs::write(&path, &bytes).expect("write");
+
+        let loaded = Settings::load_or_default(&path).expect("load");
+        assert_eq!(loaded.general.update_interval_ms, 2000);
+        assert!(path.exists(), "a BOM must not quarantine the file");
     }
 
     #[test]
