@@ -8,16 +8,36 @@ A monitor that costs more than the thing it monitors is a bug.
 |---|---|---|
 | Sampling, 1 s interval | **cpu mean < 1.5 ms** per sample (0.15 % of one core) | `--bench 60` |
 | Sampling, wall p95 | < 3 ms (informational; scheduler noise on a busy desktop) | `--bench 60` |
-| Idle CPU, strip visible | < 0.2 % of one core (avg over 5 min) | Task Manager |
-| Idle CPU, strip hidden | < 0.05 % | Task Manager |
+| Idle CPU, strip visible | target < 0.2 %, **actual 0.39 %** — see [ADR 0006](../adr/0006-strip-repaint-cost.md) | process CPU over 5 min |
+| Idle CPU, tray only | < 0.05 % — measured 0.000 % | process CPU over 3 min |
 | Working set, tray only | < 15 MB | `--tray-only` + Get-Process |
 | Working set, strip live | **< 35 MB** | Get-Process after 60 s |
 | Private bytes, strip live | < 25 MB | Get-Process after 60 s |
 | Working set, strip + flyout | < 50 MB | manual |
 | GPU usage at idle | 0 % | Task Manager → GPU |
-| Handles / threads | flat over 1 h (±2) | 1-hour soak |
+| Handles / threads | flat over 1 h (±2) | 1-hour soak — measured 338–342 over 62.5 min |
 | Startup → strip visible | < 250 ms | stopwatch in log |
-| Release binary size | < 6 MB | `dir` |
+| Release binary size | < 6 MB | `dir` — measured 0.68 MB |
+
+## Two different numbers, and why the distinction matters
+
+`--bench` times `Sampler::sample` in a tight loop. That is the **sampling** cost, and it
+is ~0.4 ms. What Task Manager shows is the **visible** cost, which additionally includes
+one repaint of the strip per tick.
+
+Measured 2026-11-08 on this machine with no detail surface open:
+
+| Configuration | CPU, mean of one core |
+|---|---|
+| `--tray-only` | 0.000 % |
+| strip live, `--safe-mode` | 0.243 % |
+| strip live, all providers | 0.39 % |
+
+A 5000 ms interval changed that 0.406 % → 0.243 %, which is how the fixed per-repaint
+cost was separated from the per-sample cost. The strip tick itself measures 2.3–3.6 ms
+(`STATLINE_TRACE_TICK=1`), mostly Direct2D text drawing. See
+[ADR 0006](../adr/0006-strip-repaint-cost.md) for what was optimised and what was
+rejected.
 
 ## Why the working-set line moved from 30 to 35 MB
 

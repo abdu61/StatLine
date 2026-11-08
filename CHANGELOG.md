@@ -8,6 +8,15 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Changed
 
+- The strip no longer does unnecessary work every tick: it re-renders and re-presents
+  only when the readout, the hover state or the size changed, the text widths measured
+  for layout are reused by the painter instead of being measured twice, and the taskbar
+  geometry (which reads `TaskbarAl` from the registry) and the fullscreen check are
+  cached for 500 ms instead of running at 1 Hz.
+- Measured idle CPU with the strip visible is **0.39 %** of one core, not the 0.2 % the
+  budget asked for. The gap is Direct2D drawing, not bookkeeping; see
+  [`docs/adr/0006-strip-repaint-cost.md`](docs/adr/0006-strip-repaint-cost.md) for the
+  measurements and the rejected alternatives. Tray-only measures 0.000 %.
 - The per-row settings handler moved into a free function with a test that walks every
   row the Settings page draws and fails if an index has no handler or changes nothing.
   The row list and the `match index` are written separately, so inserting a row without

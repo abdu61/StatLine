@@ -10,6 +10,9 @@ pub struct StripMetrics {
     pub height: f32,
     /// Left edge and width of each segment, in physical pixels.
     pub segments: Vec<(f32, f32)>,
+    /// Measured width of each segment's widest string, in physical pixels.
+    /// Carried out of [`measure`] so [`render`] does not measure twice.
+    pub widths: Vec<f32>,
 }
 
 fn label_style(scale: f32) -> TextStyle {
@@ -46,44 +49,62 @@ fn segment_widths(text: &mut TextEngine, segments: &[Segment], scale: f32) -> Ve
 
 /// Compute the strip size without drawing.
 pub fn measure(text: &mut TextEngine, segments: &[Segment], scale: f32) -> StripMetrics {
-    let gap = space::XXS * scale;
     let widths = segment_widths(text, segments, scale);
+    StripMetrics {
+        width: total_width(&widths, scale),
+        height: 0.0,
+        segments: Vec::new(),
+        widths,
+    }
+}
+
+/// Total strip width for per-segment widths, including the gaps between them.
+fn total_width(widths: &[f32], scale: f32) -> f32 {
+    let gap = space::XXS * scale;
     let mut total = 0.0;
-    for width in &widths {
+    for width in widths {
         total += width + gap;
     }
     if total > 0.0 {
         total -= gap;
     }
-    StripMetrics {
-        width: total.max(1.0),
-        height: 0.0,
-        segments: Vec::new(),
-    }
+    total.max(1.0)
+}
+
+/// Everything one strip frame needs to draw.
+///
+/// Grouped because the list is long and positional: a mistyped `scale` and
+/// `height` would compile and draw garbage.
+pub struct Frame<'a> {
+    pub segments: &'a [Segment],
+    /// Per-segment widths from [`measure`], so nothing is measured twice.
+    pub widths: &'a [f32],
+    pub hovered: Option<usize>,
+    pub scale: f32,
+    pub height: f32,
 }
 
 /// Measure and draw the strip. Returns the size used and each segment's rect.
+///
+/// Takes the widths already produced by [`measure`]: measuring a string with
+/// DirectWrite is not free, and doing it twice per tick was the single largest
+/// cost in the strip's 1 Hz repaint.
 pub fn render(
     surface: &mut Surface,
     text: &mut TextEngine,
     palette: &Palette,
-    segments: &[Segment],
-    hovered: Option<usize>,
-    scale: f32,
-    height: f32,
+    frame: &Frame<'_>,
 ) -> StripMetrics {
+    let Frame {
+        segments,
+        widths,
+        hovered,
+        scale,
+        height,
+    } = *frame;
     let padding = space::XS * scale;
     let gap = space::XXS * scale;
-    let widths = segment_widths(text, segments, scale);
-
-    let mut total = 0.0;
-    for width in &widths {
-        total += width + gap;
-    }
-    if total > 0.0 {
-        total -= gap;
-    }
-    let width = total.max(1.0);
+    let width = total_width(widths, scale);
 
     surface.begin(palette.strip_background);
 
@@ -190,6 +211,7 @@ pub fn render(
         width,
         height,
         segments: rects,
+        widths: widths.to_vec(),
     }
 }
 

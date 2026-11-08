@@ -29,7 +29,12 @@ use windows::core::w;
 static HOST: AtomicPtr<Host> = AtomicPtr::new(std::ptr::null_mut());
 
 const TIMER_ID: usize = 1;
-
+/// How often the taskbar geometry is re-read even when its rect is unchanged.
+/// `taskbar::primary()` opens the registry; this is the cheap-enough compromise
+/// between noticing a DPI change and doing that 1 Hz.
+const GEOMETRY_REFRESH: Duration = Duration::from_millis(500);
+/// How often the shell is asked whether a fullscreen app owns the screen.
+const FULLSCREEN_REFRESH: Duration = Duration::from_millis(500);
 /// `WM_MOUSELEAVE` (winuser.h); not generated in this binding.
 const WM_MOUSELEAVE: u32 = 0x02A3;
 
@@ -70,6 +75,19 @@ pub struct Host {
     tray_tooltip: String,
     /// Whether the one-time "mirror is live" line has been logged.
     tray_tooltip_logged: bool,
+    /// Segments of the last frame actually drawn, so an unchanged readout does
+    /// not re-render or re-present.
+    painted_segments: Vec<strip::Segment>,
+    /// Hover index used for the last frame drawn.
+    painted_hover: Option<usize>,
+    /// Last geometry read, plus what it was read from and when, so the registry
+    /// read behind `taskbar::primary()` does not run every tick.
+    geometry: Option<taskbar::TaskbarGeometry>,
+    geometry_rect: Option<RECT>,
+    geometry_at: Option<std::time::Instant>,
+    /// Cached "something owns the screen" answer and when it was taken.
+    fullscreen_hidden: bool,
+    fullscreen_at: Option<std::time::Instant>,
 }
 
 impl Host {
@@ -116,6 +134,13 @@ impl Host {
             order: strip::DEFAULT_ORDER.to_vec(),
             tray_tooltip: String::new(),
             tray_tooltip_logged: false,
+            painted_segments: Vec::new(),
+            painted_hover: None,
+            geometry: Some(geometry),
+            geometry_rect: Some(strip_window::window_rect(geometry.taskbar)),
+            geometry_at: Some(std::time::Instant::now()),
+            fullscreen_hidden: false,
+            fullscreen_at: None,
         });
         HOST.store(host.as_mut() as *mut Host, Ordering::Release);
         host.tick();
@@ -123,8 +148,20 @@ impl Host {
     }
 
     /// Recompute the readout, reposition and repaint.
+    ///
+    /// Set `STATLINE_TRACE_TICK=1` to log the cost of each tick, which is the
+    /// difference between what `--bench` measures and what Task Manager shows.
     pub fn tick(&mut self) {
-        let Some(geometry) = taskbar::primary() else {
+        let trace = std::env::var_os("STATLINE_TRACE_TICK").is_some();
+        let started = trace.then(std::time::Instant::now);
+        self.tick_inner(trace);
+        if let Some(started) = started {
+            log::info!("tick took {:?}", started.elapsed());
+        }
+    }
+
+    fn tick_inner(&mut self, trace: bool) {
+        let Some(geometry) = self.refresh_geometry() else {
             self.set_visible(false);
             return;
         };
@@ -144,7 +181,7 @@ impl Host {
 
         // Hide for anything that owns the screen: fullscreen games, video,
         // presentation mode, or an auto-hidden taskbar.
-        let should_hide = taskbar::is_hidden(geometry.taskbar) || taskbar::fullscreen_active();
+        let should_hide = self.fullscreen_holder();
         self.set_visible(!should_hide && !self.user_hidden);
         if should_hide {
             return;
@@ -190,18 +227,37 @@ impl Host {
             }
         }
 
-        let palette = self.active_palette();
-        if let Some(surface) = self.surface.as_mut() {
-            let metrics = render::render(
-                surface,
-                &mut self.renderer.text,
-                &palette,
-                &segments,
-                self.hovered,
-                self.scale,
-                self.height,
-            );
-            self.segment_rects = metrics.segments;
+        // The perf budget forbids work on the render path unless the data, the
+        // hover state or the size changed. Comparing the drawn strings is the
+        // cheapest honest test: the strip shows text, so identical text is an
+        // identical frame.
+        let content = segments.clone();
+        let needs_repaint =
+            size_changed || self.hovered != self.painted_hover || content != self.painted_segments;
+
+        if needs_repaint {
+            let palette = self.active_palette();
+            if let Some(surface) = self.surface.as_mut() {
+                let started = trace.then(std::time::Instant::now);
+                let metrics = render::render(
+                    surface,
+                    &mut self.renderer.text,
+                    &palette,
+                    &render::Frame {
+                        segments: &segments,
+                        widths: &measured.widths,
+                        hovered: self.hovered,
+                        scale: self.scale,
+                        height: self.height,
+                    },
+                );
+                if let Some(started) = started {
+                    log::info!("  draw took {:?}", started.elapsed());
+                }
+                self.segment_rects = metrics.segments;
+            }
+            self.painted_hover = self.hovered;
+            self.painted_segments = content;
         }
 
         self.flyout.record(&snapshot);
@@ -250,9 +306,14 @@ impl Host {
 
         let mut presented = true;
         if let Some(surface) = self.surface.as_ref() {
-            // A null destination in UPDATELAYEREDWINDOWINFO makes Windows use
-            // the window's own position.
-            presented = surface.present_layered(self.hwnd, 0, 0);
+            // Only push a new frame when something above actually changed, plus
+            // on the first frame and after a move (the surface follows the
+            // window). Presenting identical pixels costs a DWM round-trip.
+            if needs_repaint || moved || !self.logged_first_frame {
+                // A null destination in UPDATELAYEREDWINDOWINFO makes Windows use
+                // the window's own position.
+                presented = surface.present_layered(self.hwnd, 0, 0);
+            }
             if !self.logged_first_frame {
                 self.logged_first_frame = true;
                 log::info!(
@@ -291,6 +352,8 @@ impl Host {
                 self.visible = true;
                 self.hovered = None;
                 self.segment_rects.clear();
+                self.painted_segments.clear();
+                self.painted_hover = None;
                 self.last_rect = None;
                 self.tick();
             }
@@ -371,6 +434,59 @@ impl Host {
             Ok(()) => {}
             Err(error) => log::debug!("could not update the tray tooltip: {error}"),
         }
+    }
+
+    /// Taskbar geometry, re-read only when it can actually have changed.
+    ///
+    /// `taskbar::primary()` opens `HKCU\...\Explorer\Advanced` to read
+    /// `TaskbarAl` and walks several taskbar children, which is far too much to
+    /// do 1 Hz for a value that changes when the taskbar moves. The taskbar rect
+    /// is a cheap `GetWindowRect` and is the thing that actually changes, so it
+    /// gates the full read: twice a second is plenty to notice a move, a DPI
+    /// change or an Explorer restart.
+    fn refresh_geometry(&mut self) -> Option<taskbar::TaskbarGeometry> {
+        let taskbar = taskbar::taskbar_window()?;
+        let rect = strip_window::window_rect(taskbar);
+        let due = self
+            .geometry_at
+            .map(|at: std::time::Instant| at.elapsed() >= GEOMETRY_REFRESH)
+            .unwrap_or(true);
+        let moved = self
+            .geometry_rect
+            .map(|previous| {
+                previous.left != rect.left
+                    || previous.top != rect.top
+                    || previous.right != rect.right
+                    || previous.bottom != rect.bottom
+            })
+            .unwrap_or(true);
+
+        if due || moved {
+            self.geometry = taskbar::primary();
+            self.geometry_rect = Some(rect);
+            self.geometry_at = Some(std::time::Instant::now());
+        }
+        self.geometry
+    }
+
+    /// Whether something (a fullscreen app, video or presentation) owns the
+    /// screen. The shell query costs a COM call, so it runs at most twice a
+    /// second; a fullscreen app cannot appear and vanish faster than a person
+    /// can notice the strip.
+    fn fullscreen_holder(&mut self) -> bool {
+        let Some(geometry) = self.geometry.as_ref() else {
+            return true;
+        };
+        let due = self
+            .fullscreen_at
+            .map(|at: std::time::Instant| at.elapsed() >= FULLSCREEN_REFRESH)
+            .unwrap_or(true);
+        if due {
+            self.fullscreen_hidden =
+                taskbar::is_hidden(geometry.taskbar) || taskbar::fullscreen_active();
+            self.fullscreen_at = Some(std::time::Instant::now());
+        }
+        self.fullscreen_hidden
     }
 
     fn set_visible(&mut self, visible: bool) {
@@ -537,6 +653,10 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
         .iter()
         .map(|slot| slot.label())
         .collect();
+
+    // A palette, unit, order or visibility change alters the drawn frame even
+    // when the numbers are identical, so drop the cached comparison.
+    host.painted_segments.clear();
 
     let temperature = match settings.appearance.temperature {
         Temperature::Celsius => TemperatureUnit::Celsius,

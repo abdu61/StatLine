@@ -180,6 +180,17 @@ pub fn taskbar_centered() -> Option<bool> {
     status.is_ok().then_some(value != 0)
 }
 
+/// The primary taskbar window handle, without the geometry walk.
+///
+/// `primary()` reads the registry and measures several children, so callers that
+/// only need the handle (a cheap `GetWindowRect` to notice a move) should use
+/// this instead.
+pub fn taskbar_window() -> Option<HWND> {
+    // SAFETY: plain window lookup; no pointers escape.
+    let taskbar = unsafe { FindWindowW(w!("Shell_TrayWnd"), None) }.ok()?;
+    (!taskbar.is_invalid()).then_some(taskbar)
+}
+
 /// True when the shell is currently animating the taskbar out of view.
 pub fn is_hidden(taskbar: HWND) -> bool {
     // SAFETY: a window handle from `primary()`; visibility is a cheap query.

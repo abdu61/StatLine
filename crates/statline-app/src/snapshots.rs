@@ -207,10 +207,13 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     &mut surface,
                     &mut renderer.text,
                     &palette,
-                    &segments,
-                    None,
-                    scale,
-                    height,
+                    &render::Frame {
+                        segments: &segments,
+                        widths: &measured.widths,
+                        hovered: None,
+                        scale,
+                        height,
+                    },
                 );
                 let path = dir.join(format!("strip-{theme_name}-{scale_name}.png"));
                 surface.save_png_over(&path, background)?;
@@ -224,10 +227,13 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     &mut surface,
                     &mut renderer.text,
                     &palette,
-                    &segments,
-                    Some(0),
-                    scale,
-                    height,
+                    &render::Frame {
+                        segments: &segments,
+                        widths: &measured.widths,
+                        hovered: Some(0),
+                        scale,
+                        height,
+                    },
                 );
                 let path = dir.join(format!("strip-{theme_name}-{scale_name}-hover.png"));
                 surface.save_png_over(&path, background)?;
@@ -243,14 +249,18 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let measured = render::measure(&mut renderer.text, &segments, scale);
         let width = measured.width.ceil().max(1.0);
         let mut surface = renderer.surface(width as u32, 80)?;
+        let tall_widths = render::measure(&mut renderer.text, &segments, scale).widths;
         render::render(
             &mut surface,
             &mut renderer.text,
             &palette,
-            &segments,
-            Some(2),
-            scale,
-            80.0,
+            &render::Frame {
+                segments: &segments,
+                widths: &tall_widths,
+                hovered: Some(2),
+                scale,
+                height: 80.0,
+            },
         );
         let path = dir.join("strip-dark-200-tall.png");
         surface.save_png_over(&path, Color::rgb(0x1F, 0x1F, 0x1F))?;

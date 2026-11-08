@@ -114,8 +114,10 @@ detail sampling on
 2. **Sensors out of reach**: CPU package/per-core temperature and fan RPM need a kernel
    driver; GPU vendor telemetry is implemented (NVML/ADL), so an NVIDIA machine is only
    needed to exercise that path.
-3. **Packaging, remaining**: a 1-hour soak and `--bench 300`, then the local `v0.1.0`
-   tag. Signing and the final Store identity are human steps.
+3. **Packaging, remaining**: the local `v0.1.0` tag. The one-hour soak (125 samples,
+   handles 338–342, WS 25.9–33.1 MB) and `--bench 120` are recorded in
+   `docs/ops/perf-log.md`, `cargo deny check` is green, and both the portable zip and the
+   MSIX build. Signing and the final Store identity are human steps.
 4. **Polish**: empty states, multi-monitor, per-pixel blur behind the flyout (needs a
    composition swapchain). `--safe-mode` and `--reset-settings` exist as diagnostics.
    Verified: a native `tooltips_class32` will not pop for a stacked/child layered window

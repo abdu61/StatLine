@@ -34,6 +34,45 @@ The new providers cost nothing on the tick: SMBIOS memory modules, drive identit
 per-process GPU are all static or ride the existing 3 s GPU collection. The GPU
 per-PID map reuses the `GPU Engine(*)` array the card sum already reads.
 
+## One-hour soak (0.1.0, final build, 2026-11-08)
+
+125 samples at 30 s, strip hosted as a tier-1 child of `Shell_TrayWnd`, one flyout
+opened during the run:
+
+```
+elapsed   handles   threads   WS MB    private MB   cpu s
+ 0.5 min    342       12      33.1       14.4        0.7
+11.0 min    341        7      27.5       14.4        2.5
+32.0 min    340        7      30.0       15.0        8.1
+62.5 min    340        7      30.5       15.8       15.8
+```
+
+Handles ranged 338–342 over the whole hour and ended where they started; no upward
+trend. Threads 6–12 (the sampler thread spawns for a process-table query and exits).
+Working set 25.9–33.1 MB, private 14.4 → 15.8 MB (+1.4 MB over an hour, the Direct2D
+text cache). CPU time 15.8 s in 62.5 min is **0.42 % of one core** with the strip live
+and one flyout session; the budget line is 0.2 % with the strip visible and no detail
+surface.
+
+Measured memory before and after opening the companion three times, on a fresh
+process:
+
+```
+fresh         handles 307   WS 21.3 MB   private 7.4 MB
+open 1        handles 376   WS 39.8 MB   private 18.2 MB
+close 1       handles 376   WS 39.9 MB   private 18.2 MB
+open 2        handles 379   WS 36.8 MB   private 14.9 MB
+close 2       handles 379   WS 36.8 MB   private 14.9 MB
+open 3        handles 379   WS 40.4 MB   private 18.4 MB
+close 3       handles 379   WS 40.4 MB   private 18.4 MB
+idle +60 s    handles 378   WS 40.0 MB   private 18.4 MB
+```
+
+The +69 handles are the detail providers opening once (process table buffer, PDH
+queries, WMI-free sensor handles) and staying cached; repeated open/close adds 0–3 and
+they do not grow. A strip hidden behind a fullscreen app drops to 303 handles and
+18 MB, because the DWM surface is not allocated.
+
 ## 90-second soak (M3b, parented strip)
 
 ```

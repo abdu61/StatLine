@@ -40,10 +40,16 @@ impl TextStyle {
     }
 }
 
-/// Owns the DirectWrite factory and its format cache.
+/// Owns the DirectWrite factory and its caches.
+///
+/// `CreateTextFormat` allocates a COM object, and the strip redraws the same
+/// handful of strings every tick, so both the formats and the measured widths
+/// are kept. Widths are the expensive part: measuring goes through a text
+/// layout, and the strip asks for the same dozen strings at 1 Hz.
 pub struct TextEngine {
     factory: IDWriteFactory,
     formats: HashMap<(u32, bool, Align), IDWriteTextFormat>,
+    widths: HashMap<(String, u32, bool, Align), f32>,
 }
 
 impl TextEngine {
@@ -53,6 +59,7 @@ impl TextEngine {
         Ok(Self {
             factory,
             formats: HashMap::new(),
+            widths: HashMap::new(),
         })
     }
 
@@ -117,7 +124,17 @@ impl TextEngine {
         if text.is_empty() {
             return 0.0;
         }
-        match self.layout(text, style) {
+        let key = (
+            String::from(text),
+            (style.size * 10.0).round() as u32,
+            style.semibold,
+            style.align,
+        );
+        if let Some(width) = self.widths.get(&key) {
+            return *width;
+        }
+
+        let width = match self.layout(text, style) {
             Ok(layout) => {
                 let mut metrics = DWRITE_TEXT_METRICS::default();
                 // SAFETY: `metrics` is a valid out-parameter.
@@ -128,7 +145,9 @@ impl TextEngine {
                 }
             }
             Err(_) => 0.0,
-        }
+        };
+        self.widths.insert(key, width);
+        width
     }
 
     /// Draw `text` inside `rect` (physical pixels).
