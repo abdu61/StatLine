@@ -11,7 +11,7 @@ Read in this order. Stop as soon as you have what you need.
 | adding a metric | [`spec/metrics.md`](spec/metrics.md) |
 | touching settings | [`adr/0004-config-paths.md`](adr/0004-config-paths.md) → [`spec/settings.md`](spec/settings.md) |
 | adding a dependency | [`adr/0005-dependency-policy.md`](adr/0005-dependency-policy.md) |
-| measuring performance | [`ops/perf-budget.md`](ops/perf-budget.md) → [`ops/testing.md`](ops/testing.md) |
+| measuring performance | [`ops/perf-budget.md`](ops/perf-budget.md) → [`adr/0006-strip-repaint-cost.md`](adr/0006-strip-repaint-cost.md) |
 | building or packaging | [`ops/build.md`](ops/build.md) → [`ops/packaging.md`](ops/packaging.md) |
 | cutting a release | [`ops/release-checklist.md`](ops/release-checklist.md) → [`PUBLISHING.md`](PUBLISHING.md) |
 | access, permissions or privacy | [`ACCESS.md`](ACCESS.md) → [`../PRIVACY.md`](../PRIVACY.md) |

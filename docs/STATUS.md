@@ -94,10 +94,12 @@ detail sampling on
 - **DPI**: process is per-monitor-v2 aware. The strip re-reads the taskbar DPI each tick
   and rebuilds its surface when the scale changes; the companion handles
   `WM_DPICHANGED` with the suggested rectangle and re-renders at the new scale.
-- **Sampling**: 0.415 ms per sample in a tight loop with detail providers off; WS ~30 MB,
-  private ~14.5 MB, handles flat. `--bench` uses the median wall sample time (mean/p95
-  include scheduler preemption); idle median is ~1.7 ms at a 1 s cadence. The WLAN query
-  is ~12 ms but runs every 15 s only while a detail surface is open.
+- **Sampling**: 243 µs per `Sampler::sample` in a tight loop with detail providers off;
+  WS ~30 MB, private ~15 MB, handles flat over an hour (338–342). `--bench` uses the
+  median wall sample time (mean/p95 include scheduler preemption). **Visible** idle cost
+  with the strip on screen is 0.39 % of one core — higher than the 0.2 % target, and that
+  is Direct2D drawing, documented in [`adr/0006`](adr/0006-strip-repaint-cost.md).
+  Tray-only measures 0.000 %.
 - **Lifecycle**: single instance, autostart commands, 1 MB × 3 log rotation, panic hook,
   `--tray-only`. Startup is a per-user `Run` value that only a release `statline.exe`
   may write; debug builds and test harnesses are refused, stale paths are repaired, and
