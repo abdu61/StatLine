@@ -1,6 +1,6 @@
 # Spec — settings
 
-Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
+Source of truth for `%APPDATA%\StatLine\settings.json`. Rust types live in
 `statline-config`; this file is the contract.
 
 ```jsonc
@@ -43,7 +43,7 @@ Source of truth for `%APPDATA%\Statline\settings.json`. Rust types live in
 ## Window state
 
 The companion's outer rectangle is stored separately in
-`%APPDATA%\Statline\window.json` (physical pixels, `{x, y, width, height}`). It is
+`%APPDATA%\StatLine\window.json` (physical pixels, `{x, y, width, height}`). It is
 written on `WM_EXITSIZEMOVE` and on close, and only restored when the rectangle still
 intersects a monitor and is at least 480×360. Minimized rectangles are never saved.
 Keeping it out of `settings.json` means a drag does not race the settings window's

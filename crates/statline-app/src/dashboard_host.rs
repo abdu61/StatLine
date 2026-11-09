@@ -14,7 +14,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_EXITSIZEMOVE, WM_KEYDOWN, WM_LBUTTONUP, WM_PAINT, WM_SIZE,
 };
 
-const CLASS: &str = "StatlineCompanionWindow";
+const CLASS: &str = "StatLineCompanionWindow";
 
 /// Logical size of the window, in DIPs. Tall enough for the card grid plus the
 /// process table at 100 %.
@@ -132,7 +132,7 @@ impl Dashboard {
             .unwrap_or((width, height));
         match window::create_frame_window(
             CLASS,
-            "Statline",
+            "StatLine",
             Some(companion_proc),
             window::FrameOptions {
                 width,

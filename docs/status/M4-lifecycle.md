@@ -4,7 +4,7 @@
 
 ## Done
 
-- [x] Single instance via a named mutex (`Statline.SingleInstance`); the second
+- [x] Single instance via a named mutex (`StatLine.SingleInstance`); the second
       launch logs and exits. Note: a plain name is per-session, which is what we want —
       `Local\` prefixes need careful escaping and add nothing here.
 - [x] `GetLastError` is cleared immediately before `CreateMutexW`; otherwise a stale

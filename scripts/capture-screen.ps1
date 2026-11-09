@@ -15,7 +15,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
-public class StatlineScreen {
+public class StatLineScreen {
   [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
   [DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr hdcDest, int x, int y, int w, int h,
@@ -48,6 +48,6 @@ public class StatlineScreen {
 }
 '@
 Add-Type -TypeDefinition $code -Language CSharp -ReferencedAssemblies System.Drawing
-$result = [StatlineScreen]::Capture($X, $Y, $Width, $Height, $OutFile)
+$result = [StatLineScreen]::Capture($X, $Y, $Width, $Height, $OutFile)
 Write-Output $result
 if (Test-Path $OutFile) { Write-Output $OutFile }

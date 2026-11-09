@@ -1,6 +1,6 @@
 //! The Windows app theme.
 //!
-//! Statline follows the system light/dark choice only when the user asks
+//! StatLine follows the system light/dark choice only when the user asks
 //! (`theme = "system"`). The registry value is the same one Explorer uses, so
 //! there is no lag waiting for a theme-change broadcast.
 

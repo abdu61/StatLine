@@ -46,7 +46,7 @@ detail sampling on
 - **Settings**: a framed window from the tray menu, the strip menu, or the companion nav,
   with theme, accent presets, sampler interval, byte units, Mica, strip placement,
   start-with-Windows and per-module strip visibility. Mica shows a GPU/battery caution.
-  Changes apply live and are saved atomically to `%APPDATA%\Statline\settings.json`;
+  Changes apply live and are saved atomically to `%APPDATA%\StatLine\settings.json`;
   unknown keys are ignored.
 - **Packaging**: portable zip script (exe, README, changelog, privacy/access docs,
   licence texts) and an MSIX manifest with `runFullTrust` + a user-toggleable startup

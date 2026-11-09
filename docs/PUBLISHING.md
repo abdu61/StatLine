@@ -1,4 +1,4 @@
-# Publishing Statline
+# Publishing StatLine
 
 Everything that must be true before a public release. Items marked **human** need an
 account, certificate, or decision that cannot be automated locally.
@@ -32,7 +32,7 @@ Licence: MIT. No GPL/AGPL/LGPL/SSPL code; `deny.toml` enforces the allow-list.
 - [ ] From the release exe: `statline.exe --install-startup`
 - [ ] `statline.exe --startup-status` says `(matches this build)` and the path is
       `...\statline.exe` — never `target\debug\deps\...`
-- [ ] `cargo test` leaves `HKCU\...\Run\Statline` untouched (tests only read/refuse)
+- [ ] `cargo test` leaves `HKCU\...\Run\StatLine` untouched (tests only read/refuse)
 - [ ] Sign out/in (or reboot) once: app appears, **no console window flashes**
 - [ ] `statline.exe --remove-startup` removes the value
 - [ ] MSIX: the `StartupTask` is disabled by default and toggleable in Windows Settings
@@ -61,7 +61,7 @@ Licence: MIT. No GPL/AGPL/LGPL/SSPL code; `deny.toml` enforces the allow-list.
 ## Tag
 
 ```powershell
-git tag -a v0.1.0 -m "Statline v0.1.0"
+git tag -a v0.1.0 -m "StatLine v0.1.0"
 ```
 
 Local only. Publishing (push, Store submission, signing) requires explicit approval.

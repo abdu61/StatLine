@@ -1,4 +1,4 @@
-# Statline — handoff
+# StatLine — handoff
 
 Native Windows 11 system monitor that lives in the taskbar. Rust + Win32 + Direct2D.
 Repo: `c:\Users\abdu1\Desktop\Windows Perf Monitor`. MIT. Local commits only, never push.
@@ -35,7 +35,7 @@ cannot resolve a path-only workspace dependency and reports
 .\target\release\statline.exe --install-startup | --remove-startup | --startup-status
 ```
 
-Log: `%LOCALAPPDATA%\Statline\logs\statline.log` (1 MB, 3 rotations).
+Log: `%LOCALAPPDATA%\StatLine\logs\statline.log` (1 MB, 3 rotations).
 Single instance is enforced by a named mutex; a second launch logs and exits.
 
 ## Visual QA — important
@@ -56,14 +56,14 @@ them — verified this session against the live strip.
 
   ```powershell
   $taskbar = [User32]::FindWindow("Shell_TrayWnd", $null)
-  $strip   = [User32]::FindWindowEx($taskbar, [IntPtr]::Zero, "StatlineStripWindow", "Statline")
+  $strip   = [User32]::FindWindowEx($taskbar, [IntPtr]::Zero, "StatLineStripWindow", "StatLine")
   ```
 
   Pass the real title: an empty string matches only windows whose title is empty, which
   is a confusing way to get a zero handle.
 
-  `FindWindow("StatlineFlyoutWindow", "Statline")` and
-  `FindWindow("StatlineCompanionWindow", "Statline")` still work: both are top-level.
+  `FindWindow("StatLineFlyoutWindow", "StatLine")` and
+  `FindWindow("StatLineCompanionWindow", "StatLine")` still work: both are top-level.
 - Check `GetParent(strip)`, `IsWindowVisible`, `GetWindowRect`, the `WS_CHILD` and
   `WS_EX_LAYERED` style bits, and the log line `presented=true tier=child`.
 - Post synthetic input to test interaction: `PostMessage(strip, 0x0202 /*LBUTTONUP*/, 0,
@@ -120,7 +120,7 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **Settings**: framed window from the tray/strip menu or the companion nav. Theme
   (system/light/dark), accent presets (system/blue/green/purple/orange/teal/pink),
   interval, byte units, Mica, strip placement, autostart and per-module strip visibility,
-  applied live and saved atomically to `%APPDATA%\Statline\settings.json`. Turning Mica
+  applied live and saved atomically to `%APPDATA%\StatLine\settings.json`. Turning Mica
   on shows a GPU/battery caution. The Run key is treated as the truth for startup.
 - **Sensors**: ACPI zones via PDH (5 s, whole Kelvin), drive temperature via
   `IOCTL_STORAGE_QUERY_PROPERTY` with a volume→disk mapping (5 min cache, ~11 ms),
@@ -159,11 +159,11 @@ docs/                    INDEX.md, STATUS.md, adr/, spec/, ops/, status/
 - **First run**: no settings file → a tray balloon states the access posture. Focus
   Assist may suppress it; About and `docs/ACCESS.md` carry the same facts.
 - **Window state**: the companion remembers its outer rectangle in
-  `%APPDATA%\Statline\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
+  `%APPDATA%\StatLine\window.json`, saved on `WM_EXITSIZEMOVE`/close and restored only
   when it still intersects a monitor. A separate file avoids racing the settings
   window's full-document saves. Closing via X now clears the host's `hwnd`, so the next
   Dashboard toggle reopens it instead of doing nothing.
-- **Packaging**: `scripts/package.ps1` builds `dist/Statline-<v>-x64.zip` (exe, README,
+- **Packaging**: `scripts/package.ps1` builds `dist/StatLine-<v>-x64.zip` (exe, README,
   changelog, licence texts) plus a SHA-256. `scripts/build-msix.ps1` stages the layout and
   runs the SDK's makeappx; the manifest declares `runFullTrust` and a startup task, and
   the tile assets live under `packaging/msix/Assets`. CI has a tag-only packaging job.

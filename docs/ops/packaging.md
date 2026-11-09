@@ -5,7 +5,7 @@ Two channels, one binary.
 ## Portable (GitHub releases)
 
 ```
-dist/Statline-<version>-x64/
+dist/StatLine-<version>-x64/
   statline.exe
   LICENSE
   PRIVACY.md
@@ -14,7 +14,7 @@ dist/Statline-<version>-x64/
   docs/ACCESS.md
 ```
 
-Zip as `Statline-<version>-x64.zip`. No installer, no registry writes except the
+Zip as `StatLine-<version>-x64.zip`. No installer, no registry writes except the
 optional `HKCU\...\Run` autostart value toggled by the user.
 
 ## MSIX (Microsoft Store and sideload)
@@ -26,7 +26,7 @@ optional `HKCU\...\Run` autostart value toggled by the user.
 - `windows.startupTask` extension (user-toggleable in Task Manager → Startup), disabled
   by default
 - tile + logo assets at every required scale
-- identity: `Publisher="CN=Statline"`, `Name="Statline"`, `Version` from `Cargo.toml`
+- identity: `Publisher="CN=StatLine"`, `Name="StatLine"`, `Version` from `Cargo.toml`
 - `PRIVACY.md` and `docs/ACCESS.md` staged next to the binary
 
 Build with the SDK's `makeappx.exe`:

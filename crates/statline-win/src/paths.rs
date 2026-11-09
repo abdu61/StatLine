@@ -1,11 +1,11 @@
-//! Filesystem locations used by Statline.
+//! Filesystem locations used by StatLine.
 //!
 //! Settings live in `%APPDATA%` (roaming, user-editable); logs live in
 //! `%LOCALAPPDATA%` (machine-local, disposable).
 
 use std::path::PathBuf;
 
-const APP_DIR: &str = "Statline";
+const APP_DIR: &str = "StatLine";
 
 fn env_path(var: &str, fallback: &str) -> PathBuf {
     std::env::var_os(var)
@@ -15,12 +15,12 @@ fn env_path(var: &str, fallback: &str) -> PathBuf {
 
 /// Roaming application data directory (settings).
 pub fn data_dir() -> PathBuf {
-    env_path("APPDATA", "Statline-roaming").join(APP_DIR)
+    env_path("APPDATA", "StatLine-roaming").join(APP_DIR)
 }
 
 /// Local application data directory (logs, caches).
 pub fn local_dir() -> PathBuf {
-    env_path("LOCALAPPDATA", "Statline-local").join(APP_DIR)
+    env_path("LOCALAPPDATA", "StatLine-local").join(APP_DIR)
 }
 
 /// Directory containing rotating log files.

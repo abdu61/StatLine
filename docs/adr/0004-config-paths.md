@@ -6,8 +6,8 @@
 
 | What | Where | Why |
 |---|---|---|
-| `settings.json` | `%APPDATA%\Statline\settings.json` | Roams with the user profile; user-editable for power users and bug reports. |
-| Logs | `%LOCALAPPDATA%\Statline\logs\statline.log` | Machine-local, disposable, never roamed. |
+| `settings.json` | `%APPDATA%\StatLine\settings.json` | Roams with the user profile; user-editable for power users and bug reports. |
+| Logs | `%LOCALAPPDATA%\StatLine\logs\statline.log` | Machine-local, disposable, never roamed. |
 | Snapshots (dev only) | caller-supplied path | Produced by `--render-snapshots`, never written by the app on its own. |
 
 Nothing else is written. No registry keys (except the documented autostart value under

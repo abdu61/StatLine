@@ -18,7 +18,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_PAINT, WM_SIZE,
 };
 
-const CLASS: &str = "StatlineSettingsWindow";
+const CLASS: &str = "StatLineSettingsWindow";
 
 /// Pointer to the live window, for its own procedure.
 static SETTINGS_WINDOW: AtomicPtr<SettingsWindow> = AtomicPtr::new(std::ptr::null_mut());
@@ -83,7 +83,7 @@ fn open() -> windows::core::Result<()> {
     let renderer = Renderer::new()?;
     let hwnd = window::create_frame_window(
         CLASS,
-        "Statline Settings",
+        "StatLine Settings",
         Some(settings_proc),
         window::FrameOptions {
             width,

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "System metric providers and sampling engine for Statline"
+description = "System metric providers and sampling engine for StatLine"
 
 [dependencies]
 statline-core.workspace = true

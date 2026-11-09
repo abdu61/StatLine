@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn tooltip_is_truncated_and_terminated() {
         let mut buf = [0u16; 8];
-        copy_wide("Statline monitor", &mut buf);
+        copy_wide("StatLine monitor", &mut buf);
         assert_eq!(buf[7], 0);
         assert_eq!(buf[0], b'S' as u16);
     }

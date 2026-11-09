@@ -14,10 +14,10 @@ pub use model::{
 pub use ring::RingBuffer;
 
 /// Product name. Used in window titles, tray tooltips and log headers.
-pub const APP_NAME: &str = "Statline";
+pub const APP_NAME: &str = "StatLine";
 
 /// Stable identifier for mutexes, message names and package identity.
-pub const APP_ID: &str = "Statline";
+pub const APP_ID: &str = "StatLine";
 
 /// Semantic version of the running binary.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn identity_is_set() {
-        assert_eq!(APP_NAME, "Statline");
+        assert_eq!(APP_NAME, "StatLine");
         assert!(!VERSION.is_empty());
     }
 }

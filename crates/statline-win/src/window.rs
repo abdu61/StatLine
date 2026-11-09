@@ -1,6 +1,6 @@
 //! Minimal message window and message loop.
 //!
-//! Statline's main window is invisible: all user-facing surfaces are created
+//! StatLine's main window is invisible: all user-facing surfaces are created
 //! on demand (taskbar strip, flyout, dashboard). This window exists to receive
 //! tray callbacks and app-wide notifications.
 

@@ -21,7 +21,7 @@ use windows::Win32::System::Registry::{
 use windows::core::{Error, HRESULT, PCWSTR, Result, w};
 
 const RUN_KEY: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-const VALUE_NAME: PCWSTR = w!("Statline");
+const VALUE_NAME: PCWSTR = w!("StatLine");
 
 fn registry_error(status: WIN32_ERROR) -> Error {
     Error::new(HRESULT::from_win32(status.0), "registry operation failed")
@@ -32,7 +32,7 @@ fn command_for(executable: &Path) -> String {
     format!("\"{}\"", executable.display())
 }
 
-/// Read the command currently stored for `Statline`.
+/// Read the command currently stored for `StatLine`.
 pub fn stored_command() -> Option<String> {
     let mut key = HKEY::default();
     // SAFETY: static key name; read-only access.
@@ -193,8 +193,8 @@ mod tests {
 
     #[test]
     fn command_quotes_the_path() {
-        let command = command_for(Path::new(r"C:\Program Files\Statline\statline.exe"));
-        assert_eq!(command, "\"C:\\Program Files\\Statline\\statline.exe\"");
+        let command = command_for(Path::new(r"C:\Program Files\StatLine\statline.exe"));
+        assert_eq!(command, "\"C:\\Program Files\\StatLine\\statline.exe\"");
     }
 
     #[test]

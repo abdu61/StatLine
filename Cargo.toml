@@ -7,8 +7,8 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-authors = ["Statline contributors"]
-description = "Statline - a live system monitor for the Windows 11 taskbar"
+authors = ["StatLine contributors"]
+description = "StatLine - a live system monitor for the Windows 11 taskbar"
 
 [workspace.dependencies]
 statline-core = { version = "0.1.0", path = "crates/statline-core" }

@@ -33,7 +33,7 @@ Run top to bottom. Do not skip the parts that need eyes.
 - [ ] Release `statline.exe --install-startup` writes `...\statline.exe` (never `target\debug`)
 - [ ] `--startup-status` says `(matches this build)`
 - [ ] Sign out/in: app appears, **no console window flashes**
-- [ ] `cargo test` leaves `HKCU\...\Run\Statline` untouched
+- [ ] `cargo test` leaves `HKCU\...\Run\StatLine` untouched
 - [ ] `docs/ACCESS.md` / `PRIVACY.md` match the build (no network, no admin, write paths)
 - [ ] MSIX capabilities: `runFullTrust` + disabled startup task only
 
@@ -45,7 +45,7 @@ Run top to bottom. Do not skip the parts that need eyes.
 
 ## Packaging
 
-- [ ] `Statline-<version>-x64.zip` built and unzipped on a clean path
+- [ ] `StatLine-<version>-x64.zip` built and unzipped on a clean path
 - [ ] MSIX builds; installs via `Add-AppxPackage` with the dev cert
 - [ ] Startup task present and toggleable
 - [ ] LICENSE + THIRD_PARTY_NOTICES present in both artifacts
@@ -60,7 +60,7 @@ Run top to bottom. Do not skip the parts that need eyes.
 ## Tag (local only)
 
 ```powershell
-git tag -a v<version> -m "Statline v<version>"
+git tag -a v<version> -m "StatLine v<version>"
 ```
 
 Never push. Publishing is a separate, explicitly-approved step.

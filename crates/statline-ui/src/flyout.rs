@@ -166,7 +166,7 @@ pub fn model_with_units(
             format_duration(system.uptime_secs),
             system.processes
         ),
-        None => String::from("Statline"),
+        None => String::from("StatLine"),
     };
 
     if let Some(cpu) = snapshot.cpu.as_ref() {

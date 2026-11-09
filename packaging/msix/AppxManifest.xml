@@ -7,14 +7,14 @@
   IgnorableNamespaces="uap desktop rescap">
 
   <Identity
-    Name="Statline"
-    Publisher="CN=Statline"
+    Name="StatLine"
+    Publisher="CN=StatLine"
     Version="0.1.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>Statline</DisplayName>
-    <PublisherDisplayName>Statline contributors</PublisherDisplayName>
+    <DisplayName>StatLine</DisplayName>
+    <PublisherDisplayName>StatLine contributors</PublisherDisplayName>
     <Description>A native system monitor that lives in the Windows 11 taskbar.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -32,11 +32,11 @@
 
   <Applications>
     <Application
-      Id="Statline"
+      Id="StatLine"
       Executable="statline.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Statline"
+        DisplayName="StatLine"
         Description="CPU, memory, GPU, disk, network, sensors and top processes in the taskbar."
         BackgroundColor="#202020"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -50,9 +50,9 @@
           Executable="statline.exe"
           EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask
-            TaskId="StatlineStartup"
+            TaskId="StatLineStartup"
             Enabled="false"
-            DisplayName="Statline" />
+            DisplayName="StatLine" />
         </desktop:Extension>
       </Extensions>
     </Application>

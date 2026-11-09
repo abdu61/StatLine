@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Statline are recorded here. The format follows
+All notable changes to StatLine are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -50,7 +50,7 @@ All notable changes to Statline are recorded here. The format follows
 
 ### Added
 
-- The tray icon's tooltip mirrors the strip: `Statline — CPU 23% · MEM 57% · GPU 8% ·
+- The tray icon's tooltip mirrors the strip: `StatLine — CPU 23% · MEM 57% · GPU 8% ·
   DISK 4% · NET ↓1.18 MiB/s ↑82.0 KiB/s`. The strip hides itself while a fullscreen app
   owns the screen, which is exactly when a glanceable number is wanted, so the values
   stay reachable from the notification area. Updated only when the text changes, and the
@@ -165,7 +165,7 @@ All notable changes to Statline are recorded here. The format follows
   (`IOCTL_STORAGE_QUERY_PROPERTY`), battery health and temperature
   (`IOCTL_BATTERY_QUERY_INFORMATION`). Every source hides when unavailable.
 - Settings window: theme, sampler interval, strip placement and start with Windows;
-  applied live and persisted atomically to `%APPDATA%\Statline\settings.json`.
+  applied live and persisted atomically to `%APPDATA%\StatLine\settings.json`.
 - Tray menu with pause/resume, show/hide strip, dashboard, settings and exit.
 - Single instance, autostart commands, rotating log, panic hook, `--probe`, `--bench`,
   `--profile`, `--render-snapshots`, `--tray-only`.

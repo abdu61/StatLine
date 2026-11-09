@@ -184,7 +184,7 @@ fn draw_nav(
 
     let _ = text.draw(
         surface,
-        "Statline",
+        "StatLine",
         (pad, 22.0 * scale, nav_width - pad * 2.0, 24.0 * scale),
         title_style(scale),
         palette.text_primary,
@@ -646,8 +646,8 @@ fn render_about(
             "Privacy",
             "No network access, no telemetry, no driver, no elevated helper.",
         ),
-        ("Settings", "%APPDATA%\\Statline\\settings.json"),
-        ("Logs", "%LOCALAPPDATA%\\Statline\\logs"),
+        ("Settings", "%APPDATA%\\StatLine\\settings.json"),
+        ("Logs", "%LOCALAPPDATA%\\StatLine\\logs"),
         (
             "Licence",
             "MIT. Third-party notices and the Apache/MIT texts ship with the app.",

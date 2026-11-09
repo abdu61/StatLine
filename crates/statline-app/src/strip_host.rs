@@ -714,11 +714,11 @@ fn strip_height(taskbar_height: f32, scale: f32, inset: f32) -> f32 {
 /// The message window that owns the tray icon, if it exists yet.
 fn message_window() -> Option<HWND> {
     // SAFETY: plain window lookup by class name; no pointers escape.
-    unsafe { FindWindowW(w!("StatlineMessageWindow"), None) }.ok()
+    unsafe { FindWindowW(w!("StatLineMessageWindow"), None) }.ok()
 }
 
 /// One-line summary for the tray tooltip, e.g.
-/// `Statline — CPU 23% · MEM 57% · GPU 8% · DISK 4% · ↓1.18 MiB/s ↑82.0 KiB/s`.
+/// `StatLine — CPU 23% · MEM 57% · GPU 8% · DISK 4% · ↓1.18 MiB/s ↑82.0 KiB/s`.
 ///
 /// Kept to one line because `NOTIFYICONDATAW.szTip` is 127 characters, and the
 /// shell shows a tooltip, not a paragraph.
@@ -751,7 +751,7 @@ fn create_window(height: f32) -> windows::core::Result<(HWND, bool)> {
     };
     let hwnd = strip_window::create_strip_window(
         strip_window::STRIP_CLASS,
-        "Statline",
+        "StatLine",
         Some(strip_proc),
         rect,
     )?;
@@ -877,7 +877,7 @@ pub unsafe extern "system" fn strip_proc(
             // app window that owns the command handlers.
             // SAFETY: plain window lookup and a posted message.
             unsafe {
-                if let Ok(app) = FindWindowW(w!("StatlineMessageWindow"), None) {
+                if let Ok(app) = FindWindowW(w!("StatLineMessageWindow"), None) {
                     let _ = PostMessageW(Some(app), WM_COMMAND, wparam, LPARAM(0));
                 }
             }

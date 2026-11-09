@@ -5,7 +5,7 @@ are touching. Do not bulk-read the docs tree; it is deliberately indexed.
 
 ## What this is
 
-**Statline** — a native Windows 11 system monitor that lives in the taskbar. Rust,
+**StatLine** — a native Windows 11 system monitor that lives in the taskbar. Rust,
 Win32, Direct2D. No Electron, no WebView, no .NET runtime, no driver, no network
 access, no telemetry.
 

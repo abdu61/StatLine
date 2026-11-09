@@ -37,7 +37,7 @@ pub fn print_help() {
         "Access: performance counters and sensors only. No admin, no network,",
         "no telemetry. See docs/ACCESS.md and PRIVACY.md.",
         "",
-        "With no options, Statline starts in the notification area.",
+        "With no options, StatLine starts in the notification area.",
     ];
     for line in lines {
         console::write_line(line);

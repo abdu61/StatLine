@@ -1,4 +1,4 @@
-//! Safe wrappers over the Win32 surface Statline needs.
+//! Safe wrappers over the Win32 surface StatLine needs.
 //!
 //! This is the only crate (besides `statline-render`'s drawing calls) allowed
 //! to contain `unsafe`. Every block carries a `// SAFETY:` justification, and

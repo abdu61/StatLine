@@ -1,4 +1,4 @@
-# Generates the Statline icon and MSIX tile assets from one vector drawing.
+# Generates the StatLine icon and MSIX tile assets from one vector drawing.
 # Usage: powershell -ExecutionPolicy Bypass -File .\scripts\make-icon.ps1
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing

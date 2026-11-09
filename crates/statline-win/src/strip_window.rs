@@ -22,7 +22,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{PCWSTR, Result};
 
 /// Class name used by the strip window.
-pub const STRIP_CLASS: &str = "StatlineStripWindow";
+pub const STRIP_CLASS: &str = "StatLineStripWindow";
 
 /// Create the strip window and put it above the taskbar without activating it.
 ///

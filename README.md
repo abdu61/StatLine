@@ -1,11 +1,11 @@
-# Statline
+# StatLine
 
-<img src="docs/images/icon.png" alt="Statline icon" width="64" align="right">
+<img src="docs/images/icon.png" alt="StatLine icon" width="64" align="right">
 
 A live system monitor that lives in the Windows 11 taskbar. Native Rust + Win32 +
 Direct2D — no Electron, no WebView, no driver, no telemetry, no network access.
 
-![Statline strip in the taskbar](docs/images/strip.jpg)
+![StatLine strip in the taskbar](docs/images/strip.jpg)
 
 > **Status: 0.1.0 preview.** The strip, flyout, companion window, settings and
 > driver-free sensors work. See [`docs/STATUS.md`](docs/STATUS.md) for the exact state
@@ -52,13 +52,13 @@ Direct2D — no Electron, no WebView, no driver, no telemetry, no network access
 
 ## Access and permissions
 
-Statline runs as a standard user. It never requests elevation, installs a driver or
+StatLine runs as a standard user. It never requests elevation, installs a driver or
 service, or opens a network connection.
 
 | | |
 |---|---|
 | **Reads** | CPU/memory/disk/network/GPU performance counters, PDH, DXGI, storage/battery IOCTLs, WLAN SSID, and read-only registry (theme, CPU name, Windows build) |
-| **Writes** | `%APPDATA%\Statline\settings.json`, `window.json`, `%LOCALAPPDATA%\Statline\logs`, and an optional per-user `Run` value |
+| **Writes** | `%APPDATA%\StatLine\settings.json`, `window.json`, `%LOCALAPPDATA%\StatLine\logs`, and an optional per-user `Run` value |
 | **Never** | Admin/UAC, network, telemetry, drivers/services, clipboard, input, screen, or document access |
 
 Startup is optional and per-user, with no elevation:
@@ -76,7 +76,7 @@ release process in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
 
 - No network access, no telemetry, no update check, no analytics.
 - No kernel driver, no elevated helper, no third-party runtime.
-- Writes only to `%APPDATA%\Statline` (settings), `%LOCALAPPDATA%\Statline` (logs), and
+- Writes only to `%APPDATA%\StatLine` (settings), `%LOCALAPPDATA%\StatLine` (logs), and
   the per-user `Run` key when you enable "Start with Windows".
 - Idle cost measured on a Ryzen laptop: **0.46 ms CPU per 1 s sample** with detail
   surfaces closed, ~30 MB working set / ~14.5 MB private with the strip live.
@@ -84,7 +84,7 @@ release process in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
 
 ## Install (portable)
 
-1. Build or unpack `Statline-<version>-x64.zip`.
+1. Build or unpack `StatLine-<version>-x64.zip`.
 2. Run `statline.exe`. It starts in the notification area and attaches the strip.
 3. Right-click the strip or the tray icon for Settings, Dashboard, Pause and Exit.
 
@@ -128,7 +128,7 @@ Debug and measurement modes:
 .\target\release\statline.exe --tray-only
 ```
 
-Logs: `%LOCALAPPDATA%\Statline\logs\statline.log` (1 MB, three rotations).
+Logs: `%LOCALAPPDATA%\StatLine\logs\statline.log` (1 MB, three rotations).
 
 ## What it deliberately does not do
 

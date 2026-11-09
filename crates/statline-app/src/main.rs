@@ -19,7 +19,7 @@ use statline_win::{
 };
 use std::time::Duration;
 
-const WINDOW_CLASS: &str = "StatlineMessageWindow";
+const WINDOW_CLASS: &str = "StatLineMessageWindow";
 /// The single notification-area icon. Shared with the strip host, which mirrors
 /// its readout into the icon's tooltip.
 pub const TRAY_ICON_ID: u32 = 1;
@@ -137,7 +137,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // A second instance must not stack trays or strips.
     let Some(_instance) =
-        statline_win::single_instance::InstanceGuard::acquire("Statline.SingleInstance")
+        statline_win::single_instance::InstanceGuard::acquire("StatLine.SingleInstance")
     else {
         info!("another instance is already running; exiting");
         return Ok(());
@@ -183,7 +183,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let _ = tray::notify(
             window.hwnd(),
             TRAY_ICON_ID,
-            "Statline is running",
+            "StatLine is running",
             "Reads performance counters and sensors. No admin, no network, no telemetry. See About > Access.",
         );
         info!("first run: access summary shown");
@@ -274,12 +274,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
 fn show_access_summary() {
     window::message_box(
-        "Statline \u{2014} access & privacy",
+        "StatLine \u{2014} access & privacy",
         "Reads performance counters and sensors only.\n\n\
          No administrator/UAC. No network. No telemetry. No driver.\n\n\
          Writes:\n\
-           %APPDATA%\\Statline (settings, window)\n\
-           %LOCALAPPDATA%\\Statline (logs)\n\
+           %APPDATA%\\StatLine (settings, window)\n\
+           %LOCALAPPDATA%\\StatLine (logs)\n\
            HKCU\\...\\Run (only when Start with Windows is on)\n\n\
          Full details: docs\\ACCESS.md and PRIVACY.md.",
     );

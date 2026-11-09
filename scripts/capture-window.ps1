@@ -13,7 +13,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
-public class StatlineCapture {
+public class StatLineCapture {
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string win);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
@@ -38,6 +38,6 @@ public class StatlineCapture {
 }
 '@
 Add-Type -TypeDefinition $code -Language CSharp -ReferencedAssemblies System.Drawing
-$result = [StatlineCapture]::Capture($ClassName, $OutFile)
+$result = [StatLineCapture]::Capture($ClassName, $OutFile)
 Write-Output $result
 if (Test-Path $OutFile) { Write-Output $OutFile }

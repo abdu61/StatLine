@@ -85,7 +85,7 @@ whose title is empty:
 
 ```powershell
 $taskbar = FindWindow("Shell_TrayWnd", $null)
-$strip   = FindWindowEx($taskbar, 0, "StatlineStripWindow", "Statline")
+$strip   = FindWindowEx($taskbar, 0, "StatLineStripWindow", "StatLine")
 GetParent($strip) -eq $taskbar          # must be true
 GetWindowLongPtr($strip, GWL_STYLE)     # WS_CHILD | WS_CLIPSIBLINGS, no WS_POPUP
 GetWindowLongPtr($strip, GWL_EXSTYLE)   # WS_EX_LAYERED | NOACTIVATE | TOOLWINDOW

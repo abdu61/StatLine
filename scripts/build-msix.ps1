@@ -50,7 +50,7 @@ $manifestPath = Join-Path $layout 'AppxManifest.xml'
 $manifest.Package.Identity.Version = "$Version.0"
 $manifest.Save($manifestPath)
 
-$msix = Join-Path $root "dist\Statline-$Version-x64.msix"
+$msix = Join-Path $root "dist\StatLine-$Version-x64.msix"
 if (Test-Path $msix) { Remove-Item $msix -Force }
 & $makeappx pack /d $layout /p $msix /o
 if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }

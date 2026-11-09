@@ -1,6 +1,6 @@
 # Third-party notices
 
-Statline itself is MIT-licensed; see [`LICENSE`](LICENSE).
+StatLine itself is MIT-licensed; see [`LICENSE`](LICENSE).
 
 The shipped binary links the following crates. All of them use permissive licences
 that `deny.toml` enforces in CI.

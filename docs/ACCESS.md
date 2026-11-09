@@ -1,9 +1,9 @@
 # Access and permissions
 
-What Statline reads, writes, and never touches. This is the short, complete answer;
+What StatLine reads, writes, and never touches. This is the short, complete answer;
 the privacy policy is in [`PRIVACY.md`](../PRIVACY.md).
 
-Statline runs as an ordinary user process. It never requests elevation, installs a
+StatLine runs as an ordinary user process. It never requests elevation, installs a
 driver or service, or opens a network connection.
 
 ## Reads
@@ -35,17 +35,17 @@ Registry keys read:
 - `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion` — Windows edition/build
 - `HKLM\SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName` — computer name
 
-Statline reads **metadata**, never document contents, browser history, clipboard,
+StatLine reads **metadata**, never document contents, browser history, clipboard,
 keystrokes, or screen pixels.
 
 ## Writes
 
 | Path | When |
 |---|---|
-| `%APPDATA%\Statline\settings.json` | settings change (atomic write) |
-| `%APPDATA%\Statline\window.json` | companion moved/resized/closed |
-| `%LOCALAPPDATA%\Statline\logs\statline.log*` | normal logging, rotating at 1 MB × 3 |
-| `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Statline` | only when "Start with Windows" is enabled |
+| `%APPDATA%\StatLine\settings.json` | settings change (atomic write) |
+| `%APPDATA%\StatLine\window.json` | companion moved/resized/closed |
+| `%LOCALAPPDATA%\StatLine\logs\statline.log*` | normal logging, rotating at 1 MB × 3 |
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\StatLine` | only when "Start with Windows" is enabled |
 
 Nothing else is written. Portable builds keep no files outside those directories.
 Uninstalling is deleting the folder and, if enabled, the `Run` value (Settings →
@@ -56,7 +56,7 @@ Start with Windows, or `statline.exe --remove-startup`).
 "Start with Windows" writes a per-user `Run` value:
 
 ```
-"HKCU\...\Run"  Statline = "C:\path\to\statline.exe"
+"HKCU\...\Run"  StatLine = "C:\path\to\statline.exe"
 ```
 
 No arguments, no elevation, no scheduled task, no service. It is optional and off by
@@ -78,7 +78,7 @@ next launch when the setting is on.
 - No network connections, update checks, telemetry, or analytics.
 - No kernel driver, service, scheduled task, or shell extension.
 - No keyboard, mouse, clipboard, screen, or document access.
-- No writing outside `%APPDATA%\Statline`, `%LOCALAPPDATA%\Statline`, and the optional
+- No writing outside `%APPDATA%\StatLine`, `%LOCALAPPDATA%\StatLine`, and the optional
   per-user `Run` value.
 - No access to other users' profiles.
 

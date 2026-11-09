@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Direct2D rendering, design tokens and widget primitives for Statline"
+description = "Direct2D rendering, design tokens and widget primitives for StatLine"
 
 [dependencies]
 statline-core.workspace = true

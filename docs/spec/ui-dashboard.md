@@ -7,7 +7,7 @@ outlined, and the active nav item gets an accent marker.
 
 ```
 ┌────────────┬───────────────────────────────────────────────┐
-│  Statline  │  Dashboard                                    │
+│  StatLine  │  Dashboard                                    │
 │            │  ┌─────────────────┐ ┌─────────────────┐      │
 │  Dashboard │  │ CPU 23%  ▁▂▃▂▅  │ │ MEM 62%  ▅▅▆▇█  │      │
 │  CPU       │  └─────────────────┘ └─────────────────┘      │

@@ -51,7 +51,7 @@ this first.
 - `TaskbarCreated` is broadcast to top-level windows only. The app's hidden message
   window now receives it and rebuilds the strip for both placement tiers.
 - `FindWindow` does not search child windows. Verification and scripts must use
-  `FindWindowEx(taskbar, None, "StatlineStripWindow", "Statline")`.
+  `FindWindowEx(taskbar, None, "StatLineStripWindow", "StatLine")`.
 - `WM_MOUSEACTIVATE` returns `MA_NOACTIVATE`, so clicking the strip never deactivates
   the user's foreground window.
 - Hiding the taskbar (fullscreen shell, auto-hide) hides the child with it; the explicit

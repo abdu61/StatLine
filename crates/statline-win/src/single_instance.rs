@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn second_acquire_fails_while_the_first_is_alive() {
-        let name = format!("Statline.Test.{}", std::process::id());
+        let name = format!("StatLine.Test.{}", std::process::id());
         let first = InstanceGuard::acquire(&name);
         assert!(first.is_some(), "first acquire must succeed");
         // A second CreateMutexW for the same name yields ERROR_ALREADY_EXISTS.

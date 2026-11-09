@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Statline - Windows 11 taskbar system monitor"
+description = "StatLine - Windows 11 taskbar system monitor"
 
 [[bin]]
 name = "statline"

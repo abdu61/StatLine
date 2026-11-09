@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Views and layout for Statline"
+description = "Views and layout for StatLine"
 
 [dependencies]
 statline-core.workspace = true

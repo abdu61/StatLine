@@ -6,7 +6,7 @@
 $code = @'
 using System;
 using System.Runtime.InteropServices;
-public class StatlineTaskbarProbe {
+public class StatLineTaskbarProbe {
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] public struct APPBARDATA { public int cbSize; public IntPtr hWnd; public int uCallbackMessage; public int uEdge; public RECT rc; public IntPtr lParam; }
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string win);
@@ -41,6 +41,6 @@ public class StatlineTaskbarProbe {
 }
 '@
 Add-Type -TypeDefinition $code -Language CSharp
-[StatlineTaskbarProbe]::Report()
+[StatLineTaskbarProbe]::Report()
 $v = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 "windows: $($v.DisplayVersion) build $($v.CurrentBuild).$($v.UBR)"

@@ -12,7 +12,7 @@ use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN};
 /// Pointer to the live flyout, for its window procedure.
 static FLYOUT: AtomicPtr<Flyout> = AtomicPtr::new(std::ptr::null_mut());
 
-const CLASS: &str = "StatlineFlyoutWindow";
+const CLASS: &str = "StatLineFlyoutWindow";
 /// How many samples each sparkline keeps (one minute at the default cadence).
 const HISTORY_LEN: usize = 60;
 
@@ -128,7 +128,7 @@ impl Flyout {
                 right: left + width,
                 bottom: top + height,
             };
-            match strip_window::create_popup_window(CLASS, "Statline", Some(flyout_proc), rect) {
+            match strip_window::create_popup_window(CLASS, "StatLine", Some(flyout_proc), rect) {
                 Ok(hwnd) => {
                     self.hwnd = Some(hwnd);
                     FLYOUT.store(self as *mut Flyout, Ordering::Release);

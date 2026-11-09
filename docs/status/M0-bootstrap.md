@@ -34,13 +34,13 @@ A repo that builds, runs, and has an indexed documentation set, before any produ
 ```
 cargo test --quiet      → 15 passed, 0 failed
 cargo clippy -D warnings → clean
-app launch              → log: "Statline 0.1.0 starting" / "tray icon ready"
+app launch              → log: "StatLine 0.1.0 starting" / "tray icon ready"
 taskbar probe           → 1536x48 logical, dpi 120, TrayNotifyWnd at x=1272,
                           MSTaskSwWClass = 0
 ```
 
 ## Follow-ups
 
-- Verify "Statline" is available in Partner Center + a trademark knock-out search
+- Verify "StatLine" is available in Partner Center + a trademark knock-out search
   before packaging (M9), not before M1–M8.
 - Artwork: real app icon replaces `IDI_APPLICATION` in M4.
