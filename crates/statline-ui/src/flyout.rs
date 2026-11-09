@@ -597,11 +597,15 @@ pub fn model_with_units(
                 // Firmware often repeats the device locator per module, so the
                 // bank/channel is what actually distinguishes two SODIMMs.
                 let mut value = format!(
-                    "{} {}  \u{00b7}  {} MT/s",
+                    "{} {}",
                     format_bytes(module.size_bytes, UnitSystem::Binary),
-                    kind,
-                    module.speed_mts
+                    kind
                 );
+                // Cloud VMs and some firmware omit the speed field entirely;
+                // printing "0 MT/s" would look like a fault rather than a gap.
+                if module.speed_mts > 0 {
+                    value.push_str(&format!("  \u{00b7}  {} MT/s", module.speed_mts));
+                }
                 if !module.bank.is_empty() {
                     value.push_str("  \u{00b7}  ");
                     value.push_str(&module.bank);

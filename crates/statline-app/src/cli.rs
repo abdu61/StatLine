@@ -168,15 +168,19 @@ pub fn probe(count: u32, interval: Duration) {
                     .memory_modules
                     .iter()
                     .map(|module| {
+                        let mut kind = if module.kind.is_empty() {
+                            String::from("RAM")
+                        } else {
+                            module.kind.clone()
+                        };
+                        if module.speed_mts > 0 {
+                            kind.push_str(&format!(" {}", module.speed_mts));
+                        }
                         format!(
                             "{} {} {}{}",
                             module.slot,
                             format_bytes(module.size_bytes, UnitSystem::Binary),
-                            if module.kind.is_empty() {
-                                "RAM".to_string()
-                            } else {
-                                format!("{} {}", module.kind, module.speed_mts)
-                            },
+                            kind,
                             if module.bank.is_empty() {
                                 String::new()
                             } else {

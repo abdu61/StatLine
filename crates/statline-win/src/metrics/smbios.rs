@@ -207,19 +207,66 @@ fn memory_kind(memory_type: u8) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Firmware coverage varies wildly: a physical laptop reports speed, a cloud
+    /// VM often reports 0 or omits the field entirely. Assert the shape of what
+    /// this machine offers rather than assuming it has the field at all — an
+    /// earlier version of this test failed only on CI for exactly that reason.
     #[test]
-    fn modules_report_slot_type_and_speed() {
+    fn modules_report_plausible_identity() {
         for module in modules() {
             assert!(!module.slot.is_empty(), "slot label");
+
+            // Speed is either absent (0) or a real MT/s figure. Nothing between.
             assert!(
-                module.speed_mts >= 400,
-                "speed should be MT/s, got {}",
+                module.speed_mts == 0 || module.speed_mts >= 400,
+                "speed is either 0 or MT/s, got {}",
                 module.speed_mts
             );
+
+            // An unknown generation is allowed; a wrong one is not.
             assert!(
-                ["DDR3", "DDR4", "DDR5", "LPDDR3", "LPDDR4", "LPDDR5"].contains(&&*module.kind)
+                module.kind.is_empty()
+                    || ["DDR3", "DDR4", "DDR5", "LPDDR3", "LPDDR4", "LPDDR5"]
+                        .contains(&&*module.kind),
+                "unexpected generation {:?}",
+                module.kind
             );
         }
+    }
+
+    /// The parser's own logic, independent of what this machine's firmware says:
+    /// a type 17 record with a configured speed yields it, one without yields 0.
+    #[test]
+    fn speed_is_read_from_the_record_that_has_it() {
+        // Fields: 0x0C size = 8 GiB/1024, 0x10 locator string 1, 0x11 bank
+        // string 2, 0x12 DDR4, 0x15 speed, 0x20 configured speed.
+        let mut record = vec![0u8; 0x22];
+        record[0] = SMBIOS_TYPE_MEMORY_DEVICE;
+        record[1] = 0x22;
+        record[0x0C] = 0x00; // low byte
+        record[0x0D] = 0x40; // 0x4000 -> 16384 MiB with the high bit trick below
+        record[0x10] = 1; // "DIMM 0"
+        record[0x11] = 2; // "BANK 0"
+        record[0x12] = 0x1A; // DDR4
+        record[0x15] = 0x80; // 3200 MT/s, little-endian
+        record[0x16] = 0x0C;
+        record[0x20] = 0x80; // configured 3200 MT/s
+        record[0x21] = 0x0C;
+
+        let strings = vec![String::from("DIMM 0"), String::from("BANK 0")];
+        let with_speed = memory_device(&record, &strings).expect("record parses");
+        assert_eq!(with_speed.speed_mts, 3200);
+        assert_eq!(with_speed.kind, "DDR4");
+        assert_eq!(with_speed.bank, "BANK 0");
+
+        // Clear both speed fields: the record must still parse, reporting 0.
+        record[0x15] = 0;
+        record[0x16] = 0;
+        record[0x20] = 0;
+        record[0x21] = 0;
+        let without_speed = memory_device(&record, &strings).expect("record parses");
+        assert_eq!(without_speed.speed_mts, 0);
     }
 
     #[test]

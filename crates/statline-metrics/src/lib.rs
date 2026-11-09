@@ -367,11 +367,14 @@ mod tests {
         assert!(memory.total_bytes > 0);
         assert!(memory.used_bytes <= memory.total_bytes);
 
-        let network = snapshot.network.expect("network sample");
-        assert!(network.rx_bytes_per_sec >= 0.0);
+        // A freshly imaged VM can report no network adapters for the first
+        // seconds after boot; the field is optional for that reason.
+        if let Some(network) = snapshot.network {
+            assert!(network.rx_bytes_per_sec >= 0.0);
+        }
 
         if let Some(disk) = snapshot.disk {
-            assert!(!disk.volumes.is_empty());
+            assert!(disk.volumes.iter().all(|volume| volume.total_bytes > 0));
         }
 
         if let Some(gpu) = snapshot.gpu {

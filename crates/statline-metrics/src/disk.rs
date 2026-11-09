@@ -135,7 +135,11 @@ mod tests {
         let mut state = DiskState::new();
         // PDH rate counters need two collections to produce a value.
         std::thread::sleep(Duration::from_millis(80));
-        let sample = state.sample(Instant::now(), true).expect("disk sample");
+        // A VM can expose no physical-disk counters at all; the sampler returns
+        // None there and the UI hides the module. Nothing to assert in that case.
+        let Some(sample) = state.sample(Instant::now(), true) else {
+            return;
+        };
         assert!(sample.read_bytes_per_sec >= 0.0);
         assert!(sample.write_bytes_per_sec >= 0.0);
         assert!((0.0..=100.0).contains(&sample.busy_percent));
