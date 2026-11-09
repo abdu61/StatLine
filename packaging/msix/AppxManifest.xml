@@ -14,7 +14,7 @@
 
   <Properties>
     <DisplayName>StatLine</DisplayName>
-    <PublisherDisplayName>StatLine contributors</PublisherDisplayName>
+    <PublisherDisplayName>Abdu</PublisherDisplayName>
     <Description>A native system monitor that lives in the Windows 11 taskbar.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>

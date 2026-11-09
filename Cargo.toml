@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-authors = ["StatLine contributors"]
+authors = ["Abdu"]
 description = "StatLine - a live system monitor for the Windows 11 taskbar"
 
 [workspace.dependencies]
