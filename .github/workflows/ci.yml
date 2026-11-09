@@ -109,6 +109,21 @@ jobs:
           $body -join "`n" | Set-Content release-notes.md -Encoding utf8
           Get-Content release-notes.md | Select-Object -First 5
 
+      - name: Remove stale release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # See the note on the upload step: replacing a tag reuses the release,
+          # so anything this workflow no longer builds has to be deleted by hand.
+          tag="${GITHUB_REF_NAME}"
+          gh release view "$tag" --json assets --jq '.assets[].name' | while read -r name; do
+            case "$name" in
+              *.zip|*.sha256) ;;
+              *) echo "removing stale asset: $name"; gh release delete-asset "$tag" "$name" --yes ;;
+            esac
+          done
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -116,6 +131,11 @@ jobs:
           body_path: release-notes.md
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # Replacing a tag reuses the existing release object, and action-gh-release
+          # only overwrites assets with the same name. A file dropped from this list
+          # therefore survives from the previous run — which is how an uninstallable
+          # unsigned MSIX stayed on 0.1.0 after it was removed here. Deleting first
+          # keeps the release to exactly what this workflow produces.
           files: |
             dist/*.zip
             dist/*.sha256
