@@ -52,9 +52,13 @@ jobs:
           if-no-files-found: warn
 
   package:
-    # Local tags only for now; this job is ready for a release remote.
+    # Runs on a tag push: builds the release artifacts and publishes them to a
+    # GitHub Release, which is what the README's `releases/latest/download/...`
+    # link and the winget manifest point at.
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +77,40 @@ jobs:
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
           .\scripts\build-msix.ps1 -Version $version
 
-      - uses: actions/upload-artifact@v4
+      - name: Collect release notes
+        shell: powershell
+        run: |
+          # Everything under the current version heading in CHANGELOG.md.
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $lines = Get-Content CHANGELOG.md
+          $start = ($lines | Select-String -Pattern "^## \[$version\]" | Select-Object -First 1).LineNumber
+          if (-not $start) {
+            "No CHANGELOG section for $version; falling back to the whole Unreleased block."
+            $start = ($lines | Select-String -Pattern '^## \[Unreleased\]' | Select-Object -First 1).LineNumber
+          }
+          $body = @()
+          for ($i = $start; $i -lt $lines.Count; $i++) {
+            if ($i -gt $start -and $lines[$i] -match '^## \[') { break }
+            $body += $lines[$i]
+          }
+          $body -join "`n" | Set-Content release-notes.md -Encoding utf8
+          Get-Content release-notes.md | Select-Object -First 5
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: StatLine ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/*.zip
+            dist/*.sha256
+            dist/*.msix
+          fail_on_unmatched_files: true
+
+      - name: Keep artifacts on the run too
+        uses: actions/upload-artifact@v4
         with:
           name: statline-packages
           path: |

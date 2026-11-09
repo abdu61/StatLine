@@ -6,6 +6,12 @@ All notable changes to StatLine are recorded here. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-11-08
+
+First public release.
+
 ### Changed
 
 - The strip no longer does unnecessary work every tick: it re-renders and re-presents
@@ -148,8 +154,6 @@ All notable changes to StatLine are recorded here. The format follows
 
 - The flyout now opens at its final anchored position and grows upward when the process
   table arrives, instead of appearing under the strip or being clipped.
-
-## [0.1.0] - 2026-10-24
 
 ### Added
 

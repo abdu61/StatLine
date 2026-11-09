@@ -55,8 +55,9 @@ using the Windows performance counters and nothing else.
 
 ## Install
 
-Download `StatLine-<version>-x64.zip` from [Releases](../../releases), unpack it anywhere,
-and run `statline.exe`. No installer, no administrator rights, no runtime to install.
+Download `StatLine-<version>-x64.zip` from [Releases](https://github.com/abdu61/StatLine/releases/latest),
+unpack it anywhere, and run `statline.exe`. No installer, no administrator rights, no
+runtime to install.
 
 To start with Windows, enable **Start with Windows** in Settings — it writes a per-user
 `Run` value. Verify or remove it from a console:
