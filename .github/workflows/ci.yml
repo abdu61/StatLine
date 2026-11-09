@@ -36,10 +36,18 @@ jobs:
       - name: Build (release)
         run: cargo build --release
 
-      - name: Licenses
-        uses: EmbarkStudios/cargo-deny-action@v2
+      # Pinned rather than `EmbarkStudios/cargo-deny-action`: that action bundles
+      # its own cargo-deny, and versions before 0.20.x cannot resolve a
+      # workspace-inherited path dependency (`bug[unresolved-workspace-dependency]`
+      # on every internal crate). This is the version the gate is verified against
+      # locally, so CI and a developer run agree.
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
         with:
-          command: check licenses bans sources advisories
+          tool: cargo-deny@0.20.2
+
+      - name: Licences, bans, advisories, sources
+        run: cargo deny check licenses bans sources advisories
 
       - name: Render snapshots
         run: cargo run --release -p statline-app -- --render-snapshots snapshots-out
