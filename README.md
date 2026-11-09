@@ -55,9 +55,18 @@ using the Windows performance counters and nothing else.
 
 ## Install
 
-Download `StatLine-<version>-x64.zip` from [Releases](https://github.com/abdu61/StatLine/releases/latest),
-unpack it anywhere, and run `statline.exe`. No installer, no administrator rights, no
-runtime to install.
+**[Download the latest release](https://github.com/abdu61/StatLine/releases/latest)** —
+`StatLine-<version>-x64.zip`. Unpack it anywhere and run `statline.exe`. No installer, no
+administrator rights, no runtime to install.
+
+Each release publishes a `.sha256` next to the zip, so you can verify the download:
+
+```powershell
+Get-FileHash .\StatLine-0.1.0-x64.zip -Algorithm SHA256
+```
+
+> The binaries are not code-signed yet, so Windows SmartScreen shows "Windows protected
+> your PC" on first run. Choose **More info → Run anyway**, or build it yourself below.
 
 To start with Windows, enable **Start with Windows** in Settings — it writes a per-user
 `Run` value. Verify or remove it from a console:
