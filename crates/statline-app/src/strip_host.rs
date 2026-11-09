@@ -436,6 +436,15 @@ impl Host {
         }
     }
 
+    /// Enable or disable the Wi-Fi SSID query on the sampler.
+    ///
+    /// Windows answers the SSID query with a location consent prompt, so this is
+    /// off until the user asks for it.
+    pub fn set_wifi_details(&mut self, enabled: bool) {
+        self.sampler.set_wifi_details(enabled);
+        self.tick();
+    }
+
     /// Taskbar geometry, re-read only when it can actually have changed.
     ///
     /// `taskbar::primary()` opens `HKCU\...\Explorer\Advanced` to read
@@ -676,6 +685,10 @@ pub fn apply_settings(settings: &Settings, dark: bool) {
         host.surface = None;
     }
 
+    // Wi-Fi details are opt-in: reading the SSID makes Windows ask for location
+    // permission, so the sampler must know before it runs.
+    host.sampler.set_wifi_details(settings.general.wifi_details);
+
     host.sampler.set_interval(Duration::from_millis(
         settings.general.update_interval_ms as u64,
     ));
@@ -772,7 +785,7 @@ fn create_window(height: f32) -> windows::core::Result<(HWND, bool)> {
     Ok((hwnd, parented))
 }
 
-fn host() -> Option<&'static mut Host> {
+pub(crate) fn host() -> Option<&'static mut Host> {
     let pointer = HOST.load(Ordering::Acquire);
     if pointer.is_null() {
         None

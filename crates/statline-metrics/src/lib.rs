@@ -59,6 +59,9 @@ pub struct Sampler {
     averages_initialized: bool,
     /// Set by the UI while a surface that shows processes or sensors is open.
     details_visible: bool,
+    /// Whether to read the Wi-Fi SSID. Off unless the user opted in, because the
+    /// query makes Windows ask for location permission.
+    wifi_details: bool,
     /// `--safe-mode`: only the documented CPU/memory/system counters.
     safe_mode: bool,
 }
@@ -95,6 +98,7 @@ impl Sampler {
             average_15m: 0.0,
             averages_initialized: false,
             details_visible: false,
+            wifi_details: false,
             safe_mode: false,
         }
     }
@@ -145,6 +149,24 @@ impl Sampler {
 
     pub fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    /// Whether the Wi-Fi SSID query is enabled.
+    pub fn wifi_details(&self) -> bool {
+        self.wifi_details
+    }
+
+    /// Enable or disable the Wi-Fi SSID query.
+    ///
+    /// Windows answers `WlanQueryInterface(current_connection)` with a location
+    /// consent prompt, so this stays off until the user asks for it in Settings.
+    pub fn set_wifi_details(&mut self, enabled: bool) {
+        self.wifi_details = enabled;
+        if !enabled {
+            // Drop the cached value so a disabled setting cannot keep showing an
+            // SSID the user asked to stop reading.
+            self.wifi = None;
+        }
     }
 
     /// Take one reading of everything v1 measures.
@@ -258,7 +280,12 @@ impl Sampler {
         if stale || self.interfaces.is_empty() {
             self.interfaces = metrics::net::interfaces();
             self.interfaces_at = Some(now);
-            self.wifi = self.details_visible.then(metrics::net::wifi).flatten();
+            // The SSID query is what makes Windows ask for location permission,
+            // so it runs only when the user opted in and a detail surface is
+            // open — never in the background.
+            self.wifi = (self.wifi_details && self.details_visible)
+                .then(metrics::net::wifi)
+                .flatten();
         }
 
         let counters = self

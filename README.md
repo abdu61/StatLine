@@ -35,8 +35,10 @@ using the Windows performance counters and nothing else.
 - **Companion window** — a normal resizable window with a page per module and a
   remembered position.
 - **Sensors without a driver** — ACPI thermal zone, drive temperature, battery health and
-  cycle count, Wi-Fi SSID and signal, and GPU telemetry via NVML or ADL when the driver
-  exposes it. Anything unavailable is hidden, never faked.
+  cycle count, and GPU telemetry via NVML or ADL when the driver exposes it. Wi-Fi name
+  and signal are **off by default**: reading the SSID makes Windows ask for location
+  permission, so it is opt-in in Settings and explained there first. Anything unavailable
+  is hidden, never faked.
 - **Per-app detail** — CPU and GPU share per process, grouped by executable. Sampling runs
   only while a surface that shows it is open.
 - **Yours to configure** — theme, seven accent colours, interval, binary or decimal units,
@@ -55,9 +57,14 @@ using the Windows performance counters and nothing else.
 
 ## Install
 
-**[Download the latest release](https://github.com/abdu61/StatLine/releases/latest)** —
-`StatLine-<version>-x64.zip`. Unpack it anywhere and run `statline.exe`. No installer, no
-administrator rights, no runtime to install.
+<p>
+  <a href="https://github.com/abdu61/StatLine/releases/latest/download/StatLine-0.1.0-x64.zip">
+    <img src="https://img.shields.io/badge/Download-StatLine%200.1.0%20for%20Windows%2011-2ea043?style=for-the-badge&logo=windows11&logoColor=white" alt="Download StatLine for Windows 11">
+  </a>
+</p>
+
+Unpack the zip anywhere and run `statline.exe`. No installer, no administrator rights, no
+runtime to install.
 
 Each release publishes a `.sha256` next to the zip, so you can verify the download:
 
@@ -65,8 +72,10 @@ Each release publishes a `.sha256` next to the zip, so you can verify the downlo
 Get-FileHash .\StatLine-0.1.0-x64.zip -Algorithm SHA256
 ```
 
-> The binaries are not code-signed yet, so Windows SmartScreen shows "Windows protected
-> your PC" on first run. Choose **More info → Run anyway**, or build it yourself below.
+> **Two things to expect on first run.** The binaries are not code-signed yet, so Windows
+> SmartScreen shows "Windows protected your PC" — choose **More info → Run anyway**, or
+> build it yourself below. And the app asks for nothing: it runs as a standard user and
+> never requests elevation.
 
 To start with Windows, enable **Start with Windows** in Settings — it writes a per-user
 `Run` value. Verify or remove it from a console:
@@ -102,9 +111,10 @@ elevated helper.
 
 | | |
 |---|---|
-| **Reads** | Performance counters, PDH, DXGI, storage and battery IOCTLs, WLAN SSID, SMBIOS, and read-only registry (theme, CPU name, Windows build) |
+| **Reads** | Performance counters, PDH, DXGI, storage and battery IOCTLs, SMBIOS, and read-only registry (theme, CPU name, Windows build) |
 | **Writes** | `%APPDATA%\StatLine` (settings), `%LOCALAPPDATA%\StatLine\logs`, and an optional per-user `Run` value |
 | **Never** | Admin/UAC, network, telemetry, drivers or services, clipboard, input, screen or document access |
+| **Location** | Only if you turn on Wi-Fi details. Windows gates the network name behind a location permission prompt; with it off — the default — the app never asks and never reads the SSID |
 
 The full read/write table is in [`docs/ACCESS.md`](docs/ACCESS.md); the policy is in
 [`PRIVACY.md`](PRIVACY.md).

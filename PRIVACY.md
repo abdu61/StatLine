@@ -22,6 +22,9 @@ Only on your computer:
 - `%LOCALAPPDATA%\StatLine\logs\statline.log*` — operational logs (rotating)
 - `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\StatLine` — only if you enable
   "Start with Windows"
+- `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\...` — written by
+  **Windows**, not by StatLine, only if you turn on Wi-Fi details and answer the location
+  prompt. It records that you were asked.
 
 No data leaves the device. There is no crash reporting service; a panic is written to
 the local log only.
@@ -36,9 +39,18 @@ are not contacted over the network by StatLine.
 ## Permissions
 
 StatLine runs as a standard user with medium integrity. It never requests elevation and
-installs no driver or service. The MSIX package declares only `runFullTrust` and a
-disabled-by-default startup task. See [`ACCESS.md`](docs/ACCESS.md) for the full
-read/write table.
+installs no driver or service. The executable embeds an `asInvoker` manifest so Windows
+cannot apply its installer-detection heuristic and demand administrator rights.
+
+**Wi-Fi name and signal are off by default.** Windows exposes the SSID only through an API
+it treats as a location request, so the first read raises the system prompt *"Let StatLine
+use your location?"*. StatLine does not use GPS, cell triangulation or the Windows location
+API, and with the setting off it never calls that API and never triggers the prompt. Turn
+it on in Settings if you want the network name; turn it off again and the cached value is
+discarded.
+
+The MSIX package declares only `runFullTrust` and a disabled-by-default startup task. See
+[`ACCESS.md`](docs/ACCESS.md) for the full read/write table.
 
 ## Children
 

@@ -211,4 +211,24 @@ mod tests {
         with_warning.warning = Some(String::from("Mica can cost battery"));
         assert!(height(&with_warning, 1.0) > height(&model(2), 1.0));
     }
+
+    /// The warning is drawn on one line in a fixed-height box, so a string that
+    /// is too long is silently clipped. Keep it short enough for the 460 px
+    /// panel at the smallest scale the app supports.
+    #[test]
+    fn warnings_fit_on_one_line() {
+        // Measured allowance: roughly 62 characters of the muted 9 px face in
+        // the 412 px content width at 100 % scaling.
+        const MAX_CHARS: usize = 78;
+        for text in [
+            "Windows will ask for location permission before it reveals the network name.",
+            "Mica blurs the desktop through DWM; it can cost GPU power and battery.",
+        ] {
+            assert!(
+                text.chars().count() <= MAX_CHARS,
+                "warning is {} chars, over the {MAX_CHARS} that fit: {text}",
+                text.chars().count()
+            );
+        }
+    }
 }

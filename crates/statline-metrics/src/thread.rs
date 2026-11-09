@@ -16,6 +16,9 @@ struct Control {
     stopping: bool,
     paused: bool,
     safe_mode: bool,
+    /// Read the Wi-Fi SSID. Off unless the user opted in: the query makes
+    /// Windows show a location consent prompt.
+    wifi_details: bool,
 }
 
 /// Handle to the running sampler. Dropping it stops the thread.
@@ -35,6 +38,7 @@ impl SamplerThread {
                 stopping: false,
                 paused: false,
                 safe_mode: false,
+                wifi_details: false,
             }),
             Condvar::new(),
         ));
@@ -87,6 +91,18 @@ impl SamplerThread {
         cvar.notify_all();
     }
 
+    /// Enable or disable the Wi-Fi SSID query.
+    ///
+    /// Off by default. `WlanQueryInterface(current_connection)` makes Windows
+    /// show its location consent prompt, which a system monitor should never
+    /// trigger without being asked.
+    pub fn set_wifi_details(&self, enabled: bool) {
+        let (lock, cvar) = &*self.control;
+        let mut control = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        control.wifi_details = enabled;
+        cvar.notify_all();
+    }
+
     /// Pause or resume sampling. The last snapshot stays readable.
     ///
     /// While paused the thread waits on the same condition variable, so a paused
@@ -132,10 +148,16 @@ fn run(
             let state = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             if state.safe_mode != sampler.safe_mode() {
                 let enabled = state.safe_mode;
-                drop(state);
                 sampler.set_safe_mode(enabled);
                 if enabled {
                     log::info!("sampler in safe mode");
+                }
+            }
+            if state.wifi_details != sampler.wifi_details() {
+                let enabled = state.wifi_details;
+                sampler.set_wifi_details(enabled);
+                if enabled {
+                    log::info!("wifi details on; Windows may ask for location permission");
                 }
             }
         }

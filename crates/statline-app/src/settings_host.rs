@@ -132,11 +132,13 @@ fn cycle_setting(settings: &mut Settings, index: usize) -> bool {
         // the registry write happened.
         8 => settings.general.run_at_startup = !settings.general.run_at_startup,
         9 => settings.modules.order.rotate(),
-        10 => settings.modules.cpu = !settings.modules.cpu,
-        11 => settings.modules.memory = !settings.modules.memory,
-        12 => settings.modules.gpu = !settings.modules.gpu,
-        13 => settings.modules.disk = !settings.modules.disk,
-        14 => settings.modules.network = !settings.modules.network,
+        // Also owned by the caller: it must reach the sampler as well.
+        10 => settings.general.wifi_details = !settings.general.wifi_details,
+        11 => settings.modules.cpu = !settings.modules.cpu,
+        12 => settings.modules.memory = !settings.modules.memory,
+        13 => settings.modules.gpu = !settings.modules.gpu,
+        14 => settings.modules.disk = !settings.modules.disk,
+        15 => settings.modules.network = !settings.modules.network,
         _ => return false,
     }
     true
@@ -194,6 +196,10 @@ fn build_model(settings: &Settings) -> settings::Model {
                 }),
             },
             settings::Row {
+                label: "Wi-Fi name & signal",
+                value: on_off(settings.general.wifi_details),
+            },
+            settings::Row {
                 label: "Strip order",
                 value: settings.modules.order.normalized().describe(),
             },
@@ -218,7 +224,13 @@ fn build_model(settings: &Settings) -> settings::Model {
                 value: on_off(settings.modules.network),
             },
         ],
-        warning: if settings.appearance.mica {
+        warning: if settings.general.wifi_details {
+            // The only setting that triggers an operating-system prompt, so it
+            // has to fit one line and say the consequence before it happens.
+            Some(String::from(
+                "Windows will ask for location permission before it reveals the network name.",
+            ))
+        } else if settings.appearance.mica {
             Some(String::from(
                 "Mica blurs the desktop through DWM; it can cost GPU power and battery.",
             ))
@@ -248,20 +260,33 @@ impl SettingsWindow {
     }
 
     fn cycle(&mut self, index: usize) -> bool {
-        // The startup entry is the one setting that can fail (a denied registry
-        // write), so it stays here; every other row lives in `cycle_setting`.
-        if index == 8 {
-            let enabled = !self.settings.general.run_at_startup;
-            return match autostart::set_enabled(enabled) {
-                Ok(()) => {
-                    self.settings.general.run_at_startup = enabled;
-                    true
+        // Two rows need code beyond "flip a value": the startup entry can fail
+        // (a denied registry write), and Wi-Fi needs its sampler gate updated.
+        // Both still have an arm in `cycle_setting` so the row-alignment test
+        // sees them.
+        match index {
+            8 => {
+                let enabled = !self.settings.general.run_at_startup;
+                return match autostart::set_enabled(enabled) {
+                    Ok(()) => {
+                        self.settings.general.run_at_startup = enabled;
+                        true
+                    }
+                    Err(error) => {
+                        log::warn!("could not change the startup entry: {error}");
+                        false
+                    }
+                };
+            }
+            10 => {
+                let enabled = !self.settings.general.wifi_details;
+                self.settings.general.wifi_details = enabled;
+                if let Some(host) = strip_host::host() {
+                    host.set_wifi_details(enabled);
                 }
-                Err(error) => {
-                    log::warn!("could not change the startup entry: {error}");
-                    false
-                }
-            };
+                return true;
+            }
+            _ => {}
         }
         cycle_setting(&mut self.settings, index)
     }

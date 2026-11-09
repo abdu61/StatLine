@@ -79,9 +79,14 @@ jobs:
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
           .\scripts\package.ps1 -Version $version
 
-      - name: MSIX (unsigned)
+      - name: MSIX (unsigned, not published)
         shell: powershell
         run: |
+          # Kept as a build check, but not attached to the release: an unsigned
+          # MSIX cannot be installed by an end user at all. `Add-AppxPackage`
+          # fails with 0x800B010A ("publisher certificate could not be verified")
+          # until the package is signed with a certificate the machine trusts.
+          # Shipping it next to the zip only produces support requests.
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
           .\scripts\build-msix.ps1 -Version $version
 
@@ -114,7 +119,6 @@ jobs:
           files: |
             dist/*.zip
             dist/*.sha256
-            dist/*.msix
           fail_on_unmatched_files: true
 
       - name: Keep artifacts on the run too

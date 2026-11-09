@@ -546,6 +546,10 @@ pub fn run(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
                     value: String::from("Off"),
                 },
                 settings_ui::Row {
+                    label: "Wi-Fi name & signal",
+                    value: String::from("Off"),
+                },
+                settings_ui::Row {
                     label: "Strip order",
                     value: String::from(
                         "Network \u{00b7} CPU \u{00b7} Memory \u{00b7} GPU \u{00b7} Disk",

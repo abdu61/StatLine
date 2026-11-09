@@ -20,7 +20,7 @@ driver or service, or opens a network connection.
 | Drive temperature | Disk volume rows | `IOCTL_STORAGE_QUERY_PROPERTY` on the volume/disk |
 | Drive model and bus type | Disk page | `IOCTL_STORAGE_QUERY_PROPERTY` (`StorageDeviceProperty`) on `\\.\PhysicalDriveN`, zero-access handle |
 | Battery charge, health, temperature, cycles | Battery card | `GetSystemPowerStatus`, `CallNtPowerInformation`, `IOCTL_BATTERY_QUERY_INFORMATION` |
-| Wi-Fi SSID and signal | Network page | `wlanapi` (only while a detail surface is open) |
+| Wi-Fi SSID and signal | Network page, **off by default** | `wlanapi` — see the location note below |
 | GPU temperature/fan/power/clocks | GPU page | `nvml.dll` (NVIDIA) or `atiadlxx.dll` (AMD), loaded at runtime if present |
 | Theme, accent, CPU name, base clock, Windows build, computer name | Appearance and About | read-only registry (`HKCU`/`HKLM`) |
 | Installed memory modules: slot, size, DDR generation, speed | System page | `GetSystemFirmwareTable('RSMB')` (SMBIOS type 17, read once at first sample) |
@@ -37,6 +37,23 @@ Registry keys read:
 
 StatLine reads **metadata**, never document contents, browser history, clipboard,
 keystrokes, or screen pixels.
+
+## Location, and why Wi-Fi is opt-in
+
+Windows exposes the Wi-Fi network name only through `WlanQueryInterface` with
+`wlan_intf_opcode_current_connection`, and it treats that as a **location request**: the
+first call raises the system prompt *"Let StatLine use your location?"*.
+
+A new system monitor asking for location on first launch is how you get uninstalled, so:
+
+- The write is **off by default** (`general.wifi_details` in `settings.json`).
+- The Settings row says what will happen *before* you click it, and the warning sits under
+  the row while the setting is on.
+- Turning it off clears the cached SSID immediately.
+- With it off, `WlanQueryInterface` is never called — the location prompt never appears.
+
+StatLine does not use GPS, cell triangulation or the Windows location API. It reads the
+name of the network you are already connected to, and nothing else.
 
 ## Writes
 

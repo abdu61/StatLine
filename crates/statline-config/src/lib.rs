@@ -133,6 +133,14 @@ pub struct General {
     pub strip_placement: StripPlacement,
     /// Byte units: 1024-based (KiB) or 1000-based (kB).
     pub units: Units,
+    /// Show the Wi-Fi network name and signal strength.
+    ///
+    /// Off by default, and deliberately so: reading the SSID goes through
+    /// `WlanQueryInterface`, which Windows treats as a location request and
+    /// answers with the system "let this app use your location?" prompt. A
+    /// system monitor asking for location on first launch is exactly how you
+    /// lose a new user, so it is opt-in and explained before it happens.
+    pub wifi_details: bool,
 }
 
 impl Default for General {
@@ -142,6 +150,7 @@ impl Default for General {
             run_at_startup: false,
             strip_placement: StripPlacement::Right,
             units: Units::Binary,
+            wifi_details: false,
         }
     }
 }
