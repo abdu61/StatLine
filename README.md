@@ -12,6 +12,7 @@ CPU, memory, GPU, disk and network in a 240-pixel strip. Native Rust, no Electro
 [![Platform](https://img.shields.io/badge/platform-Windows%2011%20x64-0078D4)](https://www.microsoft.com/windows/windows-11)
 [![Licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 [![Telemetry](https://img.shields.io/badge/telemetry-none-brightgreen)](PRIVACY.md)
+[![Install](https://img.shields.io/badge/install-download%20%26%20setup-2ea043?logo=windows11&logoColor=white)](#install)
 
 </div>
 
